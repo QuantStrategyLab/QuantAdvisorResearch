@@ -131,6 +131,94 @@ def load_ai_signal(path: str | Path | None) -> dict[str, Any] | None:
     return payload
 
 
+
+def load_theme_momentum(path: str | Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    with Path(path).open(encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if payload.get("mode") != "theme_momentum_snapshot":
+        raise ValueError("Theme momentum input must remain mode=theme_momentum_snapshot.")
+    if payload.get("policy", {}).get("execution_allowed") is not False:
+        raise ValueError("Theme momentum input must not allow execution.")
+    return payload
+
+
+def summarize_theme_momentum(payload: dict[str, Any] | None, *, max_themes: int = 5) -> dict[str, Any]:
+    if not payload:
+        return {"available": False, "top_themes": [], "data_quality": {}}
+    top_themes: list[dict[str, Any]] = []
+    for theme in list(payload.get("theme_ranks", []))[:max_themes]:
+        if not isinstance(theme, dict):
+            continue
+        top_symbols = []
+        for item in list(theme.get("top_symbols", []))[:5]:
+            if isinstance(item, dict) and item.get("symbol"):
+                top_symbols.append(str(item["symbol"]).upper())
+        top_themes.append(
+            {
+                "rank": theme.get("rank"),
+                "theme_id": theme.get("theme_id", ""),
+                "theme_name": theme.get("theme_name", ""),
+                "sector": theme.get("sector", ""),
+                "momentum_score": theme.get("momentum_score"),
+                "breadth_3m": theme.get("breadth_3m"),
+                "top_symbols": top_symbols,
+            }
+        )
+    return {
+        "available": True,
+        "as_of": payload.get("as_of", ""),
+        "taxonomy_version": payload.get("taxonomy_version", ""),
+        "top_themes": top_themes,
+        "data_quality": payload.get("data_quality", {}),
+        "policy": {
+            "execution_allowed": False,
+            "theme_rank_is_research_context_only": True,
+        },
+    }
+
+
+def normalize_ai_mapping(mapping: Any) -> dict[str, Any]:
+    if not isinstance(mapping, dict):
+        return {}
+    return {str(key).upper(): value for key, value in mapping.items()}
+
+
+def aggregate_theme_bias(values: list[str]) -> str | None:
+    if not values:
+        return None
+    if "avoid" in values:
+        return "avoid"
+    if "negative" in values:
+        return "negative"
+    if "positive" in values:
+        return "positive"
+    if "watch" in values:
+        return "watch"
+    if "neutral" in values:
+        return "neutral"
+    return None
+
+
+def resolve_ai_bias(symbol: str, ai_signal: dict[str, Any] | None) -> tuple[str | None, list[str]]:
+    if not ai_signal:
+        return None, []
+    normalized_symbol = symbol.upper()
+    explicit_bias = normalize_ai_mapping(ai_signal.get("research_bias") or ai_signal.get("candidate_bias", {}))
+    if normalized_symbol in explicit_bias:
+        return str(explicit_bias[normalized_symbol]), []
+
+    theme_bias = {str(theme): str(bias) for theme, bias in dict(ai_signal.get("theme_bias") or {}).items()}
+    raw_exposure = normalize_ai_mapping(ai_signal.get("symbol_theme_exposure") or {})
+    theme_ids = raw_exposure.get(normalized_symbol, [])
+    if isinstance(theme_ids, str):
+        theme_ids = [theme_ids]
+    if not isinstance(theme_ids, list):
+        return None, []
+    matched_biases = [theme_bias[theme_id] for theme_id in theme_ids if theme_id in theme_bias]
+    return aggregate_theme_bias(matched_biases), [theme_id for theme_id in theme_ids if theme_id in theme_bias]
+
 def freshness_bonus(event_date: dt.date, as_of: dt.date) -> int:
     age_days = (as_of - event_date).days
     if age_days <= 7:
@@ -215,8 +303,7 @@ def build_recommendation(
     ai_signal: dict[str, Any] | None,
     as_of: dt.date,
 ) -> dict[str, Any]:
-    ai_bias_map = (ai_signal.get("research_bias") or ai_signal.get("candidate_bias", {})) if ai_signal else {}
-    ai_bias = ai_bias_map.get(symbol)
+    ai_bias, ai_bias_source_themes = resolve_ai_bias(symbol, ai_signal)
     ai_confidence = float(ai_signal.get("confidence", 0.0)) if ai_signal else 0.0
     ai_regime = ai_signal.get("regime") if ai_signal else "unknown"
 
@@ -294,7 +381,12 @@ def build_recommendation(
         event_names = ", ".join(sorted({event.event_type for event in events}))
         reasons.append(f"Observed event evidence: {event_names}.")
     if ai_bias:
-        reasons.append(f"AI shadow bias is {ai_bias} with regime={ai_regime}.")
+        if ai_bias_source_themes:
+            reasons.append(
+                f"AI shadow theme bias is {ai_bias} with regime={ai_regime}; themes={', '.join(ai_bias_source_themes)}."
+            )
+        else:
+            reasons.append(f"AI shadow bias is {ai_bias} with regime={ai_regime}.")
     if not reasons:
         reasons.append("No strong point-in-time evidence yet; keep as context only.")
 
@@ -359,6 +451,7 @@ def build_advisory_report(
     political_events_path: str | Path,
     political_watchlist_path: str | Path,
     ai_signal_path: str | Path | None = None,
+    theme_momentum_path: str | Path | None = None,
     max_candidates: int = 12,
 ) -> dict[str, Any]:
     if cadence not in ALLOWED_CADENCES:
@@ -367,10 +460,13 @@ def build_advisory_report(
     watchlist = load_watchlist(political_watchlist_path)
     events = load_events(political_events_path, as_of_date)
     ai_signal = load_ai_signal(ai_signal_path)
+    theme_momentum = load_theme_momentum(theme_momentum_path)
+    theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
         political_events_path,
         political_watchlist_path,
         ai_signal_path,
+        theme_momentum_path,
     )
 
     events_by_symbol: dict[str, list[Event]] = defaultdict(list)
@@ -407,6 +503,7 @@ def build_advisory_report(
             "political_events": str(political_events_path),
             "political_watchlist": str(political_watchlist_path),
             "ai_signal": str(ai_signal_path) if ai_signal_path else "",
+            "theme_momentum": str(theme_momentum_path) if theme_momentum_path else "",
         },
         "summary": {
             "recommendation_count": len(recommendations),
@@ -415,10 +512,13 @@ def build_advisory_report(
             "ai_confidence": ai_signal.get("confidence", 0.0) if ai_signal else 0.0,
             "source_mode": source_mode,
             "data_quality_warnings": data_quality_warnings,
+            "theme_momentum_available": theme_momentum_summary["available"],
+            "top_theme_ids": [theme["theme_id"] for theme in theme_momentum_summary["top_themes"]],
             "top_recommended_symbols": [rec["symbol"] for rec in recommendations if rec["recommendation_tier"] == "tier_1"][:5],
             "review_note": "Non-personalized model recommendations. No order, target quantity, account suitability, or portfolio allocation is encoded.",
         },
         "recommendations": recommendations,
+        "theme_momentum": theme_momentum_summary,
         "policy": {
             "non_personalized_recommendations_allowed": True,
             "execution_allowed": False,
@@ -449,9 +549,25 @@ def render_markdown(report: dict[str, Any]) -> str:
         "- Non-personalized recommendations allowed: `true`",
         "- Account-specific advice allowed: `false`",
         "",
+    ]
+    theme_momentum = report.get("theme_momentum", {})
+    if theme_momentum.get("available"):
+        lines.extend(["## 主题动量", ""] )
+        lines.append(f"- Snapshot as of: `{theme_momentum.get('as_of', '')}`")
+        lines.append(f"- Taxonomy version: `{theme_momentum.get('taxonomy_version', '')}`")
+        lines.append("- 注意: 主题动量只用于研究排序和候选展示，不直接改变推荐评级。")
+        lines.append("")
+        for theme in theme_momentum.get("top_themes", []):
+            symbols = ", ".join(theme.get("top_symbols", [])) or "None"
+            lines.append(
+                f"- #{theme.get('rank')} `{theme.get('theme_id')}` "
+                f"score=`{theme.get('momentum_score')}` breadth_3m=`{theme.get('breadth_3m')}` top_symbols={symbols}"
+            )
+        lines.append("")
+    lines.extend([
         "## 推荐列表",
         "",
-    ]
+    ])
     for rec in report["recommendations"]:
         lines.extend(
             [
@@ -502,6 +618,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--political-events", required=True, help="Political event CSV.")
     parser.add_argument("--political-watchlist", required=True, help="Political watchlist CSV.")
     parser.add_argument("--ai-signal", help="Saved AI shadow signal JSON.")
+    parser.add_argument("--theme-momentum", help="Saved theme momentum snapshot JSON.")
     parser.add_argument("--max-items", "--max-candidates", dest="max_candidates", type=int, default=12)
     parser.add_argument("--output-json", required=True, help="Output JSON artifact path.")
     parser.add_argument("--output-md", required=True, help="Output Markdown report path.")
@@ -517,6 +634,7 @@ def main(argv: list[str] | None = None) -> None:
         political_events_path=args.political_events,
         political_watchlist_path=args.political_watchlist,
         ai_signal_path=args.ai_signal,
+        theme_momentum_path=args.theme_momentum,
         max_candidates=args.max_candidates,
     )
     write_json(args.output_json, report)

@@ -215,3 +215,111 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
     assert manifest["producer"]["git_sha"] == "abcdef1234567890"
     assert manifest["artifacts"]["json"]["sha256"]
     assert manifest["artifacts"]["markdown"]["sha256"]
+
+
+def test_theme_bias_can_lift_static_watchlist_item_without_direct_symbol_bias(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.csv"
+    events_path.write_text(
+        "event_id,event_date,symbol,event_type,direction,confidence,source_url,notes\n",
+        encoding="utf-8",
+    )
+    watchlist_path = tmp_path / "watchlist.csv"
+    watchlist_path.write_text(
+        "\n".join(
+            [
+                "symbol,name,bucket,research_status,thesis,source_url",
+                "MU,Micron Technology,policy_capital,watchlist,HBM and memory-cycle watch,https://example.invalid/mu",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    ai_signal_path = tmp_path / "ai_signal.json"
+    ai_signal_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "as_of": "2026-05-30",
+                "generated_at": "2026-05-30T00:00:00Z",
+                "mode": "shadow",
+                "horizon": "1-3 years",
+                "universe": ["MU"],
+                "regime": "neutral",
+                "risk_flags": [],
+                "candidate_bias": {},
+                "theme_bias": {"hbm_memory": "positive"},
+                "symbol_theme_exposure": {"MU": ["hbm_memory"]},
+                "confidence": 0.6,
+                "evidence": {
+                    "sources": ["theme-test"],
+                    "summary": "Synthetic theme context.",
+                    "data_gaps": [],
+                },
+                "expires_at": "2026-06-30",
+                "policy": {
+                    "execution_allowed": False,
+                    "downstream_use": "Research-only shadow context.",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=events_path,
+        political_watchlist_path=watchlist_path,
+        ai_signal_path=ai_signal_path,
+    )
+
+    rec = report["recommendations"][0]
+    assert rec["symbol"] == "MU"
+    assert rec["rating"] == "watch"
+    assert rec["evidence_score"] > 4
+    assert any("themes=hbm_memory" in reason for reason in rec["reasons"])
+
+
+def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.csv"
+    events_path.write_text(
+        "event_id,event_date,symbol,event_type,direction,confidence,source_url,notes\n",
+        encoding="utf-8",
+    )
+    watchlist_path = tmp_path / "watchlist.csv"
+    watchlist_path.write_text(
+        "\n".join(
+            [
+                "symbol,name,bucket,research_status,thesis,source_url",
+                "MU,Micron Technology,policy_capital,watchlist,HBM and memory-cycle watch,https://example.invalid/mu",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    theme_momentum_path = ROOT / "examples/theme_momentum_snapshot.example.json"
+
+    report_without_theme = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=events_path,
+        political_watchlist_path=watchlist_path,
+    )
+    report_with_theme = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=events_path,
+        political_watchlist_path=watchlist_path,
+        theme_momentum_path=theme_momentum_path,
+    )
+
+    assert report_with_theme["summary"]["top_theme_ids"][:1] == ["hbm_memory"]
+    assert report_with_theme["theme_momentum"]["top_themes"][0]["theme_id"] == "hbm_memory"
+    assert report_with_theme["theme_momentum"]["top_themes"][0]["top_symbols"][:1] == ["MU"]
+    assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
+    assert report_with_theme["recommendations"][0]["score"] == report_without_theme["recommendations"][0]["score"]
+
+    markdown = render_markdown(report_with_theme)
+    assert "## 主题动量" in markdown
+    assert "hbm_memory" in markdown

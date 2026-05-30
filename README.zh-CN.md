@@ -130,3 +130,23 @@ gh workflow run "Publish Model Recommendations Site" \
 
 通知格式设计见 [docs/notification_format.zh-CN.md](docs/notification_format.zh-CN.md)。
 数据源和因子完善路线见 [docs/data_factor_roadmap.zh-CN.md](docs/data_factor_roadmap.zh-CN.md)。
+
+## 主题动量展示
+
+`build_advisory_report.py` 支持可选的主题动量快照输入：
+
+```bash
+python scripts/build_advisory_report.py \
+  --as-of 2026-05-30 \
+  --cadence weekly \
+  --political-events examples/political_events.example.csv \
+  --political-watchlist examples/political_watchlist.example.csv \
+  --ai-signal examples/ai_long_horizon_signal.example.json \
+  --theme-momentum examples/theme_momentum_snapshot.example.json \
+  --output-json data/output/advisory_report.example.json \
+  --output-md data/output/advisory_report.example.md
+```
+
+主题动量只展示强主题和主题内候选，不直接改变推荐评级、分数、仓位或执行状态。线上 workflow 如果找不到 `data/output/theme_momentum_snapshot.json`，会自动跳过这个展示区块。
+
+Yahoo chart 下载只作为临时 fallback。不要把随机免费代理 IP 池作为稳定生产方案；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。

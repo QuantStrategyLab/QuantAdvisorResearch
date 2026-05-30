@@ -17,8 +17,6 @@
 
 - 官方/半结构化记录：`official_records.csv`，支持政府、发行人、主社媒、财经媒体 lead。
 - RSS/Atom：`fetch_rss_sources.py`，可拉取 SEC 等公开 feed。
-- X recent search：`fetch_x_recent_search.py`，需要 `X_BEARER_TOKEN`。
-- Truth Social：`import_truthsocial_export.py`，当前走导出或合规采集后的 JSON。
 - 原始文本抽取：`extract_source_mentions.py`，通过 alias map 抽取 ticker 相关事件。
 - 事件研究：`run_event_study.py`，用本地日收盘价做小窗口事件回测。
 
@@ -31,9 +29,11 @@
 
 当前来源置信度：
 
-- `high`：政府、官方披露、发行人等主来源。
-- `medium`：可复核主社媒或一手社媒导出。
+- `high`：政府、官方披露、SEC/EDGAR、发行人等主来源。
+- `medium`：发行人材料或可复核的一手资料。
 - `low`：财经媒体 lead，必须先核验主来源。
+
+稳定版暂不包含 X / Truth Social / Longbridge 登录态或社区采集；这些来源只能在未来有稳定官方接口、清晰合规边界和可回放 artifact 后再评估。
 
 ### AiLongHorizonSignalPipelines
 
@@ -157,6 +157,8 @@ Crypto 可作为跨资产风险情绪参考，但暂时不应混入 US equity �
 - confidence：只作为背景强弱，不作为直接下单信号。
 - risk_flags：波动、流动性、盈利集中、宏观冲击。
 - candidate bias：用于解释候选标的的长周期背景。
+- theme bias：用于表达跨板块长期主题背景，例如 AI compute、HBM、国防、能源、医疗政策、金融基础设施等。
+- symbol theme exposure：由静态 taxonomy 决定，不能因为近期热门表现临时加入或改权重。
 - model/version/source：必须可审计，保留历史 artifact。
 
 ## 低风险实施顺序
@@ -201,3 +203,31 @@ Crypto 可作为跨资产风险情绪参考，但暂时不应混入 US equity �
 - 人工复核清单：任何一级推荐必须能追溯到来源、事件、AI context 和风险说明。
 
 短期真正要补的是源和复核数据，不是把自动交易仓库接进来。等真实数据积累后，再决定哪些新闻/政策因子值得转成可回测的独立策略。
+
+## 防过拟合主题设计
+
+长期有效的投顾研究不应该只追逐 AI 热点。建议把主题分成静态 taxonomy，并在 `AiLongHorizonSignalPipelines` 维护：
+
+```text
+config/theme_taxonomy.csv
+config/symbol_theme_exposure.csv
+```
+
+第一版跨板块覆盖：
+
+- AI compute / HBM / foundry / AI server
+- 数据中心电力、清洁电网、核电可选项
+- 网络安全
+- 国防航天
+- 能源安全
+- 金融和市场基础设施
+- 医疗政策
+- 消费平台、工业自动化、crypto 基础设施、EV/汽车
+
+防过拟合规则：
+
+1. theme membership 先固定，再观察后续表现。
+2. AI 只能输出 `theme_bias` 和 shadow context，不能输出目标仓位。
+3. Advisor 可以把主题 bias 作为解释和轻量加分，但一级推荐仍需要事件证据和来源质量支撑。
+4. 每次规则、taxonomy、universe 变更都要记录版本，后续 walk-forward 只能 replay 已保存 artifact。
+5. 不因为 MU、INTC、DELL 或任何短期热门标的临时调权重；如果它们长期有 SEC/IR/政策/需求证据，会通过固定规则自然上升。

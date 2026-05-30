@@ -1,0 +1,68 @@
+{
+  "schema_version": "1",
+  "as_of": "2026-05-30",
+  "generated_at": "2026-05-30T00:00:00Z",
+  "mode": "theme_momentum_snapshot",
+  "taxonomy_version": "2026-05-31-core-themes-v1",
+  "methodology": {
+    "windows": {
+      "return_12_1m": {"lookback_trading_days": 252, "skip_recent_trading_days": 21, "weight": 0.4},
+      "return_6_1m": {"lookback_trading_days": 126, "skip_recent_trading_days": 21, "weight": 0.35},
+      "return_3m": {"lookback_trading_days": 63, "skip_recent_trading_days": 0, "weight": 0.25}
+    },
+    "theme_membership_source": "static versioned symbol_theme_exposure.csv"
+  },
+  "summary": {
+    "ranked_theme_count": 2,
+    "priced_symbol_count": 4,
+    "top_theme_ids": ["hbm_memory", "ai_server_infrastructure"]
+  },
+  "theme_ranks": [
+    {
+      "theme_id": "hbm_memory",
+      "theme_name": "HBM and memory cycle",
+      "sector": "technology",
+      "horizon": "6-24 months",
+      "rank": 1,
+      "momentum_score": 0.82,
+      "breadth_3m": 1.0,
+      "component_count": 2,
+      "priced_symbol_count": 2,
+      "returns": {"3m": 0.24, "6_1m": 0.31, "12_1m": 0.45},
+      "risk": {"realized_vol_63d": 0.28, "drawdown_126d": -0.08},
+      "top_symbols": [
+        {"symbol": "MU", "momentum_score": 0.88, "return_3m": 0.28, "return_6_1m": 0.34, "return_12_1m": 0.52},
+        {"symbol": "NVDA", "momentum_score": 0.76, "return_3m": 0.2, "return_6_1m": 0.28, "return_12_1m": 0.38}
+      ],
+      "source_policy": "Require issuer filings, earnings transcripts, capex plans, and supply-chain primary evidence."
+    },
+    {
+      "theme_id": "ai_server_infrastructure",
+      "theme_name": "AI server and data-center hardware",
+      "sector": "technology",
+      "horizon": "6-24 months",
+      "rank": 2,
+      "momentum_score": 0.65,
+      "breadth_3m": 1.0,
+      "component_count": 2,
+      "priced_symbol_count": 2,
+      "returns": {"3m": 0.18, "6_1m": 0.24, "12_1m": 0.36},
+      "risk": {"realized_vol_63d": 0.32, "drawdown_126d": -0.12},
+      "top_symbols": [
+        {"symbol": "DELL", "momentum_score": 0.7, "return_3m": 0.2, "return_6_1m": 0.25, "return_12_1m": 0.39},
+        {"symbol": "VRT", "momentum_score": 0.6, "return_3m": 0.16, "return_6_1m": 0.23, "return_12_1m": 0.33}
+      ],
+      "source_policy": "Require issuer releases, filings, customer demand evidence, or confirmed procurement data."
+    }
+  ],
+  "data_quality": {
+    "missing_price_symbols": [],
+    "unranked_themes": []
+  },
+  "policy": {
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "theme_rank_is_research_context_only": true,
+    "downstream_use": "Theme momentum snapshot for research ranking and replay only; do not route to broker execution."
+  }
+}

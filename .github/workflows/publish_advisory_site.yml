@@ -27,6 +27,11 @@ on:
         required: false
         default: "data/output/latest_signal.json"
         type: string
+      theme_momentum_path:
+        description: "Optional path inside AiLongHorizonSignalPipelines. Empty disables theme momentum context."
+        required: false
+        default: "data/output/theme_momentum_snapshot.json"
+        type: string
   schedule:
     - cron: "0 13 * * 6"
 
@@ -70,16 +75,22 @@ jobs:
           POLITICAL_EVENTS_PATH: ${{ github.event.inputs.political_events_path || 'examples/political_events.example.csv' }}
           POLITICAL_WATCHLIST_PATH: ${{ github.event.inputs.political_watchlist_path || 'examples/political_watchlist.example.csv' }}
           AI_SIGNAL_PATH: ${{ github.event.inputs.ai_signal_path || 'data/output/latest_signal.json' }}
+          THEME_MOMENTUM_PATH: ${{ github.event.inputs.theme_momentum_path || 'data/output/theme_momentum_snapshot.json' }}
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
           mkdir -p data/output/published site
+          THEME_ARGS=()
+          if [ -n "${THEME_MOMENTUM_PATH}" ] && [ -f "../ai-long-horizon/${THEME_MOMENTUM_PATH}" ]; then
+            THEME_ARGS=(--theme-momentum "../ai-long-horizon/${THEME_MOMENTUM_PATH}")
+          fi
           python scripts/build_advisory_report.py \
             --as-of "${AS_OF}" \
             --cadence weekly \
             --political-events "../political-events/${POLITICAL_EVENTS_PATH}" \
             --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}" \
             --ai-signal "../ai-long-horizon/${AI_SIGNAL_PATH}" \
+            "${THEME_ARGS[@]}" \
             --output-json "data/output/published/advisory_report_${AS_OF}.json" \
             --output-md "data/output/published/advisory_report_${AS_OF}.md"
           python scripts/publish_advisory_site.py \

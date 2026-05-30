@@ -79,3 +79,29 @@ broker platform repositories
 - 后续可以 replay 历史模型推荐，而不是重写过去判断。
 
 数据源和因子完善路线见 [data_factor_roadmap.zh-CN.md](data_factor_roadmap.zh-CN.md)。
+
+## 跨板块长期主题层
+
+`AiLongHorizonSignalPipelines` 的长期主题层不应只覆盖 AI。当前设计使用静态、版本化 taxonomy，把 AI、半导体、数据中心电力、网络安全、国防、能源、金融、医疗、消费平台、工业自动化、crypto 和 EV/汽车等板块统一成主题暴露。
+
+`QuantAdvisorResearch` 可以读取 AI shadow artifact 中的：
+
+```text
+theme_bias
+symbol_theme_exposure
+```
+
+但使用边界保持不变：主题 bias 只能作为研究背景和轻量评分输入，不能绕过事件证据、来源质量、风险提示和非个性化/不执行的合约约束。这样可以避免因为近期热点临时修改 universe 或权重，从而降低类似量化回测过拟合的问题。
+
+## Theme momentum 展示边界
+
+`QuantAdvisorResearch` 可以消费 `theme_momentum_snapshot.json`，但只用于报告展示：
+
+- 展示当前强主题；
+- 展示主题内 top symbols；
+- 写入 `summary.top_theme_ids` 和 `theme_momentum.top_themes`；
+- 不改变推荐评级、评分、周期、仓位或执行策略。
+
+如果上游 `AiLongHorizonSignalPipelines` 没有生成该 snapshot，workflow 会跳过该输入，报告仍可正常生成。
+
+Yahoo chart 只能作为临时 fallback。随机免费代理 IP 池不应进入稳定生产链路；如果需要代理，应使用自控代理或更稳定的数据快照，并记录来源、时间和 hash，便于 replay。

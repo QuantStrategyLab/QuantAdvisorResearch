@@ -196,3 +196,27 @@ See:
 - SEC automated investment advice resources: <https://www.sec.gov/about/divisions-offices/office-strategic-hub-innovation-financial-technology-finhub/automated-investment-advice>
 - FINRA Regulation Best Interest: <https://www.finra.org/rules-guidance/key-topics/regulation-best-interest>
 - FINRA suitability: <https://www.finra.org/rules-guidance/key-topics/suitability>
+
+## Theme Momentum Display
+
+`build_advisory_report.py` accepts an optional theme momentum snapshot:
+
+```bash
+python scripts/build_advisory_report.py \
+  --as-of 2026-05-30 \
+  --cadence weekly \
+  --political-events examples/political_events.example.csv \
+  --political-watchlist examples/political_watchlist.example.csv \
+  --ai-signal examples/ai_long_horizon_signal.example.json \
+  --theme-momentum examples/theme_momentum_snapshot.example.json \
+  --output-json data/output/advisory_report.example.json \
+  --output-md data/output/advisory_report.example.md
+```
+
+Theme momentum is display-only context: it highlights strong themes and candidate
+symbols, but it does not change recommendation ratings, scores, allocations, or
+execution policy.  Workflows skip the section when the snapshot file is absent.
+
+Yahoo chart downloads are only a temporary fallback.  Do not rely on random free
+proxy pools for the stable pipeline; prefer audited price snapshots, cache files,
+or a controlled proxy/data provider.

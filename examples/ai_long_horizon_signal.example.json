@@ -4,7 +4,15 @@
   "generated_at": "2026-05-28T14:38:47.474891Z",
   "mode": "shadow",
   "horizon": "1-3 months",
-  "universe": ["IDX1", "IDX2", "SECT1", "LEV1", "CASH1", "EVT1", "EVT2"],
+  "universe": [
+    "IDX1",
+    "IDX2",
+    "SECT1",
+    "LEV1",
+    "CASH1",
+    "EVT1",
+    "EVT2"
+  ],
   "regime": "mixed",
   "risk_flags": [
     "price_only_context",
@@ -22,8 +30,10 @@
   },
   "confidence": 0.58,
   "evidence": {
-    "sources": ["AiLongHorizonSignalPipelines/data/output/latest_signal.json"],
-    "summary": "Price-only AI shadow context shows mixed regime: broad growth trends remain constructive, but semiconductor and leveraged ETF volatility is elevated.",
+    "sources": [
+      "AiLongHorizonSignalPipelines/data/output/latest_signal.json"
+    ],
+    "summary": "Price-only AI shadow context with optional cross-sector theme fields. Synthetic fixture only.",
     "data_gaps": [
       "No replay evidence is attached for this specific artifact.",
       "Macro, valuation, and event risks were not independently verified."
@@ -33,5 +43,41 @@
   "policy": {
     "execution_allowed": false,
     "downstream_use": "Research-only shadow context."
+  },
+  "theme_bias": {
+    "ai_compute": "watch",
+    "hbm_memory": "watch",
+    "ai_server_infrastructure": "watch",
+    "defense_aerospace": "watch",
+    "healthcare_policy": "neutral",
+    "energy_security": "neutral",
+    "financial_market_infrastructure": "neutral"
+  },
+  "symbol_theme_exposure": {
+    "EVT2": [
+      "ai_server_infrastructure"
+    ],
+    "IDX1": [
+      "financial_market_infrastructure"
+    ],
+    "IDX2": [
+      "ai_compute"
+    ],
+    "MU": [
+      "hbm_memory",
+      "ai_compute"
+    ],
+    "INTC": [
+      "ai_compute"
+    ],
+    "DELL": [
+      "ai_server_infrastructure"
+    ],
+    "LMT": [
+      "defense_aerospace"
+    ],
+    "UNH": [
+      "healthcare_policy"
+    ]
   }
 }

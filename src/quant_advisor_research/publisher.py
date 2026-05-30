@@ -33,6 +33,36 @@ def report_filename(report: dict[str, Any]) -> str:
     return f"{report['as_of']}-{slug(report['cadence'])}-model-recommendations.html"
 
 
+
+def render_theme_momentum_html(report: dict[str, Any]) -> str:
+    theme_momentum = report.get("theme_momentum", {})
+    if not theme_momentum.get("available"):
+        return ""
+    rows = []
+    for theme in theme_momentum.get("top_themes", []):
+        symbols = ", ".join(theme.get("top_symbols", [])) or "None"
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(theme.get('rank', '')))}</td>"
+            f"<td><code>{html.escape(str(theme.get('theme_id', '')))}</code><br>{html.escape(str(theme.get('theme_name', '')))}</td>"
+            f"<td>{html.escape(str(theme.get('sector', '')))}</td>"
+            f"<td>{html.escape(str(theme.get('momentum_score', '')))}</td>"
+            f"<td>{html.escape(str(theme.get('breadth_3m', '')))}</td>"
+            f"<td>{html.escape(symbols)}</td>"
+            "</tr>"
+        )
+    return f"""
+    <section class="theme-momentum">
+      <h2>Theme Momentum</h2>
+      <p>Research-only theme ranking as of {html.escape(str(theme_momentum.get('as_of', '')))}.
+      Theme momentum highlights topics and candidates; it does not change recommendation ratings by itself.</p>
+      <table>
+        <thead><tr><th>Rank</th><th>Theme</th><th>Sector</th><th>Score</th><th>3m breadth</th><th>Top symbols</th></tr></thead>
+        <tbody>{''.join(rows)}</tbody>
+      </table>
+    </section>
+    """
+
 def render_report_html(report: dict[str, Any]) -> str:
     title = f"Quant Model Recommendations {report['cadence'].title()} Review - {report['as_of']}"
     source_mode = str(report["summary"].get("source_mode", "unknown"))
@@ -46,6 +76,7 @@ def render_report_html(report: dict[str, Any]) -> str:
       <ul>{warning_items}</ul>
     </section>
         """
+    theme_momentum_html = render_theme_momentum_html(report)
     recommendation_cards = []
     for rec in report["recommendations"]:
         reasons = "\n".join(f"<li>{html.escape(reason)}</li>" for reason in rec["reasons"])
@@ -101,6 +132,9 @@ def render_report_html(report: dict[str, Any]) -> str:
     .pill {{ border: 1px solid #d0d7de; border-radius: 999px; padding: 5px 10px; background: #fff; }}
     .policy {{ background: #fff7ed; border: 1px solid #fed7aa; padding: 14px 16px; margin-bottom: 20px; }}
     .warning {{ background: #fff1f2; border: 1px solid #fecdd3; padding: 14px 16px; margin-bottom: 20px; }}
+    .theme-momentum {{ background: #eef6ff; border: 1px solid #bfdbfe; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
+    table {{ width: 100%; border-collapse: collapse; background: #fff; }}
+    th, td {{ text-align: left; border-bottom: 1px solid #eaeef2; padding: 8px; vertical-align: top; }}
     .recommendation {{ background: #fff; border: 1px solid #d8dee4; border-radius: 8px; padding: 18px; margin: 16px 0; }}
     .recommendation h2 {{ margin: 0; font-size: 1.25rem; }}
     .recommendation h2 span {{ font-size: .85rem; color: #57606a; font-weight: 700; margin-left: 8px; }}
@@ -132,6 +166,7 @@ def render_report_html(report: dict[str, Any]) -> str:
       execution, portfolio allocation, account suitability, and personalized advice are disabled.
     </section>
     {warning_html}
+    {theme_momentum_html}
     {''.join(recommendation_cards)}
   </main>
 </body>
@@ -144,12 +179,13 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
         filename = report_filename(report)
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
+        top_themes = ", ".join(report["summary"].get("top_theme_ids", []))
         source_mode = str(report["summary"].get("source_mode", "unknown"))
         items.append(
             f"""
             <li>
               <a href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(report['cadence'].title())} Review</a>
-              <span>Source: {html.escape(source_mode)}; Recommended: {html.escape(top_symbols or 'None')}</span>
+              <span>Source: {html.escape(source_mode)}; Themes: {html.escape(top_themes or 'None')}; Recommended: {html.escape(top_symbols or 'None')}</span>
             </li>
             """
         )
@@ -197,9 +233,10 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
         ET.SubElement(item, "guid").text = link
         ET.SubElement(item, "pubDate").text = format_datetime(report["generated_at"])
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
+        top_themes = ", ".join(report["summary"].get("top_theme_ids", []))
         source_mode = str(report["summary"].get("source_mode", "unknown"))
         ET.SubElement(item, "description").text = (
-            f"Mode={report['mode']}; source={source_mode}; recommended={top_symbols or 'None'}. "
+            f"Mode={report['mode']}; source={source_mode}; themes={top_themes or 'None'}; recommended={top_symbols or 'None'}. "
             "Non-personalized model output; no execution, allocation, or account-specific advice."
         )
     rss = ET.Element("rss", {"version": "2.0"})

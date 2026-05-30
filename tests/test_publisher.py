@@ -49,3 +49,36 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "index.html" in filenames
     assert "feed.xml" in filenames
     assert "2026-05-30-weekly-model-recommendations.html" in filenames
+
+
+def test_render_report_html_includes_theme_momentum_context() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+    )
+    report["summary"]["top_theme_ids"] = ["hbm_memory"]
+    report["theme_momentum"] = {
+        "available": True,
+        "as_of": "2026-05-30",
+        "taxonomy_version": "test-v1",
+        "top_themes": [
+            {
+                "rank": 1,
+                "theme_id": "hbm_memory",
+                "theme_name": "HBM and memory",
+                "sector": "technology",
+                "momentum_score": 0.91,
+                "breadth_3m": 1.0,
+                "top_symbols": ["MU"],
+            }
+        ],
+    }
+
+    html = render_report_html(report)
+
+    assert "Theme Momentum" in html
+    assert "hbm_memory" in html
+    assert "MU" in html
