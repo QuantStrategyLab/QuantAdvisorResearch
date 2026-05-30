@@ -6,12 +6,10 @@ QuantStrategyLab 现有仓库已经天然分层：
 
 - `PoliticalEventTrackingResearch`：事实事件层。
 - `AiLongHorizonSignalPipelines`：AI 长周期 shadow 观点层。
-- `UsEquitySnapshotPipelines`：特征快照和研究回测层。
-- `UsEquityStrategies`：确定性策略规则层。
 - `QuantStrategyPlugins`：sidecar 风控、事件和通知 artifact 层。
 - 券商平台仓库：执行、通知、凭证和运行时适配层。
 
-`QuantAdvisorResearch` 只做协调和报告，不侵入上述职责。
+`QuantAdvisorResearch` 只协调事件证据和 AI shadow context，不侵入其他量化策略、快照或券商执行仓库。
 
 ## 模型推荐数据流
 
@@ -31,18 +29,20 @@ model-recommendation artifact
 GitHub Issue / Markdown / static HTML / RSS / manual review
 ```
 
-未来可继续接入：
+当前不接入：
 
 ```text
-UsEquitySnapshotPipelines ranking artifacts
-UsEquityStrategies strategy metadata
-QuantStrategyPlugins risk artifacts
+UsEquitySnapshotPipelines
+UsEquityStrategies
+broker platform repositories
 ```
+
+这些仓库保持独立，避免把政策/新闻/AI 驱动的推荐系统扩成全量量化平台。
 
 ## 设计模式
 
-- Ports and Adapters：隔离事件、AI、快照、策略 metadata 等输入。
-- Strategy：不同研究视角可替换，如价值、事件驱动、趋势、风险防守。
+- Ports and Adapters：隔离事件来源和 AI shadow context。
+- Strategy：不同推荐规则可替换，如事件驱动、政策资金、公开点名、风险暂缓。
 - Pipeline：输入载入、候选聚合、评分、风控、报告渲染分阶段执行。
 - Repository：保存 point-in-time model recommendation artifact，用于后续 replay。
 - Command：日评、周评、月评、历史回顾都用可审计命令触发。
@@ -61,6 +61,12 @@ QuantStrategyPlugins risk artifacts
 - 会模糊“模型推荐”与“执行”边界。
 - 容易把 model recommendation artifact 误用成 target allocation。
 - 增加合规和操作风险。
+
+也不建议在当前阶段接入 `UsEquitySnapshotPipelines` 或 `UsEquityStrategies`：
+
+- 当前产品目标是政策/新闻/AI 驱动的模型推荐，不是全量多因子选股。
+- 接入策略仓库会让“推荐结论”和“可执行策略”边界变模糊。
+- 接入快照仓库会引入数据 freshness、样本外回测和因子版本管理问题，MVP 过重。
 
 ## MVP 验证标准
 

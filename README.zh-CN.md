@@ -6,12 +6,11 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 
 ## 仓库定位
 
-这个仓库把各个研究仓库的产物组合成 model recommendation artifact：
+这个仓库把事件研究和 AI shadow 产物组合成 model recommendation artifact：
 
 - `PoliticalEventTrackingResearch`：政治/公开事件事实、催化剂、来源置信度。
 - `AiLongHorizonSignalPipelines`：已保存的长周期 AI shadow context。
-- `UsEquitySnapshotPipelines`：未来接入特征快照、候选排名、回测证据。
-- `UsEquityStrategies`：继续负责确定性策略规则，不被本仓库替代。
+- 其他量化策略/快照仓库：保持独立，不作为当前推荐链路的直接输入。
 - 各券商平台仓库：继续只负责执行链路；本仓库不调用它们。
 
 ## 当前 MVP

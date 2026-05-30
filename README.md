@@ -4,10 +4,10 @@
 
 Non-personalized model recommendation orchestration for QuantStrategyLab.
 
-This repository combines deterministic event evidence, strategy/snapshot context,
-and saved AI shadow context into audit-ready model recommendation reports. It
-does not place orders, store broker credentials, manage portfolios, or
-personalize advice for a specific investor.
+This repository combines deterministic event evidence and saved AI shadow context
+into audit-ready model recommendation reports. It does not place orders, store
+broker credentials, manage portfolios, or personalize advice for a specific
+investor.
 
 ## Repository Role
 
@@ -16,8 +16,7 @@ system:
 
 - consume political/public-event context from `PoliticalEventTrackingResearch`
 - consume saved AI shadow context from `AiLongHorizonSignalPipelines`
-- leave executable strategy math in `UsEquityStrategies`
-- leave feature generation and backtests in `UsEquitySnapshotPipelines`
+- keep other strategy and snapshot repositories independent from this pipeline
 - leave broker execution in platform repositories
 
 The output is a non-personalized model recommendation artifact and a readable daily, weekly,
