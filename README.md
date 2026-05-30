@@ -22,6 +22,10 @@ system:
 The output is a non-personalized model recommendation artifact and a readable daily, weekly,
 or monthly report.
 
+Live site:
+
+<https://quantstrategylab.github.io/QuantAdvisorResearch/>
+
 ## Boundary
 
 This repository owns:
@@ -52,6 +56,8 @@ python scripts/build_advisory_report.py \
   --output-json data/output/advisory_report.example.json \
   --output-md data/output/advisory_report.example.md
 ```
+
+The command also writes `data/output/advisory_report.example.json.manifest.json`.
 
 Run tests:
 
@@ -144,6 +150,19 @@ Default horizon windows:
 - medium: `2-12 weeks`
 - long: `1-3 years`
 - not_applicable: source check, defer, or monitor only
+
+## Versioning
+
+The Python package version is `0.1.1`. Report artifacts are versioned separately:
+
+- report schema: `schema_version = 5`
+- report contract: `model_recommendations.v5`
+- report manifest: `<output-json>.manifest.json`
+
+The manifest records the JSON and Markdown SHA256 hashes, `as_of`, cadence,
+source artifacts, policy boundary, Git SHA, GitHub run id, and contract version.
+This mirrors the snapshot and AI artifact repos without turning recommendations
+into executable strategy targets.
 
 ## Regulatory Boundary
 

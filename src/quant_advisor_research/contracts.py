@@ -10,6 +10,8 @@ class AdvisoryValidationError(ValueError):
 
 
 ALLOWED_CADENCES = frozenset({"daily", "weekly", "monthly"})
+SOURCE_PROJECT = "QuantAdvisorResearch"
+REPORT_CONTRACT_VERSION = "model_recommendations.v5"
 ALLOWED_RECOMMENDATION_RATINGS = frozenset({"recommend", "watch", "verify_source", "defer", "monitor"})
 ALLOWED_RECOMMENDATION_TIERS = frozenset({"tier_1", "tier_2", "watchlist", "source_check", "defer", "monitor"})
 ALLOWED_HORIZONS = frozenset({"short", "medium", "long", "not_applicable"})

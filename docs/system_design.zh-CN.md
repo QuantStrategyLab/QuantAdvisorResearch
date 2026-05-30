@@ -72,6 +72,7 @@ broker platform repositories
 
 - 能读取政治事件 CSV 和 AI shadow JSON。
 - 能生成 `model_recommendations` JSON artifact。
+- 能生成 `<output-json>.manifest.json`，记录 contract version、hash、Git SHA 和来源。
 - 能生成日/周/月 Markdown 复盘。
 - 能生成静态 HTML 和 RSS feed 供非个性化订阅。
 - 所有 artifact 明确允许非个性化模型推荐，但禁止下单、调仓、账户级仓位和个性化建议。

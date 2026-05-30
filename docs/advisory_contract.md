@@ -111,3 +111,31 @@ Allowed strategy styles:
 
 The contract intentionally rejects account-action fields such as `target_weight`,
 `target_quantity`, `shares`, `order_type`, `broker`, and `account_id`.
+
+## Artifact Manifest
+
+Every CLI-generated JSON report also writes:
+
+```text
+<output-json>.manifest.json
+```
+
+Required manifest fields:
+
+```text
+manifest_type = model_recommendation_report
+artifact_type = model_recommendations
+contract_version = model_recommendations.v5
+schema_version = 5
+version = <as_of>-<cadence>-schema-5-<run-or-sha>
+source_project = QuantAdvisorResearch
+producer.repository
+producer.git_sha
+producer.github_run_id
+source_artifacts
+summary
+artifacts.json.sha256
+artifacts.markdown.sha256
+policy
+generated_at
+```

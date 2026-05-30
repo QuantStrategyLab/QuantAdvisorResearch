@@ -4,6 +4,8 @@
 
 QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化模型推荐、推荐理由、适合周期和日/周/月复盘，不下单、不管理仓位、不接券商凭证。
 
+线上站点：<https://quantstrategylab.github.io/QuantAdvisorResearch/>
+
 ## 仓库定位
 
 这个仓库把事件研究和 AI shadow 产物组合成 model recommendation artifact：
@@ -28,6 +30,8 @@ python scripts/build_advisory_report.py \
   --output-md data/output/advisory_report.example.md
 ```
 
+命令会同时写出 `data/output/advisory_report.example.json.manifest.json`。
+
 输出包括：
 
 - 推荐标的
@@ -41,6 +45,15 @@ python scripts/build_advisory_report.py \
 - 证据分数和风险分数
 - 推荐理由、风险、复核清单
 - 日/周/月复盘 cadence
+
+## 版本管理
+
+- Python 包版本：`0.1.1`
+- 报告 schema：`schema_version = 5`
+- 报告 contract：`model_recommendations.v5`
+- 报告 manifest：`<output-json>.manifest.json`
+
+manifest 会记录 JSON/Markdown 的 SHA256、`as_of`、cadence、来源 artifact、政策边界、Git SHA、GitHub run id 和 contract version。这样和快照/AI artifact 仓库保持同类版本纪律，但不会把推荐输出变成可执行策略 target。
 
 ## 边界
 

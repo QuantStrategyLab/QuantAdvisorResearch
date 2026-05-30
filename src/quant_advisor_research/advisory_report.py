@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .artifacts import write_report_manifest
 from .contracts import ALLOWED_CADENCES, validate_advisory_report
 from .csv_utils import read_csv_rows
 
@@ -488,6 +490,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-items", "--max-candidates", dest="max_candidates", type=int, default=12)
     parser.add_argument("--output-json", required=True, help="Output JSON artifact path.")
     parser.add_argument("--output-md", required=True, help="Output Markdown report path.")
+    parser.add_argument("--output-manifest", help="Output artifact manifest path. Defaults to <output-json>.manifest.json.")
     return parser
 
 
@@ -503,6 +506,17 @@ def main(argv: list[str] | None = None) -> None:
     )
     write_json(args.output_json, report)
     write_text(args.output_md, render_markdown(report))
+    manifest_path = args.output_manifest or f"{args.output_json}.manifest.json"
+    write_report_manifest(
+        report=report,
+        report_path=args.output_json,
+        markdown_path=args.output_md,
+        manifest_path=manifest_path,
+        repository=os.environ.get("GITHUB_REPOSITORY"),
+        git_sha=os.environ.get("GITHUB_SHA"),
+        run_id=os.environ.get("GITHUB_RUN_ID"),
+        run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"),
+    )
 
 
 if __name__ == "__main__":

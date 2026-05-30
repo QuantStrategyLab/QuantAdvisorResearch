@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from quant_advisor_research.advisory_report import build_advisory_report, render_markdown
+from quant_advisor_research.artifacts import write_report_manifest
 from quant_advisor_research.contracts import AdvisoryValidationError, validate_advisory_report
 
 
@@ -178,3 +180,36 @@ def test_contract_rejects_account_action_fields() -> None:
 
     with pytest.raises(AdvisoryValidationError):
         validate_advisory_report(report)
+
+
+def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+    )
+    report_path = tmp_path / "advisory_report.json"
+    markdown_path = tmp_path / "advisory_report.md"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+    markdown_path.write_text("# Report\n", encoding="utf-8")
+
+    manifest_path = write_report_manifest(
+        report=report,
+        report_path=report_path,
+        markdown_path=markdown_path,
+        manifest_path=tmp_path / "advisory_report.json.manifest.json",
+        repository="QuantStrategyLab/QuantAdvisorResearch",
+        git_sha="abcdef1234567890",
+        run_id="123",
+        run_attempt="2",
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["manifest_type"] == "model_recommendation_report"
+    assert manifest["contract_version"] == "model_recommendations.v5"
+    assert manifest["version"] == "2026-05-30-weekly-schema-5-run-123-attempt-2"
+    assert manifest["producer"]["git_sha"] == "abcdef1234567890"
+    assert manifest["artifacts"]["json"]["sha256"]
+    assert manifest["artifacts"]["markdown"]["sha256"]
