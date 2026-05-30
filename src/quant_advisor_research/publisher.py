@@ -11,6 +11,13 @@ from typing import Any
 from urllib.parse import quote
 
 
+CADENCE_LABELS_ZH = {
+    "daily": "日度",
+    "weekly": "周度",
+    "monthly": "月度",
+}
+
+
 def slug(value: str) -> str:
     text = re.sub(r"[^a-zA-Z0-9]+", "-", value.strip().lower()).strip("-")
     return text or "report"
@@ -33,6 +40,44 @@ def report_filename(report: dict[str, Any]) -> str:
     return f"{report['as_of']}-{slug(report['cadence'])}-model-recommendations.html"
 
 
+def cadence_label(report: dict[str, Any]) -> str:
+    cadence = str(report.get("cadence", ""))
+    return CADENCE_LABELS_ZH.get(cadence, cadence.title())
+
+
+def render_theme_first_candidates_html(report: dict[str, Any]) -> str:
+    candidates = report.get("theme_first_candidates", [])
+    if not candidates:
+        return ""
+    rows = []
+    for candidate in candidates:
+        theme_ids = ", ".join(candidate.get("theme_ids", [])) or "无"
+        reasons = candidate.get("reasons", [])
+        reason = reasons[0] if reasons else ""
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(candidate.get('rank', '')))}</td>"
+            f"<td><strong>{html.escape(str(candidate.get('symbol', '')))}</strong><br>{html.escape(str(candidate.get('name', '')))}</td>"
+            f"<td><code>{html.escape(str(candidate.get('primary_theme_id', '')))}</code><br>{html.escape(str(candidate.get('primary_theme_name', '')))}</td>"
+            f"<td>{html.escape(str(candidate.get('symbol_momentum_score', '')))}</td>"
+            f"<td>{html.escape(str(candidate.get('return_3m', '')))}</td>"
+            f"<td>{html.escape(str(candidate.get('advisor_status', '')))}</td>"
+            f"<td>{html.escape(str(candidate.get('source_confirmation', '')))}</td>"
+            f"<td>{html.escape(theme_ids)}<br>{html.escape(str(reason))}</td>"
+            "</tr>"
+        )
+    return f"""
+    <section class="theme-candidates">
+      <h2>主题优先候选</h2>
+      <p>该列表按主题和个股动量排序，优先展示 AI、高科技和其他强主题内的候选标的。
+      这些候选不是下单或仓位建议；升级为正式推荐前仍需复核估值、财报、回撤、流动性和稳定事件证据。</p>
+      <table>
+        <thead><tr><th>排名</th><th>标的</th><th>主主题</th><th>动量</th><th>3个月收益</th><th>状态</th><th>确认</th><th>说明</th></tr></thead>
+        <tbody>{''.join(rows)}</tbody>
+      </table>
+    </section>
+    """
+
 
 def render_theme_momentum_html(report: dict[str, Any]) -> str:
     theme_momentum = report.get("theme_momentum", {})
@@ -40,7 +85,7 @@ def render_theme_momentum_html(report: dict[str, Any]) -> str:
         return ""
     rows = []
     for theme in theme_momentum.get("top_themes", []):
-        symbols = ", ".join(theme.get("top_symbols", [])) or "None"
+        symbols = ", ".join(theme.get("top_symbols", [])) or "无"
         rows.append(
             "<tr>"
             f"<td>{html.escape(str(theme.get('rank', '')))}</td>"
@@ -53,18 +98,18 @@ def render_theme_momentum_html(report: dict[str, Any]) -> str:
         )
     return f"""
     <section class="theme-momentum">
-      <h2>Theme Momentum</h2>
-      <p>Research-only theme ranking as of {html.escape(str(theme_momentum.get('as_of', '')))}.
-      Theme momentum highlights topics and candidates; it does not change recommendation ratings by itself.</p>
+      <h2>主题动量</h2>
+      <p>研究用途主题排序，快照日期：{html.escape(str(theme_momentum.get('as_of', '')))}。
+      主题动量只提示强主题和候选标的，不直接改变推荐评级。</p>
       <table>
-        <thead><tr><th>Rank</th><th>Theme</th><th>Sector</th><th>Score</th><th>3m breadth</th><th>Top symbols</th></tr></thead>
+        <thead><tr><th>排名</th><th>主题</th><th>板块</th><th>分数</th><th>3个月广度</th><th>代表标的</th></tr></thead>
         <tbody>{''.join(rows)}</tbody>
       </table>
     </section>
     """
 
 def render_report_html(report: dict[str, Any]) -> str:
-    title = f"Quant Model Recommendations {report['cadence'].title()} Review - {report['as_of']}"
+    title = f"量化模型推荐{cadence_label(report)}复盘 - {report['as_of']}"
     source_mode = str(report["summary"].get("source_mode", "unknown"))
     data_warnings = list(report["summary"].get("data_quality_warnings", []))
     warning_html = ""
@@ -72,10 +117,11 @@ def render_report_html(report: dict[str, Any]) -> str:
         warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in data_warnings)
         warning_html = f"""
     <section class="warning">
-      <strong>Source mode: {html.escape(source_mode)}</strong>
+      <strong>来源模式：{html.escape(source_mode)}</strong>
       <ul>{warning_items}</ul>
     </section>
         """
+    theme_candidates_html = render_theme_first_candidates_html(report)
     theme_momentum_html = render_theme_momentum_html(report)
     recommendation_cards = []
     for rec in report["recommendations"]:
@@ -94,34 +140,34 @@ def render_report_html(report: dict[str, Any]) -> str:
                 <p>{html.escape(rec.get('name') or rec['symbol'])}</p>
               </header>
               <dl>
-                <div><dt>Horizon</dt><dd>{html.escape(rec['primary_horizon_label'])}</dd></div>
-                <div><dt>Window</dt><dd>{html.escape(rec['primary_horizon_window'])}</dd></div>
-                <div><dt>Tier</dt><dd>{html.escape(rec['recommendation_tier_label'])}</dd></div>
-                <div><dt>Source</dt><dd>{html.escape(rec['source_confidence_label'])}</dd></div>
-                <div><dt>Style</dt><dd>{html.escape(rec['strategy_style'])}</dd></div>
-                <div><dt>Score</dt><dd>{rec['score']}</dd></div>
-                <div><dt>Evidence</dt><dd>{rec['evidence_score']}</dd></div>
-                <div><dt>Risk</dt><dd>{rec['risk_score']}</dd></div>
+                <div><dt>周期</dt><dd>{html.escape(rec['primary_horizon_label'])}</dd></div>
+                <div><dt>窗口</dt><dd>{html.escape(rec['primary_horizon_window'])}</dd></div>
+                <div><dt>层级</dt><dd>{html.escape(rec['recommendation_tier_label'])}</dd></div>
+                <div><dt>来源</dt><dd>{html.escape(rec['source_confidence_label'])}</dd></div>
+                <div><dt>风格</dt><dd>{html.escape(rec['strategy_style'])}</dd></div>
+                <div><dt>分数</dt><dd>{rec['score']}</dd></div>
+                <div><dt>证据</dt><dd>{rec['evidence_score']}</dd></div>
+                <div><dt>风险</dt><dd>{rec['risk_score']}</dd></div>
               </dl>
               <p class="horizon-note">{html.escape(rec['horizon_note'])}</p>
-              <h3>Reasons</h3>
+              <h3>推荐理由</h3>
               <ul>{reasons}</ul>
-              <h3>Risks</h3>
+              <h3>风险提示</h3>
               <ul>{risks}</ul>
-              <h3>Review Checklist</h3>
+              <h3>复核清单</h3>
               <ul>{checklist}</ul>
-              <h3>Evidence</h3>
+              <h3>证据链接</h3>
               <ul>{refs}</ul>
             </article>
             """
         )
     return f"""<!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
-  <link rel="alternate" type="application/rss+xml" title="Quant Model Recommendations RSS" href="feed.xml">
+  <link rel="alternate" type="application/rss+xml" title="量化模型推荐 RSS" href="feed.xml">
   <style>
     :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
     body {{ margin: 0; background: #f6f7f9; color: #1b1f24; }}
@@ -132,6 +178,7 @@ def render_report_html(report: dict[str, Any]) -> str:
     .pill {{ border: 1px solid #d0d7de; border-radius: 999px; padding: 5px 10px; background: #fff; }}
     .policy {{ background: #fff7ed; border: 1px solid #fed7aa; padding: 14px 16px; margin-bottom: 20px; }}
     .warning {{ background: #fff1f2; border: 1px solid #fecdd3; padding: 14px 16px; margin-bottom: 20px; }}
+    .theme-candidates {{ background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
     .theme-momentum {{ background: #eef6ff; border: 1px solid #bfdbfe; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
     table {{ width: 100%; border-collapse: collapse; background: #fff; }}
     th, td {{ text-align: left; border-bottom: 1px solid #eaeef2; padding: 8px; vertical-align: top; }}
@@ -154,18 +201,20 @@ def render_report_html(report: dict[str, Any]) -> str:
     <section class="hero">
       <h1>{html.escape(title)}</h1>
       <div class="meta">
-        <span class="pill">Mode: {html.escape(report['mode'])}</span>
-        <span class="pill">Audience: {html.escape(report['audience_scope'])}</span>
-        <span class="pill">AI regime: {html.escape(str(report['summary']['ai_regime']))}</span>
-        <span class="pill">Source: {html.escape(source_mode)}</span>
-        <span class="pill">Recommendations: {report['summary']['recommendation_count']}</span>
+        <span class="pill">模式：{html.escape(report['mode'])}</span>
+        <span class="pill">受众：{html.escape(report['audience_scope'])}</span>
+        <span class="pill">AI 状态：{html.escape(str(report['summary']['ai_regime']))}</span>
+        <span class="pill">来源：{html.escape(source_mode)}</span>
+        <span class="pill">主题候选：{report['summary'].get('theme_first_candidate_count', 0)}</span>
+        <span class="pill">推荐数：{report['summary']['recommendation_count']}</span>
       </div>
     </section>
     <section class="policy">
-      <strong>Policy boundary:</strong> non-personalized model recommendations are enabled;
-      execution, portfolio allocation, account suitability, and personalized advice are disabled.
+      <strong>政策边界：</strong>当前只允许非个性化模型推荐；
+      不允许下单、组合配置、账户适当性判断或个性化建议。
     </section>
     {warning_html}
+    {theme_candidates_html}
     {theme_momentum_html}
     {''.join(recommendation_cards)}
   </main>
@@ -179,23 +228,24 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
         filename = report_filename(report)
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
+        theme_candidate_symbols = ", ".join(report["summary"].get("top_theme_candidate_symbols", []))
         top_themes = ", ".join(report["summary"].get("top_theme_ids", []))
         source_mode = str(report["summary"].get("source_mode", "unknown"))
         items.append(
             f"""
             <li>
-              <a href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(report['cadence'].title())} Review</a>
-              <span>Source: {html.escape(source_mode)}; Themes: {html.escape(top_themes or 'None')}; Recommended: {html.escape(top_symbols or 'None')}</span>
+              <a href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
+              <span>来源：{html.escape(source_mode)}；主题：{html.escape(top_themes or '无')}；主题候选：{html.escape(theme_candidate_symbols or '无')}；推荐：{html.escape(top_symbols or '无')}</span>
             </li>
             """
         )
     return f"""<!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quant Model Recommendations</title>
-  <link rel="alternate" type="application/rss+xml" title="Quant Model Recommendations RSS" href="feed.xml">
+  <title>量化模型推荐</title>
+  <link rel="alternate" type="application/rss+xml" title="量化模型推荐 RSS" href="feed.xml">
   <style>
     body {{ margin: 0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #f6f7f9; color: #1b1f24; }}
     main {{ max-width: 900px; margin: 0 auto; padding: 40px 20px; }}
@@ -209,9 +259,9 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
 </head>
 <body>
   <main>
-    <h1>Quant Model Recommendations</h1>
-    <p>Non-personalized model recommendations with reasons, horizons, and risks. No execution, allocation, or personalized advice.</p>
-    <p><a href="feed.xml">RSS feed</a></p>
+    <h1>量化模型推荐</h1>
+    <p>展示非个性化模型推荐、理由、周期和风险提示。不包含下单、仓位配置或个性化建议。</p>
+    <p><a href="feed.xml">RSS 订阅</a></p>
     <ul>{''.join(items)}</ul>
   </main>
 </body>
@@ -223,21 +273,23 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
     channel = ET.Element("channel")
     ET.SubElement(channel, "title").text = feed_title
     ET.SubElement(channel, "link").text = site_url
-    ET.SubElement(channel, "description").text = "QuantStrategyLab non-personalized model recommendations with reasons and horizons."
+    ET.SubElement(channel, "description").text = "QuantStrategyLab 非个性化模型推荐，包含理由、周期和风险提示。"
     for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
         filename = report_filename(report)
         link = f"{site_url.rstrip('/')}/{quote(filename)}"
         item = ET.SubElement(channel, "item")
-        ET.SubElement(item, "title").text = f"{report['as_of']} {report['cadence'].title()} Model Recommendations"
+        ET.SubElement(item, "title").text = f"{report['as_of']} {cadence_label(report)}模型推荐"
         ET.SubElement(item, "link").text = link
         ET.SubElement(item, "guid").text = link
         ET.SubElement(item, "pubDate").text = format_datetime(report["generated_at"])
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
+        theme_candidate_symbols = ", ".join(report["summary"].get("top_theme_candidate_symbols", []))
         top_themes = ", ".join(report["summary"].get("top_theme_ids", []))
         source_mode = str(report["summary"].get("source_mode", "unknown"))
         ET.SubElement(item, "description").text = (
-            f"Mode={report['mode']}; source={source_mode}; themes={top_themes or 'None'}; recommended={top_symbols or 'None'}. "
-            "Non-personalized model output; no execution, allocation, or account-specific advice."
+            f"模式={report['mode']}；来源={source_mode}；主题={top_themes or '无'}；"
+            f"主题候选={theme_candidate_symbols or '无'}；推荐={top_symbols or '无'}。"
+            "非个性化模型输出；不包含下单、仓位配置或账户级建议。"
         )
     rss = ET.Element("rss", {"version": "2.0"})
     rss.append(channel)
@@ -267,7 +319,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reports", nargs="+", required=True, help="One or more advisory report JSON files.")
     parser.add_argument("--output-dir", required=True, help="Static site output directory.")
     parser.add_argument("--site-url", default="https://quantstrategylab.github.io/QuantAdvisorResearch")
-    parser.add_argument("--feed-title", default="Quant Model Recommendations")
+    parser.add_argument("--feed-title", default="量化模型推荐")
     return parser
 
 

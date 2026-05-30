@@ -113,6 +113,10 @@ GitHub Pages:
 
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
+The published HTML, RSS feed title, and Telegram summary default to Simplified
+Chinese (`zh-CN`) because the current audience is Chinese-language retail
+research readers. JSON field names remain stable English contract keys.
+
 For real-source publishing, dispatch the workflow with paths inside sibling
 repositories:
 
@@ -145,6 +149,7 @@ policy.execution_allowed = false
 policy.portfolio_allocation_allowed = false
 policy.account_specific_advice_allowed = false
 recommendations[]
+theme_first_candidates[]
 ```
 
 Each recommendation carries:
@@ -172,6 +177,12 @@ risk_notes[]
 evidence_refs[]
 review_checklist[]
 ```
+
+`theme_first_candidates[]` is an optional display section derived from the
+theme momentum snapshot. It ranks symbols inside strong themes by symbol
+momentum first, then shows whether each candidate already has event confirmation
+or remains a theme-only candidate. It is still research-only and must not encode
+orders, target weights, or account-level advice.
 
 Default horizon windows:
 
@@ -230,9 +241,11 @@ python scripts/build_advisory_report.py \
   --output-md data/output/advisory_report.example.md
 ```
 
-Theme momentum is display-only context: it highlights strong themes and candidate
-symbols, but it does not change recommendation ratings, scores, allocations, or
-execution policy.  Workflows skip the section when the snapshot file is absent.
+Theme momentum is display-first context: it highlights strong themes and creates
+a `theme_first_candidates[]` section so AI/high-tech candidates are visible even
+when stable event evidence is still pending. It does not change recommendation
+ratings, scores, allocations, or execution policy. Workflows skip the section
+when the snapshot file is absent.
 
 Yahoo chart downloads are only a temporary fallback.  Do not rely on random free
 proxy pools for the stable pipeline; prefer audited price snapshots, cache files,

@@ -56,9 +56,9 @@ review_checklist[]
 RSS 只放最短摘要，适合订阅器扫一眼：
 
 ```text
-标题：2026-05-30 Weekly Model Recommendations
-摘要：Mode=model_recommendations; recommended=EVT1, EVT2.
-     Non-personalized model output; no execution, allocation, or account-specific advice.
+标题：2026-05-30 周度模型推荐
+摘要：模式=model_recommendations；来源=operator_supplied；主题=...；推荐=EVT1, EVT2。
+     非个性化模型输出；不包含下单、仓位配置或账户级建议。
 链接：完整 HTML 报告
 ```
 
@@ -67,17 +67,23 @@ RSS 只放最短摘要，适合订阅器扫一眼：
 Telegram 适合中等长度，最多展示前 3-5 个推荐：
 
 ```text
-Quant Model Recommendations | Weekly | 2026-05-30
+量化模型推荐 | 周度 | 2026-05-30
 
-1. EVT1 | 一级推荐 | 重点推荐 | 中线(2-12周) | 来源中 | score 0.85
-   理由：公开事件 + 披露证据 + AI shadow 仍在观察区间。
-   周期：事件驱动主周期为2-12周；1-10个交易日只适合观察催化反应，波动和反转风险更高。
-   风险：AI 数据缺口未完全解决。
+模式：model_recommendations
+来源：operator_supplied
+来源事件：8
 
-2. EVT2 | 一级推荐 | 重点推荐 | 中线(2-12周) | 来源高 | score 0.83
-   理由：政策资本事件触发，来源置信度高。
-   风险：需要复核估值、财报日和最新价格行为。
+主题动量：
+- #1 hbm_memory 分数=2.16 标的=MU
 
+主题优先候选：
+- #1 MU | hbm_memory | 动量=2.93 | 主题候选 | 待事件确认
+
+推荐摘要：
+- EVT1 | 一级推荐 | 重点推荐 | 中线 | 分数=0.85
+- EVT2 | 一级推荐 | 重点推荐 | 中线 | 分数=0.83
+
+说明：非个性化模型输出；不包含下单、仓位配置或账户级建议。
 完整报告：<HTML link>
 ```
 
@@ -86,7 +92,7 @@ Quant Model Recommendations | Weekly | 2026-05-30
 邮件可以放完整列表和复核清单，结构建议：
 
 ```text
-Subject: Quant Model Recommendations Weekly Review - 2026-05-30
+Subject: 量化模型推荐周度复盘 - 2026-05-30
 
 1. 本期推荐摘要
 2. 重点推荐
@@ -148,4 +154,4 @@ Subject: Quant Model Recommendations Weekly Review - 2026-05-30
 - RSS：`scripts/publish_advisory_site.py` 生成 `feed.xml`。
 - Telegram：可选。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，`scripts/notify_advisory_telegram.py` 会在 Pages 部署成功后发送短摘要；如果缺少任一 secret，会跳过通知但不让发布失败。
 
-通知仍然只能包含标的、推荐层级、周期、来源事件数、主题动量、模型分数、理由、风险和完整报告链接；不能包含订单、目标仓位、目标股数、账户适当性或账户级配置建议。
+通知仍然只能包含标的、主题优先候选、推荐层级、周期、来源事件数、主题动量、模型分数、理由、风险和完整报告链接；不能包含订单、目标仓位、目标股数、账户适当性或账户级配置建议。

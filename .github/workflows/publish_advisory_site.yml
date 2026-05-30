@@ -98,7 +98,7 @@ jobs:
             --reports "data/output/published/advisory_report_${AS_OF}.json" \
             --output-dir site \
             --site-url "${SITE_URL}" \
-            --feed-title "Quant Model Recommendations"
+            --feed-title "量化模型推荐"
           cp "data/output/published/advisory_report_${AS_OF}.json" site/
           cp "data/output/published/advisory_report_${AS_OF}.md" site/
           cp "data/output/published/advisory_report_${AS_OF}.json.manifest.json" site/

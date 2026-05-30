@@ -22,20 +22,20 @@ def build_sample_report() -> dict:
 def test_render_report_html_contains_policy_boundary() -> None:
     html = render_report_html(build_sample_report())
 
-    assert "Policy boundary" in html
-    assert "execution" in html
+    assert "政策边界" in html
+    assert "不允许下单" in html
     assert "EVT1" in html
     assert "2-12周" in html
-    assert "Source mode: fixture" in html
+    assert "来源模式：fixture" in html
 
 
 def test_render_feed_xml_contains_report_item() -> None:
     feed = render_feed_xml([build_sample_report()], site_url="https://example.com/advisor", feed_title="Test Feed")
 
     assert "<rss version=\"2.0\">" in feed
-    assert "2026-05-30 Weekly Model Recommendations" in feed
-    assert "source=fixture" in feed
-    assert "Non-personalized model output; no execution, allocation, or account-specific advice." in feed
+    assert "2026-05-30 周度模型推荐" in feed
+    assert "来源=fixture" in feed
+    assert "非个性化模型输出；不包含下单、仓位配置或账户级建议。" in feed
 
 
 def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
@@ -76,10 +76,28 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
             }
         ],
     }
+    report["summary"]["theme_first_candidate_count"] = 1
+    report["summary"]["top_theme_candidate_symbols"] = ["MU"]
+    report["theme_first_candidates"] = [
+        {
+            "rank": 1,
+            "symbol": "MU",
+            "name": "Micron Technology",
+            "primary_theme_id": "hbm_memory",
+            "primary_theme_name": "HBM and memory",
+            "symbol_momentum_score": 0.88,
+            "return_3m": 0.28,
+            "advisor_status": "主题候选",
+            "source_confirmation": "待事件确认",
+            "theme_ids": ["hbm_memory"],
+            "reasons": ["主题动量排序靠前。"],
+        }
+    ]
 
     html = render_report_html(report)
 
-    assert "Theme Momentum" in html
+    assert "主题优先候选" in html
+    assert "主题动量" in html
     assert "hbm_memory" in html
     assert "MU" in html
 
@@ -101,11 +119,22 @@ def test_format_telegram_message_contains_themes_policy_and_link() -> None:
             }
         ],
     }
+    report["theme_first_candidates"] = [
+        {
+            "rank": 1,
+            "symbol": "MU",
+            "primary_theme_id": "hbm_memory",
+            "symbol_momentum_score": 0.88,
+            "advisor_status": "主题候选",
+            "source_confirmation": "待事件确认",
+        }
+    ]
 
     message = format_telegram_message(report, site_url="https://example.com/advisor")
 
-    assert "Quant Model Recommendations" in message
+    assert "量化模型推荐" in message
+    assert "主题优先候选" in message
     assert "hbm_memory" in message
     assert "MU" in message
-    assert "no execution" in message
+    assert "不包含下单" in message
     assert "https://example.com/advisor/2026-05-30-weekly-model-recommendations.html" in message

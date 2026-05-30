@@ -165,9 +165,9 @@ def test_render_markdown_contains_policy_section() -> None:
 
     markdown = render_markdown(report)
 
-    assert "## Policy" in markdown
-    assert "Execution allowed: `false`" in markdown
-    assert "Non-personalized recommendations allowed: `true`" in markdown
+    assert "## 政策边界" in markdown
+    assert "允许下单: `false`" in markdown
+    assert "允许非个性化模型推荐: `true`" in markdown
 
 
 def test_contract_rejects_account_action_fields() -> None:
@@ -179,6 +179,21 @@ def test_contract_rejects_account_action_fields() -> None:
         ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
     )
     report["recommendations"][0]["target_weight"] = 0.1
+
+    with pytest.raises(AdvisoryValidationError):
+        validate_advisory_report(report)
+
+
+def test_contract_rejects_theme_candidate_account_action_fields() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
+    )
+    report["theme_first_candidates"][0]["target_weight"] = 0.1
 
     with pytest.raises(AdvisoryValidationError):
         validate_advisory_report(report)
@@ -278,7 +293,7 @@ def test_theme_bias_can_lift_static_watchlist_item_without_direct_symbol_bias(tm
     assert rec["symbol"] == "MU"
     assert rec["rating"] == "watch"
     assert rec["evidence_score"] > 4
-    assert any("themes=hbm_memory" in reason for reason in rec["reasons"])
+    assert any("主题=hbm_memory" in reason for reason in rec["reasons"])
 
 
 def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: Path) -> None:
@@ -315,11 +330,17 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     )
 
     assert report_with_theme["summary"]["top_theme_ids"][:1] == ["hbm_memory"]
+    assert report_with_theme["summary"]["top_theme_candidate_symbols"][:3] == ["MU", "NVDA", "DELL"]
     assert report_with_theme["theme_momentum"]["top_themes"][0]["theme_id"] == "hbm_memory"
     assert report_with_theme["theme_momentum"]["top_themes"][0]["top_symbols"][:1] == ["MU"]
+    assert report_with_theme["theme_first_candidates"][0]["symbol"] == "MU"
+    assert report_with_theme["theme_first_candidates"][0]["primary_theme_id"] == "hbm_memory"
+    assert report_with_theme["theme_first_candidates"][2]["symbol"] == "DELL"
     assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
     assert report_with_theme["recommendations"][0]["score"] == report_without_theme["recommendations"][0]["score"]
 
     markdown = render_markdown(report_with_theme)
+    assert "## 主题优先候选" in markdown
     assert "## 主题动量" in markdown
     assert "hbm_memory" in markdown
+    assert "DELL" in markdown

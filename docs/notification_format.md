@@ -9,31 +9,36 @@
   repository secrets, `scripts/notify_advisory_telegram.py` sends a short summary
   after a successful Pages deployment. Missing secrets skip notification without
   failing the publish job.
+- Locale: the public HTML/RSS/Telegram copy defaults to Simplified Chinese
+  (`zh-CN`). JSON contract keys remain in English for downstream stability.
 
 ## Boundary
 
-Notifications may show symbols, recommendation tiers, horizons, source-event
-counts, top themes, scores, reasons, risks, and report links. They must not show
-orders, target weights, target share quantities, account suitability, or any
-account-specific allocation advice.
+Notifications may show symbols, theme-first candidates, recommendation tiers,
+horizons, source-event counts, top themes, scores, reasons, risks, and report
+links. They must not show orders, target weights, target share quantities,
+account suitability, or any account-specific allocation advice.
 
 ## Telegram Summary Shape
 
 ```text
-Quant Model Recommendations | Weekly | 2026-05-31
+量化模型推荐 | 周度 | 2026-05-31
 
-Mode: model_recommendations
-Source: operator_supplied
-Source events: 8
+模式：model_recommendations
+来源：operator_supplied
+来源事件：8
 
-Top themes:
-- #1 hbm_memory score=2.16 symbols=MU
+主题动量：
+- #1 hbm_memory 分数=2.16 标的=MU
 
-Recommendations:
-- VRT | 二级推荐 | 重点推荐 | 中线 | score=0.72
+主题优先候选：
+- #1 MU | hbm_memory | 动量=2.93 | 主题候选 | 待事件确认
 
-Policy: non-personalized model output only; no execution, allocation, or account-specific advice.
-Full report: https://quantstrategylab.github.io/QuantAdvisorResearch/...
+推荐摘要：
+- VRT | 二级推荐 | 重点推荐 | 中线 | 分数=0.72
+
+说明：非个性化模型输出；不包含下单、仓位配置或账户级建议。
+完整报告：https://quantstrategylab.github.io/QuantAdvisorResearch/...
 ```
 
 ## RSS Summary Shape
@@ -41,6 +46,6 @@ Full report: https://quantstrategylab.github.io/QuantAdvisorResearch/...
 RSS remains intentionally short for feed readers:
 
 ```text
-Mode=model_recommendations; source=operator_supplied; themes=...; recommended=....
-Non-personalized model output; no execution, allocation, or account-specific advice.
+模式=model_recommendations；来源=operator_supplied；主题=...；主题候选=MU, INTC, DELL；推荐=...。
+非个性化模型输出；不包含下单、仓位配置或账户级建议。
 ```

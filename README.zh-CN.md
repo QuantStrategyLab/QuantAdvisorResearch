@@ -125,6 +125,9 @@ python scripts/publish_advisory_site.py \
 `.github/workflows/publish_advisory_site.yml` 会部署到 GitHub Pages：
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
+当前公开页面、RSS 标题和 Telegram 摘要默认使用简体中文（`zh-CN`）。
+JSON 字段名继续保持英文契约键，避免破坏下游程序读取。
+
 发布真实来源时，workflow inputs 要切到 `PoliticalEventTrackingResearch` 内的真实 CSV：
 
 ```bash
@@ -155,6 +158,8 @@ python scripts/build_advisory_report.py \
   --output-md data/output/advisory_report.example.md
 ```
 
-主题动量只展示强主题和主题内候选，不直接改变推荐评级、分数、仓位或执行状态。线上 workflow 如果找不到 `data/output/theme_momentum_snapshot.json`，会自动跳过这个展示区块。
+主题动量会生成 `theme_first_candidates[]`，让 AI / 高科技等强主题里的候选标的先展示出来。
+这些候选按主题和个股动量排序，并标明是否已有事件确认；但它们仍然不直接改变推荐评级、分数、仓位或执行状态。
+线上 workflow 如果找不到 `data/output/theme_momentum_snapshot.json`，会自动跳过这个展示区块。
 
 Yahoo chart 下载只作为临时 fallback。不要把随机免费代理 IP 池作为稳定生产方案；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。

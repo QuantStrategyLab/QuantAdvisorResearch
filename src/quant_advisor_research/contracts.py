@@ -183,6 +183,18 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         _require_sequence(rec["evidence_refs"], f"recommendations[{index}].evidence_refs")
         _require_sequence(rec["review_checklist"], f"recommendations[{index}].review_checklist")
 
+    if "theme_first_candidates" in payload:
+        theme_candidates = _require_sequence(payload["theme_first_candidates"], "theme_first_candidates")
+        for index, candidate in enumerate(theme_candidates):
+            item = _require_mapping(candidate, f"theme_first_candidates[{index}]")
+            account_keys = sorted(DISALLOWED_ACCOUNT_ACTION_KEYS & set(item))
+            if account_keys:
+                raise AdvisoryValidationError(
+                    f"theme_first_candidates[{index}] contains account-action fields: {', '.join(account_keys)}"
+                )
+            _require_string(item.get("symbol"), f"theme_first_candidates[{index}].symbol")
+            _require_string(item.get("candidate_type"), f"theme_first_candidates[{index}].candidate_type")
+
     policy = _require_mapping(payload["policy"], "policy")
     if policy.get("execution_allowed") is not False:
         raise AdvisoryValidationError("policy.execution_allowed must be false")

@@ -14,6 +14,7 @@ audience_scope: "non_personalized_model_research"
 source_artifacts: object
 summary: object
 recommendations: list
+theme_first_candidates: list, optional
 policy: object
 ```
 
@@ -111,6 +112,29 @@ Allowed strategy styles:
 
 The contract intentionally rejects account-action fields such as `target_weight`,
 `target_quantity`, `shares`, `order_type`, `broker`, and `account_id`.
+
+## Theme-first Candidate
+
+`theme_first_candidates` is optional and is derived from the theme momentum
+snapshot. It exists to make strong-theme candidates visible before the
+event-confirmed recommendation list. It is still research-only and must not
+contain account-action fields.
+
+Important fields:
+
+```text
+rank
+symbol
+candidate_type = theme_first
+primary_theme_id
+primary_theme_name
+symbol_momentum_score
+advisor_status
+source_confirmation
+theme_ids
+reasons
+risk_notes
+```
 
 ## Artifact Manifest
 

@@ -5,7 +5,7 @@ from typing import Any
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from .publisher import report_filename
+from .publisher import cadence_label, report_filename
 
 
 def report_public_url(report: dict[str, Any], *, site_url: str) -> str:
@@ -15,11 +15,30 @@ def report_public_url(report: dict[str, Any], *, site_url: str) -> str:
 def _format_themes(report: dict[str, Any], *, limit: int) -> list[str]:
     theme_momentum = report.get("theme_momentum", {})
     if not theme_momentum.get("available"):
-        return ["- Themes: not available"]
-    lines = ["Top themes:"]
+        return ["- 主题动量：暂无"]
+    lines = ["主题动量："]
     for theme in theme_momentum.get("top_themes", [])[:limit]:
-        symbols = ", ".join(theme.get("top_symbols", [])[:5]) or "None"
-        lines.append(f"- #{theme.get('rank')} {theme.get('theme_id')} score={theme.get('momentum_score')} symbols={symbols}")
+        symbols = ", ".join(theme.get("top_symbols", [])[:5]) or "无"
+        lines.append(f"- #{theme.get('rank')} {theme.get('theme_id')} 分数={theme.get('momentum_score')} 标的={symbols}")
+    return lines
+
+
+def _format_theme_candidates(report: dict[str, Any], *, limit: int) -> list[str]:
+    candidates = report.get("theme_first_candidates", [])[:limit]
+    if not candidates:
+        return ["主题优先候选：暂无"]
+    lines = ["主题优先候选："]
+    for item in candidates:
+        lines.append(
+            "- #{rank} {symbol} | {theme} | 动量={score} | {status} | {confirmation}".format(
+                rank=item.get("rank", ""),
+                symbol=item.get("symbol", ""),
+                theme=item.get("primary_theme_id", ""),
+                score=item.get("symbol_momentum_score", ""),
+                status=item.get("advisor_status", ""),
+                confirmation=item.get("source_confirmation", ""),
+            )
+        )
     return lines
 
 
@@ -31,11 +50,11 @@ def _format_recommendations(report: dict[str, Any], *, limit: int) -> list[str]:
         if item.get("recommendation_tier") in {"tier_1", "tier_2", "watchlist", "source_check"}
     ][:limit]
     if not publishable:
-        return ["Recommendations: None promoted; review full report for monitor list."]
-    lines = ["Recommendations:"]
+        return ["推荐摘要：暂无升级标的，请查看完整报告中的监控列表。"]
+    lines = ["推荐摘要："]
     for item in publishable:
         lines.append(
-            "- {symbol} | {tier} | {rating} | {horizon} | score={score}".format(
+            "- {symbol} | {tier} | {rating} | {horizon} | 分数={score}".format(
                 symbol=item.get("symbol", ""),
                 tier=item.get("recommendation_tier_label", item.get("recommendation_tier", "")),
                 rating=item.get("rating_label", item.get("rating", "")),
@@ -55,18 +74,20 @@ def format_telegram_message(
 ) -> str:
     summary = report.get("summary", {})
     lines = [
-        f"Quant Model Recommendations | {str(report.get('cadence', '')).title()} | {report.get('as_of', '')}",
+        f"量化模型推荐 | {cadence_label(report)} | {report.get('as_of', '')}",
         "",
-        f"Mode: {report.get('mode', '')}",
-        f"Source: {summary.get('source_mode', 'unknown')}",
-        f"Source events: {summary.get('source_event_count', 0)}",
+        f"模式：{report.get('mode', '')}",
+        f"来源：{summary.get('source_mode', 'unknown')}",
+        f"来源事件：{summary.get('source_event_count', 0)}",
         "",
         *_format_themes(report, limit=max_themes),
         "",
+        *_format_theme_candidates(report, limit=max_recommendations),
+        "",
         *_format_recommendations(report, limit=max_recommendations),
         "",
-        "Policy: non-personalized model output only; no execution, allocation, or account-specific advice.",
-        f"Full report: {report_public_url(report, site_url=site_url)}",
+        "说明：非个性化模型输出；不包含下单、仓位配置或账户级建议。",
+        f"完整报告：{report_public_url(report, site_url=site_url)}",
     ]
     return "\n".join(str(line) for line in lines if line is not None)
 
