@@ -72,8 +72,50 @@ def test_high_evidence_events_generate_recommendations_with_horizon() -> None:
 
     assert by_symbol["EVT1"]["rating"] == "recommend"
     assert by_symbol["EVT1"]["rating_label"] == "重点推荐"
+    assert by_symbol["EVT1"]["recommendation_tier"] == "tier_1"
+    assert by_symbol["EVT1"]["recommendation_tier_label"] == "一级推荐"
     assert by_symbol["EVT1"]["primary_horizon"] in {"short", "medium", "long"}
+    assert "短线" in by_symbol["EVT1"]["horizon_note"]
+    assert by_symbol["EVT1"]["source_confidence"] == "medium"
     assert by_symbol["EVT1"]["reasons"]
+
+
+def test_mixed_confidence_recommendation_is_not_tier_one(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.csv"
+    events_path.write_text(
+        "\n".join(
+            [
+                "event_id,event_date,symbol,event_type,direction,confidence,source_url,notes",
+                "high-mention,2026-05-29,MIX,public_mention,bullish,high,https://example.invalid/high,high source",
+                "low-lead,2026-05-29,MIX,disclosure_buy,bullish,low,https://example.invalid/low,low source",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    watchlist_path = tmp_path / "watchlist.csv"
+    watchlist_path.write_text(
+        "\n".join(
+            [
+                "symbol,name,bucket,research_status,thesis,source_url",
+                "MIX,Mixed Source Candidate,named_mentioned,triggered,mixed source evidence,https://example.invalid/watch",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=events_path,
+        political_watchlist_path=watchlist_path,
+    )
+
+    rec = report["recommendations"][0]
+    assert rec["rating"] == "recommend"
+    assert rec["source_confidence"] == "mixed"
+    assert rec["recommendation_tier"] == "tier_2"
 
 
 def test_contract_rejects_execution_enabled_report() -> None:

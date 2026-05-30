@@ -147,16 +147,16 @@ def strategy_style(item: WatchlistItem | None, events: list[Event], ai_bias: str
     return "mixed_research"
 
 
-def horizon_fit(style: str, rating: str) -> tuple[str, list[str], str]:
+def horizon_fit(style: str, rating: str) -> tuple[str, list[str], str, str]:
     if rating in {"verify_source", "defer", "monitor"}:
-        return "not_applicable", ["not_applicable"], "不适用"
+        return "not_applicable", ["not_applicable"], "不适用", "该项不是当前推荐，仅用于来源核验、风险暂缓或持续监控。"
     if style == "event_driven":
-        return "medium", ["short", "medium"], "中线"
+        return "medium", ["short", "medium"], "中线", "事件驱动以中线验证为主；短线只适合观察催化反应，波动和反转风险更高。"
     if style in {"long_horizon_growth", "value_quality"}:
-        return "long", ["medium", "long"], "长线"
+        return "long", ["medium", "long"], "长线", "更适合用中长期基本面和趋势验证，不适合按短线噪声频繁切换。"
     if style == "macro_context":
-        return "medium", ["medium"], "中线"
-    return "medium", ["medium"], "中线"
+        return "medium", ["medium"], "中线", "宏观和政策背景更适合中线观察，需要结合市场环境复核。"
+    return "medium", ["medium"], "中线", "默认按中线研究处理，等待更多证据后再调整周期判断。"
 
 
 def rating_label(rating: str) -> str:
@@ -168,6 +168,35 @@ def rating_label(rating: str) -> str:
         "monitor": "监控",
     }
     return labels[rating]
+
+
+def source_confidence(events: list[Event]) -> tuple[str, str]:
+    if not events:
+        return "no_event", "无事件"
+    levels = {event.confidence for event in events if event.confidence}
+    if not levels:
+        return "unknown", "未知"
+    if levels == {"high"}:
+        return "high", "高"
+    if levels <= {"high", "medium"}:
+        return "medium", "中"
+    if levels == {"low"}:
+        return "low", "低"
+    return "mixed", "混合"
+
+
+def recommendation_tier(rating: str, score: float, confidence: str) -> tuple[str, str]:
+    if rating == "recommend" and score >= 0.75 and confidence in {"high", "medium"}:
+        return "tier_1", "一级推荐"
+    if rating == "recommend":
+        return "tier_2", "二级推荐"
+    if rating == "watch":
+        return "watchlist", "观察名单"
+    if rating == "verify_source":
+        return "source_check", "来源核验"
+    if rating == "defer":
+        return "defer", "暂缓"
+    return "monitor", "监控"
 
 
 def build_recommendation(
@@ -243,7 +272,9 @@ def build_recommendation(
 
     style = strategy_style(item, events, ai_bias)
     score = round(clamp((evidence_score - risk_score + 8) / 24, 0.05, 0.85), 2)
-    primary_horizon, suitable_horizons, primary_horizon_label = horizon_fit(style, rating)
+    primary_horizon, suitable_horizons, primary_horizon_label, horizon_note = horizon_fit(style, rating)
+    confidence, confidence_label = source_confidence(events)
+    tier, tier_label = recommendation_tier(rating, score, confidence)
 
     reasons: list[str] = []
     if item and item.thesis:
@@ -270,13 +301,18 @@ def build_recommendation(
         "name": item.name if item else symbol,
         "rating": rating,
         "rating_label": rating_label(rating),
+        "recommendation_tier": tier,
+        "recommendation_tier_label": tier_label,
         "primary_horizon": primary_horizon,
         "primary_horizon_label": primary_horizon_label,
+        "horizon_note": horizon_note,
         "suitable_horizons": suitable_horizons,
         "strategy_style": style,
         "score": score,
         "evidence_score": int(evidence_score),
         "risk_score": int(risk_score),
+        "source_confidence": confidence,
+        "source_confidence_label": confidence_label,
         "reasons": dedupe(reasons),
         "risk_notes": dedupe(risks),
         "evidence_summary": " ".join(reasons),
@@ -335,7 +371,7 @@ def build_advisory_report(
     recommendations = recommendations[:max_candidates]
 
     report = {
-        "schema_version": "3",
+        "schema_version": "4",
         "as_of": as_of_date.isoformat(),
         "generated_at": utc_now_iso(),
         "mode": "model_recommendations",
@@ -351,7 +387,7 @@ def build_advisory_report(
             "source_event_count": len(events),
             "ai_regime": ai_signal.get("regime", "not_available") if ai_signal else "not_available",
             "ai_confidence": ai_signal.get("confidence", 0.0) if ai_signal else 0.0,
-            "top_recommended_symbols": [rec["symbol"] for rec in recommendations if rec["rating"] == "recommend"][:5],
+            "top_recommended_symbols": [rec["symbol"] for rec in recommendations if rec["recommendation_tier"] == "tier_1"][:5],
             "review_note": "Non-personalized model recommendations. No order, target quantity, account suitability, or portfolio allocation is encoded.",
         },
         "recommendations": recommendations,
@@ -393,9 +429,12 @@ def render_markdown(report: dict[str, Any]) -> str:
             [
                 f"### {rec['symbol']} - {rec['rating_label']}",
                 "",
+                f"- 推荐层级: `{rec['recommendation_tier_label']}`",
                 f"- 适合周期: `{rec['primary_horizon_label']}`",
+                f"- 周期说明: {rec['horizon_note']}",
                 f"- Strategy style: `{rec['strategy_style']}`",
                 f"- Model score: `{rec['score']}`",
+                f"- Source confidence: `{rec['source_confidence_label']}`",
                 f"- Evidence score: `{rec['evidence_score']}`",
                 f"- Risk score: `{rec['risk_score']}`",
                 "- 理由:",

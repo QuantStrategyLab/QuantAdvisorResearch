@@ -5,7 +5,7 @@
 Required top-level fields:
 
 ```text
-schema_version: "3"
+schema_version: "4"
 as_of: ISO date
 generated_at: ISO datetime
 mode: "model_recommendations"
@@ -41,12 +41,18 @@ Required fields:
 symbol
 rating
 rating_label
+recommendation_tier
+recommendation_tier_label
 primary_horizon
+primary_horizon_label
+horizon_note
 suitable_horizons
 strategy_style
 score
 evidence_score
 risk_score
+source_confidence
+source_confidence_label
 reasons
 risk_notes
 evidence_refs
@@ -61,12 +67,30 @@ Allowed ratings:
 - `defer`
 - `monitor`
 
+Allowed recommendation tiers:
+
+- `tier_1`
+- `tier_2`
+- `watchlist`
+- `source_check`
+- `defer`
+- `monitor`
+
 Allowed horizons:
 
 - `short`
 - `medium`
 - `long`
 - `not_applicable`
+
+Allowed source confidence values:
+
+- `high`
+- `medium`
+- `low`
+- `mixed`
+- `no_event`
+- `unknown`
 
 Allowed strategy styles:
 

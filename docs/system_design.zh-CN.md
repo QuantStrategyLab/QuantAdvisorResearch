@@ -76,3 +76,5 @@ broker platform repositories
 - 能生成静态 HTML 和 RSS feed 供非个性化订阅。
 - 所有 artifact 明确允许非个性化模型推荐，但禁止下单、调仓、账户级仓位和个性化建议。
 - 后续可以 replay 历史模型推荐，而不是重写过去判断。
+
+数据源和因子完善路线见 [data_factor_roadmap.zh-CN.md](data_factor_roadmap.zh-CN.md)。

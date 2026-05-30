@@ -53,11 +53,14 @@ def render_report_html(report: dict[str, Any]) -> str:
               </header>
               <dl>
                 <div><dt>Horizon</dt><dd>{html.escape(rec['primary_horizon_label'])}</dd></div>
+                <div><dt>Tier</dt><dd>{html.escape(rec['recommendation_tier_label'])}</dd></div>
+                <div><dt>Source</dt><dd>{html.escape(rec['source_confidence_label'])}</dd></div>
                 <div><dt>Style</dt><dd>{html.escape(rec['strategy_style'])}</dd></div>
                 <div><dt>Score</dt><dd>{rec['score']}</dd></div>
                 <div><dt>Evidence</dt><dd>{rec['evidence_score']}</dd></div>
                 <div><dt>Risk</dt><dd>{rec['risk_score']}</dd></div>
               </dl>
+              <p class="horizon-note">{html.escape(rec['horizon_note'])}</p>
               <h3>Reasons</h3>
               <ul>{reasons}</ul>
               <h3>Risks</h3>
@@ -93,6 +96,7 @@ def render_report_html(report: dict[str, Any]) -> str:
     dl div {{ border: 1px solid #eaeef2; border-radius: 6px; padding: 10px; }}
     dt {{ color: #57606a; font-size: .78rem; text-transform: uppercase; }}
     dd {{ margin: 4px 0 0; font-weight: 600; }}
+    .horizon-note {{ line-height: 1.55; color: #57606a; }}
     h3 {{ margin: 18px 0 8px; font-size: 1rem; }}
     li {{ margin: 5px 0; }}
     a {{ color: #0969da; word-break: break-word; }}

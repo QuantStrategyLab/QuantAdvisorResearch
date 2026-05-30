@@ -97,7 +97,7 @@ Notification channel rules are documented in
 The main JSON artifact is `ModelRecommendationReport`:
 
 ```text
-schema_version = 3
+schema_version = 4
 as_of
 generated_at
 mode = model_recommendations
@@ -116,12 +116,18 @@ Each recommendation carries:
 symbol
 rating
 rating_label
+recommendation_tier
+recommendation_tier_label
 primary_horizon
+primary_horizon_label
+horizon_note
 suitable_horizons[]
 strategy_style
 score
 evidence_score
 risk_score
+source_confidence
+source_confidence_label
 reasons[]
 risk_notes[]
 evidence_refs[]

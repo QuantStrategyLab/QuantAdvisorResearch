@@ -11,7 +11,9 @@ class AdvisoryValidationError(ValueError):
 
 ALLOWED_CADENCES = frozenset({"daily", "weekly", "monthly"})
 ALLOWED_RECOMMENDATION_RATINGS = frozenset({"recommend", "watch", "verify_source", "defer", "monitor"})
+ALLOWED_RECOMMENDATION_TIERS = frozenset({"tier_1", "tier_2", "watchlist", "source_check", "defer", "monitor"})
 ALLOWED_HORIZONS = frozenset({"short", "medium", "long", "not_applicable"})
+ALLOWED_SOURCE_CONFIDENCE = frozenset({"high", "medium", "low", "mixed", "no_event", "unknown"})
 ALLOWED_STRATEGY_STYLES = frozenset(
     {
         "event_driven",
@@ -95,8 +97,8 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     if missing:
         raise AdvisoryValidationError(f"missing required keys: {', '.join(missing)}")
 
-    if payload["schema_version"] != "3":
-        raise AdvisoryValidationError("schema_version must be '3'")
+    if payload["schema_version"] != "4":
+        raise AdvisoryValidationError("schema_version must be '4'")
     _require_iso_date(payload["as_of"], "as_of")
     _require_iso_datetime(payload["generated_at"], "generated_at")
     if payload["mode"] != "model_recommendations":
@@ -121,12 +123,18 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
             "symbol",
             "rating",
             "rating_label",
+            "recommendation_tier",
+            "recommendation_tier_label",
             "primary_horizon",
+            "primary_horizon_label",
+            "horizon_note",
             "suitable_horizons",
             "strategy_style",
             "score",
             "evidence_score",
             "risk_score",
+            "source_confidence",
+            "source_confidence_label",
             "reasons",
             "risk_notes",
             "evidence_refs",
@@ -138,14 +146,22 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         if rec["rating"] not in ALLOWED_RECOMMENDATION_RATINGS:
             raise AdvisoryValidationError(f"recommendations[{index}].rating is not allowed")
         _require_string(rec["rating_label"], f"recommendations[{index}].rating_label")
+        if rec["recommendation_tier"] not in ALLOWED_RECOMMENDATION_TIERS:
+            raise AdvisoryValidationError(f"recommendations[{index}].recommendation_tier is not allowed")
+        _require_string(rec["recommendation_tier_label"], f"recommendations[{index}].recommendation_tier_label")
         if rec["primary_horizon"] not in ALLOWED_HORIZONS:
             raise AdvisoryValidationError(f"recommendations[{index}].primary_horizon is not allowed")
+        _require_string(rec["primary_horizon_label"], f"recommendations[{index}].primary_horizon_label")
+        _require_string(rec["horizon_note"], f"recommendations[{index}].horizon_note")
         horizons = _require_sequence(rec["suitable_horizons"], f"recommendations[{index}].suitable_horizons")
         if any(horizon not in ALLOWED_HORIZONS for horizon in horizons):
             raise AdvisoryValidationError(f"recommendations[{index}].suitable_horizons contains an unsupported horizon")
         if rec["strategy_style"] not in ALLOWED_STRATEGY_STYLES:
             raise AdvisoryValidationError(f"recommendations[{index}].strategy_style is not allowed")
         _require_number_0_1(rec["score"], f"recommendations[{index}].score")
+        if rec["source_confidence"] not in ALLOWED_SOURCE_CONFIDENCE:
+            raise AdvisoryValidationError(f"recommendations[{index}].source_confidence is not allowed")
+        _require_string(rec["source_confidence_label"], f"recommendations[{index}].source_confidence_label")
         if not isinstance(rec["evidence_score"], int):
             raise AdvisoryValidationError(f"recommendations[{index}].evidence_score must be an integer")
         if not isinstance(rec["risk_score"], int):

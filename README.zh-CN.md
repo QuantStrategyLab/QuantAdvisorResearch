@@ -32,7 +32,10 @@ python scripts/build_advisory_report.py \
 
 - 推荐标的
 - 推荐等级：重点推荐、观察、先核验来源、暂缓、监控
+- 推荐层级：一级推荐、二级推荐、观察名单、来源核验
 - 适合周期：短线、中线、长线
+- 周期说明：短线风险、事件驱动验证周期、长期观察理由
+- 来源可信度：高、中、低、混合、无事件
 - 中长线、价值、事件、宏观等策略风格标签
 - 证据分数和风险分数
 - 推荐理由、风险、复核清单
@@ -96,3 +99,4 @@ python scripts/publish_advisory_site.py \
 `.github/workflows/publish_advisory_site.yml` 可以在仓库启用 GitHub Pages 后部署同样的输出。
 
 通知格式设计见 [docs/notification_format.zh-CN.md](docs/notification_format.zh-CN.md)。
+数据源和因子完善路线见 [docs/data_factor_roadmap.zh-CN.md](docs/data_factor_roadmap.zh-CN.md)。
