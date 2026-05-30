@@ -164,7 +164,8 @@ Crypto 可作为跨资产风险情绪参考，但暂时不应混入 US equity �
 ## 低风险实施顺序
 
 1. 先让 `QuantAdvisorResearch` 把主题动量放到报告前面：
-   - 新增 `theme_first_candidates[]`。
+   - 新增 `theme_first_candidates[]`，公开展示为“本期重点股票池”。
+   - 每期保留 5-10 个股票/公司标的，说明行业/主题背景、入选原因、事件确认和主要风险。
    - 按主题和个股动量排序，优先展示 AI / 高科技等强主题候选。
    - 事件证据只作为确认项，不再让事件股默认压过强主题候选。
 
@@ -233,6 +234,6 @@ config/symbol_theme_exposure.csv
 
 1. theme membership 先固定，再观察后续表现。
 2. AI 只能输出 `theme_bias` 和 shadow context，不能输出目标仓位。
-3. Advisor 可以把主题 bias 和主题动量作为“主题优先候选”展示入口；一级事件确认推荐仍需要事件证据和来源质量支撑。
+3. Advisor 可以把主题 bias 和主题动量作为“本期重点股票池”展示入口；一级事件确认推荐仍需要事件证据和来源质量支撑。
 4. 每次规则、taxonomy、universe 变更都要记录版本，后续 walk-forward 只能 replay 已保存 artifact。
 5. 不因为 MU、INTC、DELL 或任何短期热门标的临时调权重；如果它们长期有 SEC/IR/政策/需求证据，会通过固定规则自然上升。

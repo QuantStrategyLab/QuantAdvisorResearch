@@ -179,17 +179,17 @@ review_checklist[]
 ```
 
 `theme_first_candidates[]` is an optional display section derived from the
-theme momentum snapshot. It ranks symbols inside strong themes by symbol
-momentum first, then shows whether each candidate already has event confirmation
-or remains a theme-only candidate. It is still research-only and must not encode
-orders, target weights, or account-level advice.
+theme momentum snapshot. Public renderers present it as a 5-10 name "重点股票池":
+industry/theme background, why the name entered the pool, event-confirmation
+state, and key risks. It is still research-only and must not encode orders,
+target weights, or account-level advice.
 
 Default horizon windows:
 
 - short: `1-10 trading days`
 - medium: `2-12 weeks`
 - long: `1-3 years`
-- not_applicable: source check, defer, or monitor only
+- not_applicable: source check, defer, or background tracking only
 
 ## Versioning
 
@@ -242,10 +242,11 @@ python scripts/build_advisory_report.py \
 ```
 
 Theme momentum is display-first context: it highlights strong themes and creates
-a `theme_first_candidates[]` section so AI/high-tech candidates are visible even
-when stable event evidence is still pending. It does not change recommendation
-ratings, scores, allocations, or execution policy. Workflows skip the section
-when the snapshot file is absent.
+a `theme_first_candidates[]` stock-pool section so AI/high-tech candidates are
+visible with industry/theme background and reasons even when stable event
+evidence is still pending. It does not change recommendation ratings, scores,
+allocations, or execution policy. Workflows skip the section when the snapshot
+file is absent.
 
 Yahoo chart downloads are only a temporary fallback.  Do not rely on random free
 proxy pools for the stable pipeline; prefer audited price snapshots, cache files,

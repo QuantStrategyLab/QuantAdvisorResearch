@@ -31,10 +31,11 @@ account suitability, or any account-specific allocation advice.
 主题动量：
 - #1 hbm_memory 分数=2.16 标的=MU
 
-主题优先候选：
-- #1 MU | hbm_memory | 动量=2.93 | 主题候选 | 待事件确认
+本期重点股票池（5-10只，非个性化，不等于买入）：
+- #1 MU | 科技 / HBM and memory cycle | 近3月 +135.6% | 事件：待事件确认 | 结论：主题候选
+  为什么：属于科技 / HBM and memory cycle，主主题排名 #1；个股动量 2.93，近3个月 +135.6%。
 
-推荐摘要：
+推荐/观察摘要：
 - VRT | 二级推荐 | 重点推荐 | 中线 | 分数=0.72
 
 说明：非个性化模型输出；不包含下单、仓位配置或账户级建议。

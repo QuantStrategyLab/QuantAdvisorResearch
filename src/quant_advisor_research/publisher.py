@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from .advisory_report import display_number, display_percent
+
 
 CADENCE_LABELS_ZH = {
     "daily": "日度",
@@ -49,32 +51,41 @@ def render_theme_first_candidates_html(report: dict[str, Any]) -> str:
     candidates = report.get("theme_first_candidates", [])
     if not candidates:
         return ""
-    rows = []
+    cards = []
     for candidate in candidates:
         theme_ids = ", ".join(candidate.get("theme_ids", [])) or "无"
         reasons = candidate.get("reasons", [])
         reason = reasons[0] if reasons else ""
-        rows.append(
-            "<tr>"
-            f"<td>{html.escape(str(candidate.get('rank', '')))}</td>"
-            f"<td><strong>{html.escape(str(candidate.get('symbol', '')))}</strong><br>{html.escape(str(candidate.get('name', '')))}</td>"
-            f"<td><code>{html.escape(str(candidate.get('primary_theme_id', '')))}</code><br>{html.escape(str(candidate.get('primary_theme_name', '')))}</td>"
-            f"<td>{html.escape(str(candidate.get('symbol_momentum_score', '')))}</td>"
-            f"<td>{html.escape(str(candidate.get('return_3m', '')))}</td>"
-            f"<td>{html.escape(str(candidate.get('advisor_status', '')))}</td>"
-            f"<td>{html.escape(str(candidate.get('source_confirmation', '')))}</td>"
-            f"<td>{html.escape(theme_ids)}<br>{html.escape(str(reason))}</td>"
-            "</tr>"
+        cards.append(
+            f"""
+            <article class="candidate-card">
+              <header>
+                <span class="rank">#{html.escape(str(candidate.get('rank', '')))}</span>
+                <div>
+                  <h3>{html.escape(str(candidate.get('symbol', '')))}</h3>
+                  <p>{html.escape(str(candidate.get('industry_background', '')))}</p>
+                </div>
+              </header>
+              <dl>
+                <div><dt>主题</dt><dd>{html.escape(str(candidate.get('primary_theme_id', '')))}</dd></div>
+                <div><dt>动量强度</dt><dd>{html.escape(display_number(candidate.get('symbol_momentum_score')))}</dd></div>
+                <div><dt>近3个月</dt><dd>{html.escape(display_percent(candidate.get('return_3m')))}</dd></div>
+                <div><dt>事件确认</dt><dd>{html.escape(str(candidate.get('source_confirmation', '')))}</dd></div>
+                <div><dt>当前结论</dt><dd>{html.escape(str(candidate.get('advisor_status', '')))}</dd></div>
+              </dl>
+              <p><strong>为什么入选：</strong>{html.escape(str(candidate.get('recommendation_summary') or reason))}</p>
+              <p><strong>主要风险：</strong>{html.escape(str(candidate.get('risk_summary', '')))}</p>
+              <p><strong>相关主题：</strong>{html.escape(theme_ids)}</p>
+            </article>
+            """
         )
     return f"""
     <section class="theme-candidates">
-      <h2>主题优先候选</h2>
-      <p>该列表按主题和个股动量排序，优先展示 AI、高科技和其他强主题内的候选标的。
-      这些候选不是下单或仓位建议；升级为正式推荐前仍需复核估值、财报、回撤、流动性和稳定事件证据。</p>
-      <table>
-        <thead><tr><th>排名</th><th>标的</th><th>主主题</th><th>动量</th><th>3个月收益</th><th>状态</th><th>确认</th><th>说明</th></tr></thead>
-        <tbody>{''.join(rows)}</tbody>
-      </table>
+      <h2>本期重点股票池</h2>
+      <p><strong>先看这里：</strong>每期选出 5-10 个股票/公司标的，说明行业主题、入选理由、事件确认和主要风险。</p>
+      <p><strong>怎么理解：</strong>这是非个性化模型股票池，不是买入清单；“待事件确认”表示稳定事件证据还不足；
+      “背景跟踪”表示证据较弱，仅保留为研究背景。</p>
+      <div class="candidate-grid">{''.join(cards)}</div>
     </section>
     """
 
@@ -91,8 +102,8 @@ def render_theme_momentum_html(report: dict[str, Any]) -> str:
             f"<td>{html.escape(str(theme.get('rank', '')))}</td>"
             f"<td><code>{html.escape(str(theme.get('theme_id', '')))}</code><br>{html.escape(str(theme.get('theme_name', '')))}</td>"
             f"<td>{html.escape(str(theme.get('sector', '')))}</td>"
-            f"<td>{html.escape(str(theme.get('momentum_score', '')))}</td>"
-            f"<td>{html.escape(str(theme.get('breadth_3m', '')))}</td>"
+            f"<td>{html.escape(display_number(theme.get('momentum_score')))}</td>"
+            f"<td>{html.escape(display_percent(theme.get('breadth_3m')))}</td>"
             f"<td>{html.escape(symbols)}</td>"
             "</tr>"
         )
@@ -124,6 +135,7 @@ def render_report_html(report: dict[str, Any]) -> str:
     theme_candidates_html = render_theme_first_candidates_html(report)
     theme_momentum_html = render_theme_momentum_html(report)
     recommendation_cards = []
+    background_cards = []
     for rec in report["recommendations"]:
         reasons = "\n".join(f"<li>{html.escape(reason)}</li>" for reason in rec["reasons"])
         risks = "\n".join(f"<li>{html.escape(risk)}</li>" for risk in rec["risk_notes"])
@@ -132,8 +144,7 @@ def render_report_html(report: dict[str, Any]) -> str:
             f'<li><a href="{html.escape(ref)}">{html.escape(ref)}</a></li>' if ref.startswith("http") else f"<li>{html.escape(ref)}</li>"
             for ref in rec["evidence_refs"]
         )
-        recommendation_cards.append(
-            f"""
+        card_html = f"""
             <article class="recommendation">
               <header>
                 <h2>{html.escape(rec['symbol'])} <span>{html.escape(rec['rating_label'])}</span></h2>
@@ -160,7 +171,19 @@ def render_report_html(report: dict[str, Any]) -> str:
               <ul>{refs}</ul>
             </article>
             """
-        )
+        if rec.get("recommendation_tier") == "monitor":
+            background_cards.append(card_html)
+        else:
+            recommendation_cards.append(card_html)
+    background_html = ""
+    if background_cards:
+        background_html = f"""
+    <details class="background-list">
+      <summary>背景跟踪（非推荐，{len(background_cards)}项）</summary>
+      <p>这些标的只保留为研究背景，当前证据不足，不进入推荐或观察摘要。</p>
+      {''.join(background_cards)}
+    </details>
+        """
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -179,7 +202,19 @@ def render_report_html(report: dict[str, Any]) -> str:
     .policy {{ background: #fff7ed; border: 1px solid #fed7aa; padding: 14px 16px; margin-bottom: 20px; }}
     .warning {{ background: #fff1f2; border: 1px solid #fecdd3; padding: 14px 16px; margin-bottom: 20px; }}
     .theme-candidates {{ background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
+    .candidate-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }}
+    .candidate-card {{ background: #fff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; }}
+    .candidate-card header {{ display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }}
+    .candidate-card h3 {{ margin: 0; font-size: 1.15rem; }}
+    .candidate-card header p {{ margin: 2px 0 0; color: #57606a; }}
+    .candidate-card p {{ margin: 8px 0 0; color: #57606a; line-height: 1.5; }}
+    .rank {{ display: inline-block; min-width: 40px; color: #166534; font-weight: 800; }}
     .theme-momentum {{ background: #eef6ff; border: 1px solid #bfdbfe; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
+    .recommendation-section {{ margin: 22px 0 8px; }}
+    .recommendation-section p {{ color: #57606a; line-height: 1.55; }}
+    .background-list {{ margin-top: 18px; background: #fff; border: 1px dashed #d0d7de; border-radius: 8px; padding: 14px 16px; }}
+    .background-list summary {{ cursor: pointer; font-weight: 800; }}
+    .background-list > p {{ color: #57606a; }}
     table {{ width: 100%; border-collapse: collapse; background: #fff; }}
     th, td {{ text-align: left; border-bottom: 1px solid #eaeef2; padding: 8px; vertical-align: top; }}
     .recommendation {{ background: #fff; border: 1px solid #d8dee4; border-radius: 8px; padding: 18px; margin: 16px 0; }}
@@ -216,7 +251,13 @@ def render_report_html(report: dict[str, Any]) -> str:
     {warning_html}
     {theme_candidates_html}
     {theme_momentum_html}
+    <section class="recommendation-section">
+      <h2>事件确认推荐与观察列表</h2>
+      <p>这里基于事件证据、来源置信度和 AI 长周期背景生成。“背景跟踪”表示证据不足，不进入推荐；
+      “先核验来源”表示低置信来源不能直接升级。</p>
+    </section>
     {''.join(recommendation_cards)}
+    {background_html}
   </main>
 </body>
 </html>

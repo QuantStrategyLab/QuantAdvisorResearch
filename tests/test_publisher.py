@@ -27,6 +27,7 @@ def test_render_report_html_contains_policy_boundary() -> None:
     assert "EVT1" in html
     assert "2-12周" in html
     assert "来源模式：fixture" in html
+    assert "背景跟踪（非推荐" in html
 
 
 def test_render_feed_xml_contains_report_item() -> None:
@@ -89,6 +90,9 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
             "return_3m": 0.28,
             "advisor_status": "主题候选",
             "source_confirmation": "待事件确认",
+            "industry_background": "科技 / HBM and memory",
+            "recommendation_summary": "属于科技 / HBM and memory，个股动量靠前。",
+            "risk_summary": "需复核估值、财报、回撤、流动性和稳定事件证据。",
             "theme_ids": ["hbm_memory"],
             "reasons": ["主题动量排序靠前。"],
         }
@@ -96,7 +100,10 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
 
     html = render_report_html(report)
 
-    assert "主题优先候选" in html
+    assert "本期重点股票池" in html
+    assert "先看这里" in html
+    assert "+28.0%" in html
+    assert "为什么入选" in html
     assert "主题动量" in html
     assert "hbm_memory" in html
     assert "MU" in html
@@ -125,15 +132,21 @@ def test_format_telegram_message_contains_themes_policy_and_link() -> None:
             "symbol": "MU",
             "primary_theme_id": "hbm_memory",
             "symbol_momentum_score": 0.88,
+            "return_3m": 0.28,
             "advisor_status": "主题候选",
             "source_confirmation": "待事件确认",
+            "industry_background": "科技 / HBM and memory",
+            "recommendation_summary": "属于科技 / HBM and memory，个股动量靠前。",
         }
     ]
 
     message = format_telegram_message(report, site_url="https://example.com/advisor")
 
     assert "量化模型推荐" in message
-    assert "主题优先候选" in message
+    assert "本期重点股票池" in message
+    assert "不等于买入" in message
+    assert "近3月" in message
+    assert "为什么" in message
     assert "hbm_memory" in message
     assert "MU" in message
     assert "不包含下单" in message

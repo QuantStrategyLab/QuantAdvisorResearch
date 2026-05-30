@@ -35,7 +35,7 @@ python scripts/build_advisory_report.py \
 输出包括：
 
 - 推荐标的
-- 推荐等级：重点推荐、观察、先核验来源、暂缓、监控
+- 推荐等级：重点推荐、观察、先核验来源、暂缓、背景跟踪
 - 推荐层级：一级推荐、二级推荐、观察名单、来源核验
 - 适合周期：短线、中线、长线，并明确时间窗口
 - 周期窗口：短线=1-10个交易日，中线=2-12周，长线=1-3年
@@ -158,7 +158,8 @@ python scripts/build_advisory_report.py \
   --output-md data/output/advisory_report.example.md
 ```
 
-主题动量会生成 `theme_first_candidates[]`，让 AI / 高科技等强主题里的候选标的先展示出来。
+主题动量会生成 `theme_first_candidates[]`，公开页面会把它展示为“本期重点股票池”。
+股票池每期保留 5-10 个股票/公司标的，说明行业/主题背景、为什么入选、事件确认状态和主要风险。
 这些候选按主题和个股动量排序，并标明是否已有事件确认；但它们仍然不直接改变推荐评级、分数、仓位或执行状态。
 线上 workflow 如果找不到 `data/output/theme_momentum_snapshot.json`，会自动跳过这个展示区块。
 

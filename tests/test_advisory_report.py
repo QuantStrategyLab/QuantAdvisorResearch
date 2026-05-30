@@ -84,6 +84,8 @@ def test_high_evidence_events_generate_recommendations_with_horizon() -> None:
     assert "1-10个交易日" in by_symbol["EVT1"]["horizon_note"]
     assert by_symbol["EVT1"]["source_confidence"] == "medium"
     assert by_symbol["EVT1"]["reasons"]
+    assert by_symbol["EVT4"]["rating_label"] == "背景跟踪"
+    assert by_symbol["EVT4"]["recommendation_tier_label"] == "背景跟踪"
 
 
 def test_mixed_confidence_recommendation_is_not_tier_one(tmp_path: Path) -> None:
@@ -335,12 +337,15 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert report_with_theme["theme_momentum"]["top_themes"][0]["top_symbols"][:1] == ["MU"]
     assert report_with_theme["theme_first_candidates"][0]["symbol"] == "MU"
     assert report_with_theme["theme_first_candidates"][0]["primary_theme_id"] == "hbm_memory"
+    assert report_with_theme["theme_first_candidates"][0]["industry_background"]
+    assert report_with_theme["theme_first_candidates"][0]["recommendation_summary"]
     assert report_with_theme["theme_first_candidates"][2]["symbol"] == "DELL"
     assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
     assert report_with_theme["recommendations"][0]["score"] == report_without_theme["recommendations"][0]["score"]
 
     markdown = render_markdown(report_with_theme)
-    assert "## 主题优先候选" in markdown
+    assert "## 本期重点股票池" in markdown
+    assert "为什么入选" in markdown
     assert "## 主题动量" in markdown
     assert "hbm_memory" in markdown
     assert "DELL" in markdown

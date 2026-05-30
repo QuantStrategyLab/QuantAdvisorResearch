@@ -58,6 +58,30 @@ CADENCE_LABELS_ZH = {
     "monthly": "月度",
 }
 
+SECTOR_LABELS_ZH = {
+    "technology": "科技",
+    "energy": "能源",
+    "financials": "金融",
+    "healthcare": "医疗",
+    "industrials": "工业",
+    "consumer": "消费",
+    "communication_services": "通信服务",
+    "utilities": "公用事业",
+}
+
+EXCLUDED_THEME_PICK_SYMBOLS = {
+    "DIA",
+    "IWM",
+    "QQQ",
+    "SMH",
+    "SOXL",
+    "SOXX",
+    "SPY",
+    "TQQQ",
+    "XLE",
+    "XLK",
+}
+
 
 @dataclass(frozen=True)
 class Event:
@@ -196,6 +220,23 @@ def as_float(value: Any, *, default: float = 0.0) -> float:
         return default
 
 
+def display_number(value: Any, *, digits: int = 2) -> str:
+    if value in {None, ""}:
+        return "无"
+    return f"{as_float(value):.{digits}f}"
+
+
+def display_percent(value: Any, *, digits: int = 1) -> str:
+    if value in {None, ""}:
+        return "无"
+    return f"{as_float(value) * 100:+.{digits}f}%"
+
+
+def sector_label(value: Any) -> str:
+    text = str(value or "").strip()
+    return SECTOR_LABELS_ZH.get(text, text or "未分类")
+
+
 def normalize_ai_mapping(mapping: Any) -> dict[str, Any]:
     if not isinstance(mapping, dict):
         return {}
@@ -263,7 +304,7 @@ def strategy_style(item: WatchlistItem | None, events: list[Event], ai_bias: str
 
 def horizon_fit(style: str, rating: str) -> tuple[str, list[str], str, str]:
     if rating in {"verify_source", "defer", "monitor"}:
-        return "not_applicable", ["not_applicable"], "不适用", "该项不是当前推荐，仅用于来源核验、风险暂缓或持续监控。"
+        return "not_applicable", ["not_applicable"], "不适用", "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。"
     if style == "event_driven":
         return "medium", ["short", "medium"], "中线", "事件驱动主周期为2-12周；1-10个交易日只适合观察催化反应，波动和反转风险更高。"
     if style in {"long_horizon_growth", "value_quality"}:
@@ -279,7 +320,7 @@ def rating_label(rating: str) -> str:
         "watch": "观察",
         "verify_source": "先核验来源",
         "defer": "暂缓",
-        "monitor": "监控",
+        "monitor": "背景跟踪",
     }
     return labels[rating]
 
@@ -310,14 +351,14 @@ def recommendation_tier(rating: str, score: float, confidence: str) -> tuple[str
         return "source_check", "来源核验"
     if rating == "defer":
         return "defer", "暂缓"
-    return "monitor", "监控"
+    return "monitor", "背景跟踪"
 
 
 def build_theme_first_candidates(
     theme_momentum: dict[str, Any] | None,
     recommendations: list[dict[str, Any]],
     *,
-    max_candidates: int = 10,
+    max_candidates: int = 8,
     max_themes: int = 5,
 ) -> list[dict[str, Any]]:
     if not theme_momentum:
@@ -331,12 +372,15 @@ def build_theme_first_candidates(
         theme_rank = int(as_float(theme.get("rank"), default=999))
         theme_id = str(theme.get("theme_id", ""))
         theme_name = str(theme.get("theme_name", ""))
+        theme_sector = str(theme.get("sector", ""))
         theme_score = round(as_float(theme.get("momentum_score")), 6)
         theme_breadth = round(as_float(theme.get("breadth_3m")), 6)
         for item in theme.get("top_symbols", []):
             if not isinstance(item, dict) or not item.get("symbol"):
                 continue
             symbol = str(item["symbol"]).upper()
+            if symbol in EXCLUDED_THEME_PICK_SYMBOLS:
+                continue
             symbol_score = round(as_float(item.get("momentum_score")), 6)
             candidate = by_symbol.setdefault(
                 symbol,
@@ -351,6 +395,7 @@ def build_theme_first_candidates(
                     "best_theme_rank": theme_rank,
                     "primary_theme_id": theme_id,
                     "primary_theme_name": theme_name,
+                    "primary_theme_sector": theme_sector,
                     "primary_theme_score": theme_score,
                     "primary_theme_breadth_3m": theme_breadth,
                     "theme_ids": [],
@@ -366,6 +411,7 @@ def build_theme_first_candidates(
                 candidate["best_theme_rank"] = theme_rank
                 candidate["primary_theme_id"] = theme_id
                 candidate["primary_theme_name"] = theme_name
+                candidate["primary_theme_sector"] = theme_sector
                 candidate["primary_theme_score"] = theme_score
                 candidate["primary_theme_breadth_3m"] = theme_breadth
             if theme_id and theme_id not in candidate["theme_ids"]:
@@ -374,6 +420,7 @@ def build_theme_first_candidates(
                     {
                         "theme_id": theme_id,
                         "theme_name": theme_name,
+                        "sector": theme_sector,
                         "rank": theme_rank,
                         "momentum_score": theme_score,
                         "breadth_3m": theme_breadth,
@@ -402,7 +449,7 @@ def build_theme_first_candidates(
                 source_confirmation = f"已有{rec.get('source_confidence_label', '')}置信事件确认"
         theme_ids = candidate.get("theme_ids", [])
         reasons = [
-            "主题动量排序靠前，适合放入本期主题优先候选池。",
+            "主题和个股动量靠前，适合放入本期主题优先候选池。",
             (
                 f"主主题 #{candidate.get('best_theme_rank')} {candidate.get('primary_theme_id')} "
                 f"主题分数={candidate.get('primary_theme_score')}，3个月广度={candidate.get('primary_theme_breadth_3m')}。"
@@ -411,9 +458,23 @@ def build_theme_first_candidates(
         ]
         if len(theme_ids) > 1:
             reasons.append(f"同时暴露于多个强主题：{', '.join(theme_ids)}。")
+        industry_background = (
+            f"{sector_label(candidate.get('primary_theme_sector'))} / "
+            f"{candidate.get('primary_theme_name') or candidate.get('primary_theme_id')}"
+        )
+        recommendation_summary = (
+            f"属于{industry_background}，主主题排名 #{candidate.get('best_theme_rank')}；"
+            f"个股动量 {display_number(candidate.get('symbol_momentum_score'))}，"
+            f"近3个月 {display_percent(candidate.get('return_3m'))}。"
+        )
+        if len(theme_ids) > 1:
+            recommendation_summary += f" 同时覆盖 {', '.join(theme_ids[:3])} 等主题。"
+        risk_summary = "需复核估值、财报、回撤、流动性和稳定事件证据。"
+        if source_confirmation != "待事件确认":
+            risk_summary = "已有事件确认，但仍需复核估值、财报、回撤和流动性。"
         risk_notes = [
             "该候选来自主题和价格动量排序，不代表个性化建议或下单信号。",
-            "升级为正式推荐前，需要继续复核估值、财报、回撤、流动性和稳定事件证据。",
+            risk_summary,
         ]
         if rec and rec.get("risk_notes"):
             risk_notes.append(str(rec["risk_notes"][0]))
@@ -423,6 +484,9 @@ def build_theme_first_candidates(
                 "rank": index,
                 "advisor_status": advisor_status,
                 "source_confirmation": source_confirmation,
+                "industry_background": industry_background,
+                "recommendation_summary": recommendation_summary,
+                "risk_summary": risk_summary,
                 "reasons": dedupe(reasons),
                 "risk_notes": dedupe(risk_notes),
             }
@@ -691,25 +755,24 @@ def render_markdown(report: dict[str, Any]) -> str:
     ]
     theme_candidates = report.get("theme_first_candidates", [])
     if theme_candidates:
-        lines.extend(["## 主题优先候选", ""])
-        lines.append("- 说明: 该列表按主题/个股动量排序，用于突出 AI 和高科技等强主题候选；不是下单或仓位建议。")
+        lines.extend(["## 本期重点股票池", ""])
+        lines.append("- 先看这里: 每期选出 5-10 个股票/公司标的，说明行业主题、入选理由、事件确认和主要风险。")
+        lines.append("- 边界: 这是非个性化模型股票池，不是买入清单；`待事件确认` 表示稳定事件证据还不足。")
         lines.append("")
         for candidate in theme_candidates:
             lines.extend(
                 [
                     f"### #{candidate.get('rank')} {candidate.get('symbol')} - {candidate.get('advisor_status')}",
                     "",
-                    f"- 主主题: `{candidate.get('primary_theme_id')}` / {candidate.get('primary_theme_name')}",
-                    f"- 个股动量分数: `{candidate.get('symbol_momentum_score')}`",
-                    f"- 3个月收益: `{candidate.get('return_3m', '')}`",
+                    f"- 行业/主题: {candidate.get('industry_background')}",
+                    f"- 主主题: `{candidate.get('primary_theme_id')}`",
+                    f"- 个股动量分数: `{display_number(candidate.get('symbol_momentum_score'))}`",
+                    f"- 近3个月: `{display_percent(candidate.get('return_3m'))}`",
                     f"- 来源确认: `{candidate.get('source_confirmation')}`",
-                    f"- 相关主题: `{', '.join(candidate.get('theme_ids', []))}`",
-                    "- 理由:",
+                    f"- 为什么入选: {candidate.get('recommendation_summary')}",
+                    f"- 主要风险: {candidate.get('risk_summary')}",
                 ]
             )
-            lines.extend(f"  - {reason}" for reason in candidate.get("reasons", []))
-            lines.append("- 风险:")
-            lines.extend(f"  - {risk}" for risk in candidate.get("risk_notes", []))
             lines.append("")
     theme_momentum = report.get("theme_momentum", {})
     if theme_momentum.get("available"):

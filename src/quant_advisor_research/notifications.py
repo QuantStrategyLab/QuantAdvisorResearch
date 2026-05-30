@@ -5,6 +5,7 @@ from typing import Any
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from .advisory_report import display_number, display_percent
 from .publisher import cadence_label, report_filename
 
 
@@ -19,26 +20,28 @@ def _format_themes(report: dict[str, Any], *, limit: int) -> list[str]:
     lines = ["主题动量："]
     for theme in theme_momentum.get("top_themes", [])[:limit]:
         symbols = ", ".join(theme.get("top_symbols", [])[:5]) or "无"
-        lines.append(f"- #{theme.get('rank')} {theme.get('theme_id')} 分数={theme.get('momentum_score')} 标的={symbols}")
+        lines.append(f"- #{theme.get('rank')} {theme.get('theme_id')} 分数={display_number(theme.get('momentum_score'))} 标的={symbols}")
     return lines
 
 
 def _format_theme_candidates(report: dict[str, Any], *, limit: int) -> list[str]:
     candidates = report.get("theme_first_candidates", [])[:limit]
     if not candidates:
-        return ["主题优先候选：暂无"]
-    lines = ["主题优先候选："]
+        return ["本期重点股票池：暂无"]
+    lines = ["本期重点股票池（5-10只，非个性化，不等于买入）："]
     for item in candidates:
         lines.append(
-            "- #{rank} {symbol} | {theme} | 动量={score} | {status} | {confirmation}".format(
+            "- #{rank} {symbol} | {background} | 近3月 {ret3m} | 事件：{confirmation} | 结论：{status}".format(
                 rank=item.get("rank", ""),
                 symbol=item.get("symbol", ""),
-                theme=item.get("primary_theme_id", ""),
-                score=item.get("symbol_momentum_score", ""),
+                background=item.get("industry_background", item.get("primary_theme_id", "")),
+                ret3m=display_percent(item.get("return_3m")),
                 status=item.get("advisor_status", ""),
                 confirmation=item.get("source_confirmation", ""),
             )
         )
+        if item.get("recommendation_summary"):
+            lines.append(f"  为什么：{item.get('recommendation_summary')}")
     return lines
 
 
@@ -50,8 +53,8 @@ def _format_recommendations(report: dict[str, Any], *, limit: int) -> list[str]:
         if item.get("recommendation_tier") in {"tier_1", "tier_2", "watchlist", "source_check"}
     ][:limit]
     if not publishable:
-        return ["推荐摘要：暂无升级标的，请查看完整报告中的监控列表。"]
-    lines = ["推荐摘要："]
+        return ["推荐/观察摘要：暂无升级标的，请查看完整报告中的背景跟踪列表。"]
+    lines = ["推荐/观察摘要："]
     for item in publishable:
         lines.append(
             "- {symbol} | {tier} | {rating} | {horizon} | 分数={score}".format(
@@ -69,7 +72,7 @@ def format_telegram_message(
     report: dict[str, Any],
     *,
     site_url: str,
-    max_recommendations: int = 5,
+    max_recommendations: int = 8,
     max_themes: int = 5,
 ) -> str:
     summary = report.get("summary", {})
