@@ -164,6 +164,12 @@ source artifacts, policy boundary, Git SHA, GitHub run id, and contract version.
 This mirrors the snapshot and AI artifact repos without turning recommendations
 into executable strategy targets.
 
+## Source Mode
+
+Reports built from `examples/` inputs are marked `source_mode=fixture` and the
+HTML/RSS output displays that warning. Live operator-provided inputs are marked
+`source_mode=operator_supplied`.
+
 ## Regulatory Boundary
 
 Even when no orders or allocations are generated, specific securities

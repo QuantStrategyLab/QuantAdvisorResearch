@@ -55,6 +55,10 @@ python scripts/build_advisory_report.py \
 
 manifest 会记录 JSON/Markdown 的 SHA256、`as_of`、cadence、来源 artifact、政策边界、Git SHA、GitHub run id 和 contract version。这样和快照/AI artifact 仓库保持同类版本纪律，但不会把推荐输出变成可执行策略 target。
 
+## 来源模式
+
+如果报告输入来自 `examples/`，输出会标记 `source_mode=fixture`，HTML/RSS 也会显示 fixture 警告，避免把合成样例误认为真实推荐。真实运营输入会标记为 `source_mode=operator_supplied`。
+
 ## 边界
 
 本仓库负责：

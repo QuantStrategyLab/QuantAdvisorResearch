@@ -344,6 +344,14 @@ def dedupe(values: list[str]) -> list[str]:
     return result
 
 
+def source_mode_for_paths(*paths: str | Path | None) -> tuple[str, list[str]]:
+    text = " ".join(str(path or "") for path in paths)
+    warnings: list[str] = []
+    if "/examples/" in text or text.startswith("examples/") or " example" in text:
+        warnings.append("Input artifacts include example fixture paths; do not treat this report as live recommendations.")
+    return ("fixture", warnings) if warnings else ("operator_supplied", warnings)
+
+
 def build_advisory_report(
     *,
     as_of: str,
@@ -359,6 +367,11 @@ def build_advisory_report(
     watchlist = load_watchlist(political_watchlist_path)
     events = load_events(political_events_path, as_of_date)
     ai_signal = load_ai_signal(ai_signal_path)
+    source_mode, data_quality_warnings = source_mode_for_paths(
+        political_events_path,
+        political_watchlist_path,
+        ai_signal_path,
+    )
 
     events_by_symbol: dict[str, list[Event]] = defaultdict(list)
     for event in events:
@@ -400,6 +413,8 @@ def build_advisory_report(
             "source_event_count": len(events),
             "ai_regime": ai_signal.get("regime", "not_available") if ai_signal else "not_available",
             "ai_confidence": ai_signal.get("confidence", 0.0) if ai_signal else 0.0,
+            "source_mode": source_mode,
+            "data_quality_warnings": data_quality_warnings,
             "top_recommended_symbols": [rec["symbol"] for rec in recommendations if rec["recommendation_tier"] == "tier_1"][:5],
             "review_note": "Non-personalized model recommendations. No order, target quantity, account suitability, or portfolio allocation is encoded.",
         },

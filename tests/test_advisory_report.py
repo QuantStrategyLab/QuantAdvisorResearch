@@ -29,6 +29,8 @@ def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     assert report["policy"]["portfolio_allocation_allowed"] is False
     assert report["policy"]["personalized_advice_allowed"] is False
     assert report["policy"]["account_specific_advice_allowed"] is False
+    assert report["summary"]["source_mode"] == "fixture"
+    assert report["summary"]["data_quality_warnings"]
     assert report["recommendations"]
 
 

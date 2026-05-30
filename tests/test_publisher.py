@@ -26,6 +26,7 @@ def test_render_report_html_contains_policy_boundary() -> None:
     assert "execution" in html
     assert "EVT1" in html
     assert "2-12周" in html
+    assert "Source mode: fixture" in html
 
 
 def test_render_feed_xml_contains_report_item() -> None:
@@ -33,6 +34,7 @@ def test_render_feed_xml_contains_report_item() -> None:
 
     assert "<rss version=\"2.0\">" in feed
     assert "2026-05-30 Weekly Model Recommendations" in feed
+    assert "source=fixture" in feed
     assert "Non-personalized model output; no execution, allocation, or account-specific advice." in feed
 
 

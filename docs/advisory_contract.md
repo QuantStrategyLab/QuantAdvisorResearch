@@ -139,3 +139,12 @@ artifacts.markdown.sha256
 policy
 generated_at
 ```
+
+## Source Mode
+
+`summary.source_mode` is:
+
+- `fixture`: one or more inputs came from `examples/`; public output must show a fixture warning.
+- `operator_supplied`: inputs did not come from fixture paths.
+
+`summary.data_quality_warnings` carries any source-mode warnings for renderers.
