@@ -117,5 +117,16 @@ python scripts/publish_advisory_site.py \
 `.github/workflows/publish_advisory_site.yml` 会部署到 GitHub Pages：
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
+发布真实来源时，workflow inputs 要切到 `PoliticalEventTrackingResearch` 内的真实 CSV：
+
+```bash
+gh workflow run "Publish Model Recommendations Site" \
+  --repo QuantStrategyLab/QuantAdvisorResearch \
+  -f as_of=2026-05-30 \
+  -f political_events_path=data/live/political_events.csv \
+  -f political_watchlist_path=data/live/political_watchlist.csv \
+  -f ai_signal_path=data/output/latest_signal.json
+```
+
 通知格式设计见 [docs/notification_format.zh-CN.md](docs/notification_format.zh-CN.md)。
 数据源和因子完善路线见 [docs/data_factor_roadmap.zh-CN.md](docs/data_factor_roadmap.zh-CN.md)。

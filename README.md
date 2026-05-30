@@ -97,6 +97,18 @@ GitHub Pages:
 
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
+For real-source publishing, dispatch the workflow with paths inside sibling
+repositories:
+
+```bash
+gh workflow run "Publish Model Recommendations Site" \
+  --repo QuantStrategyLab/QuantAdvisorResearch \
+  -f as_of=2026-05-30 \
+  -f political_events_path=data/live/political_events.csv \
+  -f political_watchlist_path=data/live/political_watchlist.csv \
+  -f ai_signal_path=data/output/latest_signal.json
+```
+
 Notification channel rules are documented in
 [`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md).
 
