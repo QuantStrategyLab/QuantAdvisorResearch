@@ -59,7 +59,7 @@ class WatchlistItem:
     symbol: str
     name: str
     bucket: str
-    article_status: str
+    research_status: str
     thesis: str
     source_url: str
 
@@ -101,7 +101,7 @@ def load_watchlist(path: str | Path) -> dict[str, WatchlistItem]:
             symbol=symbol,
             name=row.get("name", ""),
             bucket=row.get("bucket", ""),
-            article_status=row.get("article_status", ""),
+            research_status=row.get("research_status") or row.get("article_status", ""),
             thesis=row.get("thesis", ""),
             source_url=row.get("source_url", ""),
         )
@@ -422,4 +422,3 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

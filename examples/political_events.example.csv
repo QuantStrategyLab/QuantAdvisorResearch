@@ -1,7 +1,5 @@
 event_id,event_date,symbol,event_type,direction,confidence,source_url,notes
-lb41260998-dell-disclosure-buy,2026-02-10,DELL,disclosure_buy,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived seed; official filing verification required."
-lb41260998-dell-public-mention,2026-05-08,DELL,public_mention,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived public mention seed."
-lb41260998-mu-disclosure-buy,2026-03-25,MU,disclosure_buy,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived seed; official filing verification required."
-lb41260998-mu-public-mention,2026-05-22,MU,public_mention,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived public mention seed."
-lb41260998-intc-policy-capital,2026-05-01,INTC,policy_capital,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived policy capital seed."
-
+demo-evt1-disclosure-buy,2026-01-10,EVT1,disclosure_buy,bullish,medium,https://example.invalid/official-filing/evt1-2026-01-10,"Synthetic official filing event for advisory pipeline validation."
+demo-evt1-public-mention,2026-01-20,EVT1,public_mention,bullish,medium,https://example.invalid/official-remarks/evt1-2026-01-20,"Synthetic public mention event for advisory pipeline validation."
+demo-evt2-policy-capital,2026-02-05,EVT2,policy_capital,bullish,high,https://example.invalid/policy-capital/evt2-2026-02-05,"Synthetic policy capital event for advisory pipeline validation."
+demo-evt3-disclosure-buy,2026-03-01,EVT3,disclosure_buy,bullish,low,https://example.invalid/unverified-lead/evt3-2026-03-01,"Synthetic low-confidence lead used to verify source-review behavior."

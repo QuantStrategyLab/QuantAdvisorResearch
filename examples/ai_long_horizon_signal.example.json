@@ -4,7 +4,7 @@
   "generated_at": "2026-05-28T14:38:47.474891Z",
   "mode": "shadow",
   "horizon": "1-3 months",
-  "universe": ["SPY", "QQQ", "SOXX", "TQQQ", "BIL", "BOXX", "MU", "DELL"],
+  "universe": ["IDX1", "IDX2", "SECT1", "LEV1", "CASH1", "EVT1", "EVT2"],
   "regime": "mixed",
   "risk_flags": [
     "price_only_context",
@@ -12,14 +12,13 @@
     "no_point_in_time_replay_evidence"
   ],
   "candidate_bias": {
-    "SPY": "positive",
-    "QQQ": "positive",
-    "SOXX": "watch",
-    "TQQQ": "avoid",
-    "MU": "watch",
-    "DELL": "watch",
-    "BIL": "neutral",
-    "BOXX": "neutral"
+    "IDX1": "positive",
+    "IDX2": "positive",
+    "SECT1": "watch",
+    "LEV1": "avoid",
+    "EVT1": "watch",
+    "EVT2": "positive",
+    "CASH1": "neutral"
   },
   "confidence": 0.58,
   "evidence": {
@@ -36,4 +35,3 @@
     "downstream_use": "Research-only shadow context."
   }
 }
-

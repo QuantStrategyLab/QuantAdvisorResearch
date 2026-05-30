@@ -28,7 +28,7 @@ def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     assert report["recommendations"]
 
 
-def test_article_derived_events_remain_source_review_only_until_verified() -> None:
+def test_low_confidence_events_remain_source_review_only_until_verified() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="daily",
@@ -39,9 +39,9 @@ def test_article_derived_events_remain_source_review_only_until_verified() -> No
 
     by_symbol = {recommendation["symbol"]: recommendation for recommendation in report["recommendations"]}
 
-    assert by_symbol["MU"]["action"] == "source_review_only"
-    assert by_symbol["MU"]["stance"] == "watch_pending_source_verification"
-    assert by_symbol["MU"]["evidence_score"] > by_symbol["ORCL"]["evidence_score"]
+    assert by_symbol["EVT3"]["action"] == "source_review_only"
+    assert by_symbol["EVT3"]["stance"] == "watch_pending_source_verification"
+    assert by_symbol["EVT1"]["evidence_score"] > by_symbol["EVT4"]["evidence_score"]
 
 
 def test_ai_avoid_bias_defers_candidate() -> None:
@@ -55,7 +55,7 @@ def test_ai_avoid_bias_defers_candidate() -> None:
 
     by_symbol = {recommendation["symbol"]: recommendation for recommendation in report["recommendations"]}
 
-    assert by_symbol["TQQQ"]["action"] == "avoid_or_defer"
+    assert by_symbol["LEV1"]["action"] == "avoid_or_defer"
 
 
 def test_contract_rejects_execution_enabled_report() -> None:
@@ -85,4 +85,3 @@ def test_render_markdown_contains_policy_section() -> None:
 
     assert "## Policy" in markdown
     assert "Execution allowed: `false`" in markdown
-

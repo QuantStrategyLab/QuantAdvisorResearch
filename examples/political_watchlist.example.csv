@@ -1,8 +1,7 @@
-symbol,name,bucket,article_status,thesis,source_url
-DELL,Dell Technologies,named_mentioned,triggered,"AI servers and data center capex with disclosure plus mention timeline.",https://longbridge.com/zh-CN/topics/41260998.md
-MU,Micron Technology,named_mentioned,triggered,"HBM and DRAM supplier with disclosure plus mention timeline.",https://longbridge.com/zh-CN/topics/41260998.md
-INTC,Intel,policy_capital,triggered,"Policy capital support and semiconductor manufacturing theme.",https://longbridge.com/zh-CN/topics/41260998.md
-ORCL,Oracle,disclosed_holding,watchlist,"Cloud and AI infrastructure watchlist name.",https://longbridge.com/zh-CN/topics/41260998.md
-SPY,SPDR S&P 500 ETF,macro_index,watchlist,"Broad US equity benchmark for AI macro context.",https://example.com/macro-context
-QQQ,Invesco QQQ ETF,macro_index,watchlist,"Growth benchmark for AI macro context.",https://example.com/macro-context
-
+symbol,name,bucket,research_status,thesis,source_url
+EVT1,Example Catalyst One,named_mentioned,triggered,"Synthetic disclosure plus mention candidate used only to validate advisory output.",https://example.invalid/watchlist/evt1
+EVT2,Example Policy Two,policy_capital,triggered,"Synthetic policy capital candidate used only to validate advisory output.",https://example.invalid/watchlist/evt2
+EVT3,Example Review Three,disclosed_holding,watchlist,"Synthetic low-confidence candidate used only to validate source-review behavior.",https://example.invalid/watchlist/evt3
+EVT4,Example Monitor Four,drone_policy_watchlist,watchlist,"Synthetic watch-only candidate used only to validate monitor behavior.",https://example.invalid/watchlist/evt4
+IDX1,Example Broad Index,macro_index,watchlist,"Synthetic broad-market benchmark for AI macro context.",https://example.invalid/macro-context/idx1
+IDX2,Example Growth Index,macro_index,watchlist,"Synthetic growth benchmark for AI macro context.",https://example.invalid/macro-context/idx2
