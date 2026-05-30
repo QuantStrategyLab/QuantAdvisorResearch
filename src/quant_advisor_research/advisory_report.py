@@ -15,7 +15,9 @@ from .csv_utils import read_csv_rows
 EVENT_WEIGHTS = {
     "public_mention": 4,
     "policy_capital": 4,
+    "procurement": 4,
     "disclosure_buy": 3,
+    "regulatory_action": 3,
     "market_reaction": 1,
 }
 
@@ -136,7 +138,7 @@ def clamp(value: float, lower: float, upper: float) -> float:
 def candidate_style(item: WatchlistItem | None, events: list[Event], ai_bias: str | None) -> str:
     event_types = {event.event_type for event in events}
     bucket = item.bucket if item else ""
-    if "policy_capital" in event_types or "public_mention" in event_types or "disclosure_buy" in event_types:
+    if event_types & {"policy_capital", "procurement", "regulatory_action", "public_mention", "disclosure_buy"}:
         return "event_driven_speculation"
     if bucket == "macro_index" or ai_bias in {"positive", "negative"}:
         return "defensive_macro_context" if ai_bias in {"negative", "avoid"} else "long_horizon_growth"

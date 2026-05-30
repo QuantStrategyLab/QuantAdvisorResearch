@@ -60,6 +60,23 @@ Run tests:
 python -m pytest -q
 ```
 
+Build the weekly report from sibling checkouts:
+
+```bash
+python scripts/build_advisory_report.py \
+  --as-of 2026-05-30 \
+  --cadence weekly \
+  --political-events ../PoliticalEventTrackingResearch/examples/political_events.example.csv \
+  --political-watchlist ../PoliticalEventTrackingResearch/examples/political_watchlist.example.csv \
+  --ai-signal ../AiLongHorizonSignalPipelines/data/output/latest_signal.json \
+  --output-json data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
+  --output-md data/output/weekly_advisory_review/advisory_report_2026-05-30.md
+```
+
+`.github/workflows/weekly_advisory_review.yml` runs the same command on a weekly
+schedule and uploads the report as a GitHub Actions artifact. It does not commit
+files, create orders, or notify investors.
+
 ## Output Contract
 
 The main JSON artifact is `AdvisoryReport`:
@@ -106,4 +123,3 @@ See:
 - SEC automated investment advice resources: <https://www.sec.gov/about/divisions-offices/office-strategic-hub-innovation-financial-technology-finhub/automated-investment-advice>
 - FINRA Regulation Best Interest: <https://www.finra.org/rules-guidance/key-topics/regulation-best-interest>
 - FINRA suitability: <https://www.finra.org/rules-guidance/key-topics/suitability>
-

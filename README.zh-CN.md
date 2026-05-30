@@ -72,3 +72,9 @@ python scripts/build_advisory_report.py \
 python -m pytest -q
 ```
 
+## 周度复盘
+
+`.github/workflows/weekly_advisory_review.yml` 会 checkout 本仓库、`PoliticalEventTrackingResearch`
+和 `AiLongHorizonSignalPipelines`，生成周度 `recommendation_only` 报告并上传为 GitHub Actions artifact。
+
+它不会提交文件、不会通知投资者、不会创建订单。
