@@ -86,8 +86,10 @@ python scripts/publish_advisory_site.py \
 ```
 
 Open `site/index.html` locally or subscribe to `site/feed.xml`. The workflow
-`.github/workflows/publish_advisory_site.yml` can deploy the same output to
-GitHub Pages after Pages is enabled for the repository.
+`.github/workflows/publish_advisory_site.yml` deploys the same output to
+GitHub Pages:
+
+<https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
 Notification channel rules are documented in
 [`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md).

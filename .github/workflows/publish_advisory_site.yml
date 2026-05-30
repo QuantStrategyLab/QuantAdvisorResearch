@@ -23,6 +23,9 @@ permissions:
 jobs:
   build-site:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout advisor repository
         uses: actions/checkout@v6
@@ -72,10 +75,12 @@ jobs:
           name: model-recommendations-site
           path: advisor/site
           if-no-files-found: error
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: advisor/site
       - name: Deploy to GitHub Pages
-        continue-on-error: true
-        uses: actions/deploy-pages@v4
+        id: deployment
+        uses: actions/deploy-pages@v5

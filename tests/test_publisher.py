@@ -25,6 +25,7 @@ def test_render_report_html_contains_policy_boundary() -> None:
     assert "Policy boundary" in html
     assert "execution" in html
     assert "EVT1" in html
+    assert "2-12周" in html
 
 
 def test_render_feed_xml_contains_report_item() -> None:

@@ -97,7 +97,8 @@ python scripts/publish_advisory_site.py \
 ```
 
 本地打开 `site/index.html`，RSS 文件是 `site/feed.xml`。
-`.github/workflows/publish_advisory_site.yml` 可以在仓库启用 GitHub Pages 后部署同样的输出。
+`.github/workflows/publish_advisory_site.yml` 会部署到 GitHub Pages：
+<https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
 通知格式设计见 [docs/notification_format.zh-CN.md](docs/notification_format.zh-CN.md)。
 数据源和因子完善路线见 [docs/data_factor_roadmap.zh-CN.md](docs/data_factor_roadmap.zh-CN.md)。
