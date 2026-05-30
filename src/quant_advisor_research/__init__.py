@@ -1,4 +1,4 @@
-"""Research-radar orchestration without direct stock recommendations."""
+"""Non-personalized model recommendation orchestration."""
 
 __all__ = ["__version__"]
 

@@ -10,14 +10,28 @@ class AdvisoryValidationError(ValueError):
 
 
 ALLOWED_CADENCES = frozenset({"daily", "weekly", "monthly"})
-ALLOWED_REVIEW_STATUSES = frozenset({"verify_source", "observe", "evidence_review", "risk_defer", "context_monitor"})
-ALLOWED_RESEARCH_LENSES = frozenset(
+ALLOWED_RECOMMENDATION_RATINGS = frozenset({"recommend", "watch", "verify_source", "defer", "monitor"})
+ALLOWED_HORIZONS = frozenset({"short", "medium", "long", "not_applicable"})
+ALLOWED_STRATEGY_STYLES = frozenset(
     {
-        "event_research",
-        "long_horizon_context",
-        "quality_review",
+        "event_driven",
+        "long_horizon_growth",
+        "value_quality",
         "macro_context",
         "mixed_research",
+    }
+)
+DISALLOWED_ACCOUNT_ACTION_KEYS = frozenset(
+    {
+        "account_id",
+        "broker",
+        "order_type",
+        "shares",
+        "target_quantity",
+        "target_weight",
+        "portfolio_weight",
+        "entry_order",
+        "exit_order",
     }
 )
 
@@ -74,69 +88,72 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         "audience_scope",
         "source_artifacts",
         "summary",
-        "research_items",
+        "recommendations",
         "policy",
     )
     missing = [key for key in required if key not in payload]
     if missing:
         raise AdvisoryValidationError(f"missing required keys: {', '.join(missing)}")
 
-    if payload["schema_version"] != "2":
-        raise AdvisoryValidationError("schema_version must be '2'")
+    if payload["schema_version"] != "3":
+        raise AdvisoryValidationError("schema_version must be '3'")
     _require_iso_date(payload["as_of"], "as_of")
     _require_iso_datetime(payload["generated_at"], "generated_at")
-    if payload["mode"] != "research_radar":
-        raise AdvisoryValidationError("mode must be research_radar")
+    if payload["mode"] != "model_recommendations":
+        raise AdvisoryValidationError("mode must be model_recommendations")
     if payload["cadence"] not in ALLOWED_CADENCES:
         raise AdvisoryValidationError(f"cadence must be one of: {', '.join(sorted(ALLOWED_CADENCES))}")
-    if payload["audience_scope"] != "non_personalized_research":
-        raise AdvisoryValidationError("audience_scope must be non_personalized_research")
+    if payload["audience_scope"] != "non_personalized_model_research":
+        raise AdvisoryValidationError("audience_scope must be non_personalized_model_research")
 
     _require_mapping(payload["source_artifacts"], "source_artifacts")
     _require_mapping(payload["summary"], "summary")
 
-    research_items = _require_sequence(payload["research_items"], "research_items")
-    for index, research_item in enumerate(research_items):
-        item = _require_mapping(research_item, f"research_items[{index}]")
-        legacy_keys = {"action", "stance", "conviction", "recommendation"}
-        present_legacy_keys = sorted(legacy_keys & set(item))
-        if present_legacy_keys:
+    recommendations = _require_sequence(payload["recommendations"], "recommendations")
+    for index, recommendation in enumerate(recommendations):
+        rec = _require_mapping(recommendation, f"recommendations[{index}]")
+        account_keys = sorted(DISALLOWED_ACCOUNT_ACTION_KEYS & set(rec))
+        if account_keys:
             raise AdvisoryValidationError(
-                f"research_items[{index}] contains direct-recommendation wording: {', '.join(present_legacy_keys)}"
+                f"recommendations[{index}] contains account-action fields: {', '.join(account_keys)}"
             )
         for key in (
             "symbol",
-            "research_view",
-            "review_status",
-            "research_lens",
-            "research_priority",
+            "rating",
+            "rating_label",
+            "primary_horizon",
+            "suitable_horizons",
+            "strategy_style",
+            "score",
             "evidence_score",
             "risk_score",
-            "evidence_summary",
-            "risks",
+            "reasons",
+            "risk_notes",
             "evidence_refs",
             "review_checklist",
-            "not_investment_rating",
         ):
-            if key not in item:
-                raise AdvisoryValidationError(f"research_items[{index}] missing {key}")
-        _require_string(item["symbol"], f"research_items[{index}].symbol")
-        _require_string(item["research_view"], f"research_items[{index}].research_view")
-        if item["review_status"] not in ALLOWED_REVIEW_STATUSES:
-            raise AdvisoryValidationError(f"research_items[{index}].review_status is not allowed")
-        if item["research_lens"] not in ALLOWED_RESEARCH_LENSES:
-            raise AdvisoryValidationError(f"research_items[{index}].research_lens is not allowed")
-        _require_number_0_1(item["research_priority"], f"research_items[{index}].research_priority")
-        if not isinstance(item["evidence_score"], int):
-            raise AdvisoryValidationError(f"research_items[{index}].evidence_score must be an integer")
-        if not isinstance(item["risk_score"], int):
-            raise AdvisoryValidationError(f"research_items[{index}].risk_score must be an integer")
-        _require_string(item["evidence_summary"], f"research_items[{index}].evidence_summary")
-        _require_sequence(item["risks"], f"research_items[{index}].risks")
-        _require_sequence(item["evidence_refs"], f"research_items[{index}].evidence_refs")
-        _require_sequence(item["review_checklist"], f"research_items[{index}].review_checklist")
-        if item["not_investment_rating"] is not True:
-            raise AdvisoryValidationError(f"research_items[{index}].not_investment_rating must be true")
+            if key not in rec:
+                raise AdvisoryValidationError(f"recommendations[{index}] missing {key}")
+        _require_string(rec["symbol"], f"recommendations[{index}].symbol")
+        if rec["rating"] not in ALLOWED_RECOMMENDATION_RATINGS:
+            raise AdvisoryValidationError(f"recommendations[{index}].rating is not allowed")
+        _require_string(rec["rating_label"], f"recommendations[{index}].rating_label")
+        if rec["primary_horizon"] not in ALLOWED_HORIZONS:
+            raise AdvisoryValidationError(f"recommendations[{index}].primary_horizon is not allowed")
+        horizons = _require_sequence(rec["suitable_horizons"], f"recommendations[{index}].suitable_horizons")
+        if any(horizon not in ALLOWED_HORIZONS for horizon in horizons):
+            raise AdvisoryValidationError(f"recommendations[{index}].suitable_horizons contains an unsupported horizon")
+        if rec["strategy_style"] not in ALLOWED_STRATEGY_STYLES:
+            raise AdvisoryValidationError(f"recommendations[{index}].strategy_style is not allowed")
+        _require_number_0_1(rec["score"], f"recommendations[{index}].score")
+        if not isinstance(rec["evidence_score"], int):
+            raise AdvisoryValidationError(f"recommendations[{index}].evidence_score must be an integer")
+        if not isinstance(rec["risk_score"], int):
+            raise AdvisoryValidationError(f"recommendations[{index}].risk_score must be an integer")
+        _require_sequence(rec["reasons"], f"recommendations[{index}].reasons")
+        _require_sequence(rec["risk_notes"], f"recommendations[{index}].risk_notes")
+        _require_sequence(rec["evidence_refs"], f"recommendations[{index}].evidence_refs")
+        _require_sequence(rec["review_checklist"], f"recommendations[{index}].review_checklist")
 
     policy = _require_mapping(payload["policy"], "policy")
     if policy.get("execution_allowed") is not False:
@@ -145,6 +162,8 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         raise AdvisoryValidationError("policy.portfolio_allocation_allowed must be false")
     if policy.get("personalized_advice_allowed") is not False:
         raise AdvisoryValidationError("policy.personalized_advice_allowed must be false")
-    if policy.get("direct_stock_recommendation_allowed") is not False:
-        raise AdvisoryValidationError("policy.direct_stock_recommendation_allowed must be false")
+    if policy.get("non_personalized_recommendations_allowed") is not True:
+        raise AdvisoryValidationError("policy.non_personalized_recommendations_allowed must be true")
+    if policy.get("account_specific_advice_allowed") is not False:
+        raise AdvisoryValidationError("policy.account_specific_advice_allowed must be false")
     _require_string(policy.get("downstream_use"), "policy.downstream_use")

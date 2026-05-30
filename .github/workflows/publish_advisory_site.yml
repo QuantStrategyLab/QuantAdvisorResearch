@@ -1,4 +1,4 @@
-name: Publish Research Radar Site
+name: Publish Model Recommendations Site
 
 on:
   workflow_dispatch:
@@ -65,11 +65,11 @@ jobs:
             --reports "data/output/published/advisory_report_${AS_OF}.json" \
             --output-dir site \
             --site-url "${SITE_URL}" \
-            --feed-title "Quant Research Radar"
+            --feed-title "Quant Model Recommendations"
       - name: Upload site artifact
         uses: actions/upload-artifact@v7
         with:
-          name: research-radar-site
+          name: model-recommendations-site
           path: advisor/site
           if-no-files-found: error
       - name: Upload Pages artifact

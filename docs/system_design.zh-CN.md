@@ -13,7 +13,7 @@ QuantStrategyLab 现有仓库已经天然分层：
 
 `QuantAdvisorResearch` 只做协调和报告，不侵入上述职责。
 
-## 研究雷达数据流
+## 模型推荐数据流
 
 ```text
 PoliticalEventTrackingResearch
@@ -25,7 +25,7 @@ event evidence + source confidence
 QuantAdvisorResearch <--- AiLongHorizonSignalPipelines latest_signal.json
         |
         v
-research-radar artifact
+model-recommendation artifact
         |
         v
 GitHub Issue / Markdown / static HTML / RSS / manual review
@@ -44,9 +44,9 @@ QuantStrategyPlugins risk artifacts
 - Ports and Adapters：隔离事件、AI、快照、策略 metadata 等输入。
 - Strategy：不同研究视角可替换，如价值、事件驱动、趋势、风险防守。
 - Pipeline：输入载入、候选聚合、评分、风控、报告渲染分阶段执行。
-- Repository：保存 point-in-time research radar artifact，用于后续 replay。
+- Repository：保存 point-in-time model recommendation artifact，用于后续 replay。
 - Command：日评、周评、月评、历史回顾都用可审计命令触发。
-- Specification：把“不能给买卖评级”“只能来源复核”“不能下单”的政策写成显式规则。
+- Specification：把“允许非个性化模型推荐”“不能下单”“不能给账户级仓位”的政策写成显式规则。
 
 ## 不推荐方案
 
@@ -58,15 +58,15 @@ QuantStrategyPlugins risk artifacts
 
 不建议直接接券商仓库：
 
-- 会模糊“研究线索”与“执行”边界。
-- 容易把 research radar artifact 误用成 target allocation。
+- 会模糊“模型推荐”与“执行”边界。
+- 容易把 model recommendation artifact 误用成 target allocation。
 - 增加合规和操作风险。
 
 ## MVP 验证标准
 
 - 能读取政治事件 CSV 和 AI shadow JSON。
-- 能生成 `research_radar` JSON artifact。
+- 能生成 `model_recommendations` JSON artifact。
 - 能生成日/周/月 Markdown 复盘。
 - 能生成静态 HTML 和 RSS feed 供非个性化订阅。
-- 所有 artifact 明确禁止买/卖/持有评级、下单、调仓、个性化建议。
-- 后续可以 replay 历史研究雷达，而不是重写过去判断。
+- 所有 artifact 明确允许非个性化模型推荐，但禁止下单、调仓、账户级仓位和个性化建议。
+- 后续可以 replay 历史模型推荐，而不是重写过去判断。

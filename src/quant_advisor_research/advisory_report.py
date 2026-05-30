@@ -135,19 +135,42 @@ def clamp(value: float, lower: float, upper: float) -> float:
     return max(lower, min(value, upper))
 
 
-def research_lens(item: WatchlistItem | None, events: list[Event], ai_bias: str | None) -> str:
+def strategy_style(item: WatchlistItem | None, events: list[Event], ai_bias: str | None) -> str:
     event_types = {event.event_type for event in events}
     bucket = item.bucket if item else ""
     if event_types & {"policy_capital", "procurement", "regulatory_action", "public_mention", "disclosure_buy"}:
-        return "event_research"
+        return "event_driven"
     if bucket == "macro_index" or ai_bias in {"positive", "negative"}:
-        return "macro_context" if ai_bias in {"negative", "avoid"} else "long_horizon_context"
+        return "macro_context" if ai_bias in {"negative", "avoid"} else "long_horizon_growth"
     if bucket in {"disclosed_holding", "named_mentioned"}:
-        return "quality_review"
+        return "value_quality"
     return "mixed_research"
 
 
-def build_research_item(
+def horizon_fit(style: str, rating: str) -> tuple[str, list[str], str]:
+    if rating in {"verify_source", "defer", "monitor"}:
+        return "not_applicable", ["not_applicable"], "不适用"
+    if style == "event_driven":
+        return "medium", ["short", "medium"], "中线"
+    if style in {"long_horizon_growth", "value_quality"}:
+        return "long", ["medium", "long"], "长线"
+    if style == "macro_context":
+        return "medium", ["medium"], "中线"
+    return "medium", ["medium"], "中线"
+
+
+def rating_label(rating: str) -> str:
+    labels = {
+        "recommend": "重点推荐",
+        "watch": "观察",
+        "verify_source": "先核验来源",
+        "defer": "暂缓",
+        "monitor": "监控",
+    }
+    return labels[rating]
+
+
+def build_recommendation(
     symbol: str,
     item: WatchlistItem | None,
     events: list[Event],
@@ -205,61 +228,60 @@ def build_research_item(
         data_gaps = ai_signal.get("evidence", {}).get("data_gaps", [])
         if data_gaps:
             risks.append("AI shadow context reports unresolved data gaps.")
-            review_checklist.append("Review AI shadow data gaps before escalating the item to a strategy review.")
+            review_checklist.append("Review AI shadow data gaps before escalating the recommendation.")
 
     if ai_bias in {"avoid", "negative"}:
-        review_status = "risk_defer"
-        research_view = "risk_resolution_first"
+        rating = "defer"
     elif low_confidence_count and not any(event.confidence in {"medium", "high"} for event in events):
-        review_status = "verify_source"
-        research_view = "source_verification_required"
+        rating = "verify_source"
     elif evidence_score >= 12 and risk_score <= 7:
-        review_status = "evidence_review"
-        research_view = "high_evidence_review"
+        rating = "recommend"
     elif evidence_score >= 5:
-        review_status = "observe"
-        research_view = "watchlist_review"
+        rating = "watch"
     else:
-        review_status = "context_monitor"
-        research_view = "context_only"
+        rating = "monitor"
 
-    lens = research_lens(item, events, ai_bias)
-    research_priority = round(clamp((evidence_score - risk_score + 8) / 24, 0.05, 0.85), 2)
+    style = strategy_style(item, events, ai_bias)
+    score = round(clamp((evidence_score - risk_score + 8) / 24, 0.05, 0.85), 2)
+    primary_horizon, suitable_horizons, primary_horizon_label = horizon_fit(style, rating)
 
-    thesis_parts: list[str] = []
+    reasons: list[str] = []
     if item and item.thesis:
-        thesis_parts.append(item.thesis)
+        reasons.append(item.thesis)
     if events:
         event_names = ", ".join(sorted({event.event_type for event in events}))
-        thesis_parts.append(f"Observed event evidence: {event_names}.")
+        reasons.append(f"Observed event evidence: {event_names}.")
     if ai_bias:
-        thesis_parts.append(f"AI shadow bias is {ai_bias} with regime={ai_regime}.")
-    if not thesis_parts:
-        thesis_parts.append("No strong point-in-time evidence yet; keep as context only.")
+        reasons.append(f"AI shadow bias is {ai_bias} with regime={ai_regime}.")
+    if not reasons:
+        reasons.append("No strong point-in-time evidence yet; keep as context only.")
 
     if not risks:
-        risks.append("Research item may be stale without fresh market, valuation, source, and liquidity checks.")
+        risks.append("Recommendation may be stale without fresh market, valuation, source, and liquidity checks.")
     review_checklist.extend(
         [
             "Check latest price action, earnings calendar, valuation, and sector news.",
-            "Document source quality and research limits before any separate strategy discussion.",
+            "Document source quality and model limits before any separate strategy discussion.",
         ]
     )
 
     return {
         "symbol": symbol,
         "name": item.name if item else symbol,
-        "research_view": research_view,
-        "review_status": review_status,
-        "research_lens": lens,
-        "research_priority": research_priority,
+        "rating": rating,
+        "rating_label": rating_label(rating),
+        "primary_horizon": primary_horizon,
+        "primary_horizon_label": primary_horizon_label,
+        "suitable_horizons": suitable_horizons,
+        "strategy_style": style,
+        "score": score,
         "evidence_score": int(evidence_score),
         "risk_score": int(risk_score),
-        "evidence_summary": " ".join(thesis_parts),
-        "risks": dedupe(risks),
+        "reasons": dedupe(reasons),
+        "risk_notes": dedupe(risks),
+        "evidence_summary": " ".join(reasons),
         "evidence_refs": dedupe(evidence_refs),
         "review_checklist": dedupe(review_checklist),
-        "not_investment_rating": True,
     }
 
 
@@ -299,8 +321,8 @@ def build_advisory_report(
         ai_bias_symbols = ai_signal.get("research_bias") or ai_signal.get("candidate_bias", {})
         symbols |= {symbol.upper() for symbol in ai_bias_symbols}
 
-    research_items = [
-        build_research_item(
+    recommendations = [
+        build_recommendation(
             symbol=symbol,
             item=watchlist.get(symbol),
             events=sorted(events_by_symbol.get(symbol, []), key=lambda event: event.event_date),
@@ -309,36 +331,37 @@ def build_advisory_report(
         )
         for symbol in sorted(symbols)
     ]
-    research_items.sort(key=lambda item: (-item["evidence_score"], item["risk_score"], item["symbol"]))
-    research_items = research_items[:max_candidates]
+    recommendations.sort(key=lambda rec: (-rec["evidence_score"], rec["risk_score"], rec["symbol"]))
+    recommendations = recommendations[:max_candidates]
 
     report = {
-        "schema_version": "2",
+        "schema_version": "3",
         "as_of": as_of_date.isoformat(),
         "generated_at": utc_now_iso(),
-        "mode": "research_radar",
+        "mode": "model_recommendations",
         "cadence": cadence,
-        "audience_scope": "non_personalized_research",
+        "audience_scope": "non_personalized_model_research",
         "source_artifacts": {
             "political_events": str(political_events_path),
             "political_watchlist": str(political_watchlist_path),
             "ai_signal": str(ai_signal_path) if ai_signal_path else "",
         },
         "summary": {
-            "item_count": len(research_items),
+            "recommendation_count": len(recommendations),
             "source_event_count": len(events),
             "ai_regime": ai_signal.get("regime", "not_available") if ai_signal else "not_available",
             "ai_confidence": ai_signal.get("confidence", 0.0) if ai_signal else 0.0,
-            "top_review_symbols": [item["symbol"] for item in research_items[:5]],
-            "review_note": "Research radar only. No buy/sell/hold rating, order, target quantity, or portfolio allocation is encoded.",
+            "top_recommended_symbols": [rec["symbol"] for rec in recommendations if rec["rating"] == "recommend"][:5],
+            "review_note": "Non-personalized model recommendations. No order, target quantity, account suitability, or portfolio allocation is encoded.",
         },
-        "research_items": research_items,
+        "recommendations": recommendations,
         "policy": {
+            "non_personalized_recommendations_allowed": True,
             "execution_allowed": False,
             "portfolio_allocation_allowed": False,
             "personalized_advice_allowed": False,
-            "direct_stock_recommendation_allowed": False,
-            "downstream_use": "Research triage only; do not treat as buy/sell/hold signal, broker execution, or account-level allocation.",
+            "account_specific_advice_allowed": False,
+            "downstream_use": "Model recommendation research only; do not route to broker execution or account-level allocation.",
         },
     }
     validate_advisory_report(report)
@@ -347,7 +370,7 @@ def build_advisory_report(
 
 def render_markdown(report: dict[str, Any]) -> str:
     lines = [
-        f"# Quant Research Radar {report['cadence'].title()} Review",
+        f"# Quant Model Recommendations {report['cadence'].title()} Review",
         "",
         f"- As of: `{report['as_of']}`",
         f"- Mode: `{report['mode']}`",
@@ -359,29 +382,30 @@ def render_markdown(report: dict[str, Any]) -> str:
         "- Execution allowed: `false`",
         "- Portfolio allocation allowed: `false`",
         "- Personalized advice allowed: `false`",
-        "- Direct stock recommendation allowed: `false`",
+        "- Non-personalized recommendations allowed: `true`",
+        "- Account-specific advice allowed: `false`",
         "",
-        "## Highest Review Priority",
+        "## 推荐列表",
         "",
     ]
-    for item in report["research_items"]:
+    for rec in report["recommendations"]:
         lines.extend(
             [
-                f"### {item['symbol']} - {item['review_status']}",
+                f"### {rec['symbol']} - {rec['rating_label']}",
                 "",
-                f"- Research view: `{item['research_view']}`",
-                f"- Research lens: `{item['research_lens']}`",
-                f"- Research priority: `{item['research_priority']}`",
-                "- Not an investment rating: `true`",
-                f"- Evidence score: `{item['evidence_score']}`",
-                f"- Risk score: `{item['risk_score']}`",
-                f"- Evidence summary: {item['evidence_summary']}",
-                "- Risks:",
+                f"- 适合周期: `{rec['primary_horizon_label']}`",
+                f"- Strategy style: `{rec['strategy_style']}`",
+                f"- Model score: `{rec['score']}`",
+                f"- Evidence score: `{rec['evidence_score']}`",
+                f"- Risk score: `{rec['risk_score']}`",
+                "- 理由:",
             ]
         )
-        lines.extend(f"  - {risk}" for risk in item["risks"])
-        lines.append("- Review checklist:")
-        lines.extend(f"  - {check}" for check in item["review_checklist"])
+        lines.extend(f"  - {reason}" for reason in rec["reasons"])
+        lines.append("- 风险:")
+        lines.extend(f"  - {risk}" for risk in rec["risk_notes"])
+        lines.append("- 复核清单:")
+        lines.extend(f"  - {check}" for check in rec["review_checklist"])
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -401,7 +425,7 @@ def write_text(path: str | Path, content: str) -> None:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build a research radar report without direct stock recommendations.")
+    parser = argparse.ArgumentParser(description="Build a non-personalized model recommendation report.")
     parser.add_argument("--as-of", required=True, help="Report date in YYYY-MM-DD format.")
     parser.add_argument("--cadence", required=True, choices=sorted(ALLOWED_CADENCES))
     parser.add_argument("--political-events", required=True, help="Political event CSV.")

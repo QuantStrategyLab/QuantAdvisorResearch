@@ -31,8 +31,8 @@ def test_render_feed_xml_contains_report_item() -> None:
     feed = render_feed_xml([build_sample_report()], site_url="https://example.com/advisor", feed_title="Test Feed")
 
     assert "<rss version=\"2.0\">" in feed
-    assert "2026-05-30 Weekly Research Radar" in feed
-    assert "No buy/sell/hold rating, execution, or portfolio allocation." in feed
+    assert "2026-05-30 Weekly Model Recommendations" in feed
+    assert "Non-personalized model output; no execution, allocation, or account-specific advice." in feed
 
 
 def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
@@ -45,4 +45,4 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     filenames = {path.name for path in written}
     assert "index.html" in filenames
     assert "feed.xml" in filenames
-    assert "2026-05-30-weekly-research-radar.html" in filenames
+    assert "2026-05-30-weekly-model-recommendations.html" in filenames
