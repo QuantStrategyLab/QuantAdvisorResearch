@@ -1,0 +1,8 @@
+symbol,name,bucket,article_status,thesis,source_url
+DELL,Dell Technologies,named_mentioned,triggered,"AI servers and data center capex with disclosure plus mention timeline.",https://longbridge.com/zh-CN/topics/41260998.md
+MU,Micron Technology,named_mentioned,triggered,"HBM and DRAM supplier with disclosure plus mention timeline.",https://longbridge.com/zh-CN/topics/41260998.md
+INTC,Intel,policy_capital,triggered,"Policy capital support and semiconductor manufacturing theme.",https://longbridge.com/zh-CN/topics/41260998.md
+ORCL,Oracle,disclosed_holding,watchlist,"Cloud and AI infrastructure watchlist name.",https://longbridge.com/zh-CN/topics/41260998.md
+SPY,SPDR S&P 500 ETF,macro_index,watchlist,"Broad US equity benchmark for AI macro context.",https://example.com/macro-context
+QQQ,Invesco QQQ ETF,macro_index,watchlist,"Growth benchmark for AI macro context.",https://example.com/macro-context
+

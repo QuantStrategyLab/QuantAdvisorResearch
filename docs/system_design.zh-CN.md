@@ -1,0 +1,72 @@
+# 智慧顾投研究系统设计
+
+## 当前架构理解
+
+QuantStrategyLab 现有仓库已经天然分层：
+
+- `PoliticalEventTrackingResearch`：事实事件层。
+- `AiLongHorizonSignalPipelines`：AI 长周期 shadow 观点层。
+- `UsEquitySnapshotPipelines`：特征快照和研究回测层。
+- `UsEquityStrategies`：确定性策略规则层。
+- `QuantStrategyPlugins`：sidecar 风控、事件和通知 artifact 层。
+- 券商平台仓库：执行、通知、凭证和运行时适配层。
+
+`QuantAdvisorResearch` 只做协调和报告，不侵入上述职责。
+
+## 推荐数据流
+
+```text
+PoliticalEventTrackingResearch
+        |
+        v
+event evidence + source confidence
+        |
+        v
+QuantAdvisorResearch <--- AiLongHorizonSignalPipelines latest_signal.json
+        |
+        v
+recommendation-only advisory report
+        |
+        v
+GitHub Issue / Markdown / dashboard / manual review
+```
+
+未来可继续接入：
+
+```text
+UsEquitySnapshotPipelines ranking artifacts
+UsEquityStrategies strategy metadata
+QuantStrategyPlugins risk artifacts
+```
+
+## 设计模式
+
+- Ports and Adapters：隔离事件、AI、快照、策略 metadata 等输入。
+- Strategy：不同 advisory 风格可替换，如价值、事件驱动、趋势、风险防守。
+- Pipeline：输入载入、候选聚合、评分、风控、报告渲染分阶段执行。
+- Repository：保存 point-in-time advisory artifact，用于后续 replay。
+- Command：日评、周评、月评、历史回顾都用可审计命令触发。
+- Specification：把“不能推荐”“只能来源复核”“不能下单”的政策写成显式规则。
+
+## 不推荐方案
+
+不建议把 `PoliticalEventTrackingResearch` 和 `AiLongHorizonSignalPipelines` 合并：
+
+- 事实与模型观点混在一起会降低可审计性。
+- 事件高频、AI 长周期，两者 cadence 不同。
+- 未来出错时很难判断是事实错误、模型判断错误还是策略规则错误。
+
+不建议直接接券商仓库：
+
+- 会模糊“建议”与“执行”边界。
+- 容易把 advisory artifact 误用成 target allocation。
+- 增加合规和操作风险。
+
+## MVP 验证标准
+
+- 能读取政治事件 CSV 和 AI shadow JSON。
+- 能生成 `recommendation_only` JSON artifact。
+- 能生成日/周/月 Markdown 复盘。
+- 所有 artifact 明确禁止下单、调仓、个性化建议。
+- 后续可以 replay 历史建议，而不是重写过去判断。
+

@@ -1,0 +1,7 @@
+event_id,event_date,symbol,event_type,direction,confidence,source_url,notes
+lb41260998-dell-disclosure-buy,2026-02-10,DELL,disclosure_buy,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived seed; official filing verification required."
+lb41260998-dell-public-mention,2026-05-08,DELL,public_mention,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived public mention seed."
+lb41260998-mu-disclosure-buy,2026-03-25,MU,disclosure_buy,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived seed; official filing verification required."
+lb41260998-mu-public-mention,2026-05-22,MU,public_mention,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived public mention seed."
+lb41260998-intc-policy-capital,2026-05-01,INTC,policy_capital,bullish,low,https://longbridge.com/zh-CN/topics/41260998.md,"Article-derived policy capital seed."
+
