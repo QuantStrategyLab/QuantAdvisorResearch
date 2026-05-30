@@ -1,0 +1,75 @@
+name: Publish Advisory Site
+
+on:
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "Report date. Defaults to current UTC date when empty."
+        required: false
+        type: string
+      site_url:
+        description: "Public site URL used in RSS links."
+        required: false
+        default: "https://quantstrategylab.github.io/QuantAdvisorResearch"
+        type: string
+  schedule:
+    - cron: "0 13 * * 6"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout advisor repository
+        uses: actions/checkout@v6
+        with:
+          path: advisor
+      - name: Checkout political event repository
+        uses: actions/checkout@v6
+        with:
+          repository: QuantStrategyLab/PoliticalEventTrackingResearch
+          path: political-events
+      - name: Checkout AI shadow repository
+        uses: actions/checkout@v6
+        with:
+          repository: QuantStrategyLab/AiLongHorizonSignalPipelines
+          path: ai-long-horizon
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install advisor package
+        working-directory: advisor
+        run: python -m pip install -e .
+      - name: Build report and static site
+        working-directory: advisor
+        env:
+          INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
+          SITE_URL: ${{ github.event.inputs.site_url || 'https://quantstrategylab.github.io/QuantAdvisorResearch' }}
+        run: |
+          set -euo pipefail
+          AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
+          mkdir -p data/output/published site
+          python scripts/build_advisory_report.py \
+            --as-of "${AS_OF}" \
+            --cadence weekly \
+            --political-events "../political-events/examples/political_events.example.csv" \
+            --political-watchlist "../political-events/examples/political_watchlist.example.csv" \
+            --ai-signal "../ai-long-horizon/data/output/latest_signal.json" \
+            --output-json "data/output/published/advisory_report_${AS_OF}.json" \
+            --output-md "data/output/published/advisory_report_${AS_OF}.md"
+          python scripts/publish_advisory_site.py \
+            --reports "data/output/published/advisory_report_${AS_OF}.json" \
+            --output-dir site \
+            --site-url "${SITE_URL}" \
+            --feed-title "Quant Advisor Research"
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: advisor/site
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+

@@ -77,6 +77,19 @@ python scripts/build_advisory_report.py \
 schedule and uploads the report as a GitHub Actions artifact. It does not commit
 files, create orders, or notify investors.
 
+Publish a static HTML + RSS preview:
+
+```bash
+python scripts/publish_advisory_site.py \
+  --reports data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
+  --output-dir site \
+  --site-url https://quantstrategylab.github.io/QuantAdvisorResearch
+```
+
+Open `site/index.html` locally or subscribe to `site/feed.xml`. The workflow
+`.github/workflows/publish_advisory_site.yml` can deploy the same output to
+GitHub Pages after Pages is enabled for the repository.
+
 ## Output Contract
 
 The main JSON artifact is `AdvisoryReport`:

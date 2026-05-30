@@ -10,3 +10,5 @@ data/input/*
 data/output/*
 !data/output/.gitkeep
 
+
+site/

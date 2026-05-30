@@ -78,3 +78,17 @@ python -m pytest -q
 和 `AiLongHorizonSignalPipelines`，生成周度 `recommendation_only` 报告并上传为 GitHub Actions artifact。
 
 它不会提交文件、不会通知投资者、不会创建订单。
+
+## RSS / 静态页面
+
+生成 HTML + RSS 预览：
+
+```bash
+python scripts/publish_advisory_site.py \
+  --reports data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
+  --output-dir site \
+  --site-url https://quantstrategylab.github.io/QuantAdvisorResearch
+```
+
+本地打开 `site/index.html`，RSS 文件是 `site/feed.xml`。
+`.github/workflows/publish_advisory_site.yml` 可以在仓库启用 GitHub Pages 后部署同样的输出。

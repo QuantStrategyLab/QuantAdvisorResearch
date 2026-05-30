@@ -28,7 +28,7 @@ QuantAdvisorResearch <--- AiLongHorizonSignalPipelines latest_signal.json
 recommendation-only advisory report
         |
         v
-GitHub Issue / Markdown / dashboard / manual review
+GitHub Issue / Markdown / static HTML / RSS / manual review
 ```
 
 未来可继续接入：
@@ -67,6 +67,6 @@ QuantStrategyPlugins risk artifacts
 - 能读取政治事件 CSV 和 AI shadow JSON。
 - 能生成 `recommendation_only` JSON artifact。
 - 能生成日/周/月 Markdown 复盘。
+- 能生成静态 HTML 和 RSS feed 供非个性化订阅。
 - 所有 artifact 明确禁止下单、调仓、个性化建议。
 - 后续可以 replay 历史建议，而不是重写过去判断。
-
