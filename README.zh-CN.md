@@ -2,11 +2,11 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-QuantStrategyLab 的“智慧顾投”研究协调仓库。它只生成非个性化的研究建议、证据摘要和日/周/月复盘，不下单、不管理仓位、不接券商凭证。
+QuantStrategyLab 的“智慧顾投”研究协调仓库。它只生成非个性化的研究雷达、证据摘要和日/周/月复盘，不给买/卖/持有评级，不下单、不管理仓位、不接券商凭证。
 
 ## 仓库定位
 
-这个仓库把各个研究仓库的产物组合成 advisory artifact：
+这个仓库把各个研究仓库的产物组合成 research radar artifact：
 
 - `PoliticalEventTrackingResearch`：政治/公开事件事实、催化剂、来源置信度。
 - `AiLongHorizonSignalPipelines`：已保存的长周期 AI shadow context。
@@ -31,21 +31,21 @@ python scripts/build_advisory_report.py \
 
 输出包括：
 
-- 候选标的
-- 建议动作：观察、来源复核、研究候选、回避/延后
-- 中长线投机/价值/事件驱动风格标签
+- 研究线索
+- 复核状态：观察、来源复核、证据复核、风险延后、上下文监控
+- 中长线、价值、事件、宏观等研究视角标签
 - 证据分数和风险分数
-- 主要理由、风险、复核清单
+- 证据摘要、风险、复核清单
 - 日/周/月复盘 cadence
 
 ## 边界
 
 本仓库负责：
 
-- advisory artifact schema
+- research radar artifact schema
 - 确定性评分和复核规则
 - 日/周/月报告生成
-- 历史建议记录和后续复盘入口
+- 历史研究雷达记录和后续复盘入口
 
 本仓库不负责：
 
@@ -64,6 +64,7 @@ python scripts/build_advisory_report.py \
 - `execution_allowed=false`
 - `portfolio_allocation_allowed=false`
 - `personalized_advice_allowed=false`
+- `direct_stock_recommendation_allowed=false`
 - `audience_scope=non_personalized_research`
 
 ## 测试
@@ -75,7 +76,7 @@ python -m pytest -q
 ## 周度复盘
 
 `.github/workflows/weekly_advisory_review.yml` 会 checkout 本仓库、`PoliticalEventTrackingResearch`
-和 `AiLongHorizonSignalPipelines`，生成周度 `recommendation_only` 报告并上传为 GitHub Actions artifact。
+和 `AiLongHorizonSignalPipelines`，生成周度 `research_radar` 报告并上传为 GitHub Actions artifact。
 
 它不会提交文件、不会通知投资者、不会创建订单。
 
@@ -92,3 +93,5 @@ python scripts/publish_advisory_site.py \
 
 本地打开 `site/index.html`，RSS 文件是 `site/feed.xml`。
 `.github/workflows/publish_advisory_site.yml` 可以在仓库启用 GitHub Pages 后部署同样的输出。
+
+通知格式设计见 [docs/notification_format.zh-CN.md](docs/notification_format.zh-CN.md)。

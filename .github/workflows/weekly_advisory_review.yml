@@ -1,4 +1,4 @@
-name: Weekly Advisory Review
+name: Weekly Research Radar
 
 on:
   workflow_dispatch:
@@ -49,7 +49,7 @@ jobs:
       - name: Install advisor package
         working-directory: advisor
         run: python -m pip install -e .
-      - name: Build recommendation-only report
+      - name: Build research radar report
         working-directory: advisor
         env:
           INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
@@ -68,9 +68,9 @@ jobs:
             --ai-signal "../ai-long-horizon/${AI_SIGNAL_PATH}" \
             --output-json "data/output/weekly_advisory_review/advisory_report_${AS_OF}.json" \
             --output-md "data/output/weekly_advisory_review/advisory_report_${AS_OF}.md"
-      - name: Upload advisory report artifact
+      - name: Upload research radar artifact
         uses: actions/upload-artifact@v7
         with:
-          name: weekly-advisory-review
+          name: weekly-research-radar
           path: advisor/data/output/weekly_advisory_review/
           if-no-files-found: error

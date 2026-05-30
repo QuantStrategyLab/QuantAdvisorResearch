@@ -2,12 +2,12 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-Recommendation-only advisory research orchestration for QuantStrategyLab.
+Research-radar orchestration for QuantStrategyLab.
 
 This repository combines deterministic event evidence, strategy/snapshot context,
-and saved AI shadow context into audit-ready advisory reports. It does not place
-orders, store broker credentials, manage portfolios, or personalize advice for a
-specific investor.
+and saved AI shadow context into audit-ready research radar reports. It does not
+create buy/sell/hold ratings, place orders, store broker credentials, manage
+portfolios, or personalize advice for a specific investor.
 
 ## Repository Role
 
@@ -20,18 +20,18 @@ system:
 - leave feature generation and backtests in `UsEquitySnapshotPipelines`
 - leave broker execution in platform repositories
 
-The output is a non-personalized advisory artifact and a readable daily, weekly,
+The output is a non-personalized research radar artifact and a readable daily, weekly,
 or monthly report.
 
 ## Boundary
 
 This repository owns:
 
-- advisory artifact schemas
+- research radar artifact schemas
 - deterministic scoring and review policy
 - daily/weekly/monthly report generation
 - evidence and risk summaries
-- recommendation history for later review
+- research radar history for later review
 
 This repository does not own:
 
@@ -90,45 +90,51 @@ Open `site/index.html` locally or subscribe to `site/feed.xml`. The workflow
 `.github/workflows/publish_advisory_site.yml` can deploy the same output to
 GitHub Pages after Pages is enabled for the repository.
 
+Notification channel rules are documented in
+[`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md).
+
 ## Output Contract
 
-The main JSON artifact is `AdvisoryReport`:
+The main JSON artifact is `ResearchRadarReport`:
 
 ```text
-schema_version
+schema_version = 2
 as_of
 generated_at
-mode = recommendation_only
+mode = research_radar
 cadence = daily | weekly | monthly
 audience_scope = non_personalized_research
 policy.execution_allowed = false
 policy.portfolio_allocation_allowed = false
-recommendations[]
+policy.direct_stock_recommendation_allowed = false
+research_items[]
 ```
 
-Each recommendation carries:
+Each research item carries:
 
 ```text
 symbol
-stance
-action
-style
-conviction
+research_view
+review_status
+research_lens
+research_priority
 evidence_score
 risk_score
-thesis
+evidence_summary
 risks[]
 evidence_refs[]
 review_checklist[]
+not_investment_rating = true
 ```
 
 ## Regulatory Boundary
 
 Even when no orders or allocations are generated, specific securities
-recommendations can still raise investment-adviser or broker-dealer obligations
+direct securities recommendations can still raise investment-adviser or broker-dealer obligations
 depending on compensation, audience, personalization, and business model. This
-repository therefore defaults to research-only, non-personalized output with
-explicit execution and allocation blocks.
+repository therefore avoids buy/sell/hold ratings and defaults to research-only,
+non-personalized output with explicit direct-recommendation, execution, and
+allocation blocks.
 
 See:
 

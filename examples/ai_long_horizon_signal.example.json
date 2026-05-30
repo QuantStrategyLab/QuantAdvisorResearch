@@ -11,7 +11,7 @@
     "semiconductor_and_leveraged_etf_high_volatility",
     "no_point_in_time_replay_evidence"
   ],
-  "candidate_bias": {
+  "research_bias": {
     "IDX1": "positive",
     "IDX2": "positive",
     "SECT1": "watch",

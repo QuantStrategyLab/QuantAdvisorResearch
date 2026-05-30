@@ -1,66 +1,70 @@
-# Advisory Artifact Contract
+# Research Radar Artifact Contract
 
 ## Report
 
 Required top-level fields:
 
 ```text
-schema_version: "1"
+schema_version: "2"
 as_of: ISO date
 generated_at: ISO datetime
-mode: "recommendation_only"
+mode: "research_radar"
 cadence: "daily" | "weekly" | "monthly"
 audience_scope: "non_personalized_research"
 source_artifacts: object
 summary: object
-recommendations: list
+research_items: list
 policy: object
 ```
 
 ## Policy
 
-The policy block must always keep execution disabled:
+The policy block must always keep direct recommendations and execution disabled:
 
 ```json
 {
   "execution_allowed": false,
   "portfolio_allocation_allowed": false,
   "personalized_advice_allowed": false,
-  "downstream_use": "Research review only; do not route to broker execution."
+  "direct_stock_recommendation_allowed": false,
+  "downstream_use": "Research triage only; do not treat as buy/sell/hold signal, broker execution, or account-level allocation."
 }
 ```
 
-## Recommendation
+## Research Item
 
 Required fields:
 
 ```text
 symbol
-stance
-action
-style
-conviction
+research_view
+review_status
+research_lens
+research_priority
 evidence_score
 risk_score
-thesis
+evidence_summary
 risks
 evidence_refs
 review_checklist
+not_investment_rating
 ```
 
-Allowed actions:
+Allowed review statuses:
 
-- `source_review_only`
-- `watch`
-- `research_candidate`
-- `avoid_or_defer`
-- `monitor`
+- `verify_source`
+- `observe`
+- `evidence_review`
+- `risk_defer`
+- `context_monitor`
 
-Allowed styles:
+Allowed research lenses:
 
-- `event_driven_speculation`
-- `long_horizon_growth`
-- `value_quality_review`
-- `defensive_macro_context`
+- `event_research`
+- `long_horizon_context`
+- `quality_review`
+- `macro_context`
 - `mixed_research`
 
+The contract intentionally rejects legacy direct-recommendation wording such as
+`action`, `stance`, `conviction`, and `recommendation` inside `research_items`.

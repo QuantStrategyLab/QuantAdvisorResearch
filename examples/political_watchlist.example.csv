@@ -1,7 +1,7 @@
 symbol,name,bucket,research_status,thesis,source_url
-EVT1,Example Catalyst One,named_mentioned,triggered,"Synthetic disclosure plus mention candidate used only to validate advisory output.",https://example.invalid/watchlist/evt1
-EVT2,Example Policy Two,policy_capital,triggered,"Synthetic policy capital candidate used only to validate advisory output.",https://example.invalid/watchlist/evt2
-EVT3,Example Review Three,disclosed_holding,watchlist,"Synthetic low-confidence candidate used only to validate source-review behavior.",https://example.invalid/watchlist/evt3
-EVT4,Example Monitor Four,drone_policy_watchlist,watchlist,"Synthetic watch-only candidate used only to validate monitor behavior.",https://example.invalid/watchlist/evt4
+EVT1,Example Catalyst One,named_mentioned,triggered,"Synthetic disclosure plus mention research item used only to validate radar output.",https://example.invalid/watchlist/evt1
+EVT2,Example Policy Two,policy_capital,triggered,"Synthetic policy capital research item used only to validate radar output.",https://example.invalid/watchlist/evt2
+EVT3,Example Review Three,disclosed_holding,watchlist,"Synthetic low-confidence research item used only to validate source-review behavior.",https://example.invalid/watchlist/evt3
+EVT4,Example Monitor Four,drone_policy_watchlist,watchlist,"Synthetic watch-only research item used only to validate monitor behavior.",https://example.invalid/watchlist/evt4
 IDX1,Example Broad Index,macro_index,watchlist,"Synthetic broad-market benchmark for AI macro context.",https://example.invalid/macro-context/idx1
 IDX2,Example Growth Index,macro_index,watchlist,"Synthetic growth benchmark for AI macro context.",https://example.invalid/macro-context/idx2

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quant-advisor-research"
 version = "0.1.0"
-description = "Recommendation-only advisory research orchestration for QuantStrategyLab."
+description = "Research-radar orchestration for QuantStrategyLab."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
