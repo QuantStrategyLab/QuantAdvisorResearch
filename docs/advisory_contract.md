@@ -5,7 +5,7 @@
 Required top-level fields:
 
 ```text
-schema_version: "4"
+schema_version: "5"
 as_of: ISO date
 generated_at: ISO datetime
 mode: "model_recommendations"
@@ -45,8 +45,10 @@ recommendation_tier
 recommendation_tier_label
 primary_horizon
 primary_horizon_label
+primary_horizon_window
 horizon_note
 suitable_horizons
+suitable_horizon_windows
 strategy_style
 score
 evidence_score
@@ -82,6 +84,13 @@ Allowed horizons:
 - `medium`
 - `long`
 - `not_applicable`
+
+Default horizon windows:
+
+- `short`: `1-10个交易日`
+- `medium`: `2-12周`
+- `long`: `1-3年`
+- `not_applicable`: `不适用`
 
 Allowed source confidence values:
 

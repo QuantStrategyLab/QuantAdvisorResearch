@@ -97,8 +97,8 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     if missing:
         raise AdvisoryValidationError(f"missing required keys: {', '.join(missing)}")
 
-    if payload["schema_version"] != "4":
-        raise AdvisoryValidationError("schema_version must be '4'")
+    if payload["schema_version"] != "5":
+        raise AdvisoryValidationError("schema_version must be '5'")
     _require_iso_date(payload["as_of"], "as_of")
     _require_iso_datetime(payload["generated_at"], "generated_at")
     if payload["mode"] != "model_recommendations":
@@ -127,8 +127,10 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
             "recommendation_tier_label",
             "primary_horizon",
             "primary_horizon_label",
+            "primary_horizon_window",
             "horizon_note",
             "suitable_horizons",
+            "suitable_horizon_windows",
             "strategy_style",
             "score",
             "evidence_score",
@@ -152,10 +154,18 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         if rec["primary_horizon"] not in ALLOWED_HORIZONS:
             raise AdvisoryValidationError(f"recommendations[{index}].primary_horizon is not allowed")
         _require_string(rec["primary_horizon_label"], f"recommendations[{index}].primary_horizon_label")
+        _require_string(rec["primary_horizon_window"], f"recommendations[{index}].primary_horizon_window")
         _require_string(rec["horizon_note"], f"recommendations[{index}].horizon_note")
         horizons = _require_sequence(rec["suitable_horizons"], f"recommendations[{index}].suitable_horizons")
         if any(horizon not in ALLOWED_HORIZONS for horizon in horizons):
             raise AdvisoryValidationError(f"recommendations[{index}].suitable_horizons contains an unsupported horizon")
+        horizon_windows = _require_mapping(
+            rec["suitable_horizon_windows"], f"recommendations[{index}].suitable_horizon_windows"
+        )
+        for horizon in horizons:
+            _require_string(
+                horizon_windows.get(horizon), f"recommendations[{index}].suitable_horizon_windows.{horizon}"
+            )
         if rec["strategy_style"] not in ALLOWED_STRATEGY_STYLES:
             raise AdvisoryValidationError(f"recommendations[{index}].strategy_style is not allowed")
         _require_number_0_1(rec["score"], f"recommendations[{index}].score")

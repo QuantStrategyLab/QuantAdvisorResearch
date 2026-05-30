@@ -53,6 +53,7 @@ def render_report_html(report: dict[str, Any]) -> str:
               </header>
               <dl>
                 <div><dt>Horizon</dt><dd>{html.escape(rec['primary_horizon_label'])}</dd></div>
+                <div><dt>Window</dt><dd>{html.escape(rec['primary_horizon_window'])}</dd></div>
                 <div><dt>Tier</dt><dd>{html.escape(rec['recommendation_tier_label'])}</dd></div>
                 <div><dt>Source</dt><dd>{html.escape(rec['source_confidence_label'])}</dd></div>
                 <div><dt>Style</dt><dd>{html.escape(rec['strategy_style'])}</dd></div>

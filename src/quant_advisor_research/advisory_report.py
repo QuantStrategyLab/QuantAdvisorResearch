@@ -43,6 +43,13 @@ AI_BIAS_WEIGHTS = {
     "negative": -3,
 }
 
+HORIZON_WINDOWS = {
+    "short": "1-10个交易日",
+    "medium": "2-12周",
+    "long": "1-3年",
+    "not_applicable": "不适用",
+}
+
 
 @dataclass(frozen=True)
 class Event:
@@ -151,12 +158,12 @@ def horizon_fit(style: str, rating: str) -> tuple[str, list[str], str, str]:
     if rating in {"verify_source", "defer", "monitor"}:
         return "not_applicable", ["not_applicable"], "不适用", "该项不是当前推荐，仅用于来源核验、风险暂缓或持续监控。"
     if style == "event_driven":
-        return "medium", ["short", "medium"], "中线", "事件驱动以中线验证为主；短线只适合观察催化反应，波动和反转风险更高。"
+        return "medium", ["short", "medium"], "中线", "事件驱动主周期为2-12周；1-10个交易日只适合观察催化反应，波动和反转风险更高。"
     if style in {"long_horizon_growth", "value_quality"}:
-        return "long", ["medium", "long"], "长线", "更适合用中长期基本面和趋势验证，不适合按短线噪声频繁切换。"
+        return "long", ["medium", "long"], "长线", "主周期为1-3年，更适合用基本面、产业趋势和事件持续性验证；超过3年需要年度复盘确认逻辑仍成立。"
     if style == "macro_context":
-        return "medium", ["medium"], "中线", "宏观和政策背景更适合中线观察，需要结合市场环境复核。"
-    return "medium", ["medium"], "中线", "默认按中线研究处理，等待更多证据后再调整周期判断。"
+        return "medium", ["medium"], "中线", "主周期为2-12周，宏观和政策背景需要结合市场环境复核。"
+    return "medium", ["medium"], "中线", "默认按2-12周中线研究处理，等待更多证据后再调整周期判断。"
 
 
 def rating_label(rating: str) -> str:
@@ -273,6 +280,8 @@ def build_recommendation(
     style = strategy_style(item, events, ai_bias)
     score = round(clamp((evidence_score - risk_score + 8) / 24, 0.05, 0.85), 2)
     primary_horizon, suitable_horizons, primary_horizon_label, horizon_note = horizon_fit(style, rating)
+    primary_horizon_window = HORIZON_WINDOWS[primary_horizon]
+    suitable_horizon_windows = {horizon: HORIZON_WINDOWS[horizon] for horizon in suitable_horizons}
     confidence, confidence_label = source_confidence(events)
     tier, tier_label = recommendation_tier(rating, score, confidence)
 
@@ -305,8 +314,10 @@ def build_recommendation(
         "recommendation_tier_label": tier_label,
         "primary_horizon": primary_horizon,
         "primary_horizon_label": primary_horizon_label,
+        "primary_horizon_window": primary_horizon_window,
         "horizon_note": horizon_note,
         "suitable_horizons": suitable_horizons,
+        "suitable_horizon_windows": suitable_horizon_windows,
         "strategy_style": style,
         "score": score,
         "evidence_score": int(evidence_score),
@@ -371,7 +382,7 @@ def build_advisory_report(
     recommendations = recommendations[:max_candidates]
 
     report = {
-        "schema_version": "4",
+        "schema_version": "5",
         "as_of": as_of_date.isoformat(),
         "generated_at": utc_now_iso(),
         "mode": "model_recommendations",
@@ -430,7 +441,11 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"### {rec['symbol']} - {rec['rating_label']}",
                 "",
                 f"- 推荐层级: `{rec['recommendation_tier_label']}`",
-                f"- 适合周期: `{rec['primary_horizon_label']}`",
+                f"- 适合周期: `{rec['primary_horizon_label']}({rec['primary_horizon_window']})`",
+                "- 可观察周期: "
+                + ", ".join(
+                    f"`{horizon}={window}`" for horizon, window in rec["suitable_horizon_windows"].items()
+                ),
                 f"- 周期说明: {rec['horizon_note']}",
                 f"- Strategy style: `{rec['strategy_style']}`",
                 f"- Model score: `{rec['score']}`",

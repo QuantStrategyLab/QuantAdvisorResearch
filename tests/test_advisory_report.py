@@ -75,7 +75,9 @@ def test_high_evidence_events_generate_recommendations_with_horizon() -> None:
     assert by_symbol["EVT1"]["recommendation_tier"] == "tier_1"
     assert by_symbol["EVT1"]["recommendation_tier_label"] == "一级推荐"
     assert by_symbol["EVT1"]["primary_horizon"] in {"short", "medium", "long"}
-    assert "短线" in by_symbol["EVT1"]["horizon_note"]
+    assert by_symbol["EVT1"]["primary_horizon_window"] == "2-12周"
+    assert by_symbol["EVT1"]["suitable_horizon_windows"]["short"] == "1-10个交易日"
+    assert "1-10个交易日" in by_symbol["EVT1"]["horizon_note"]
     assert by_symbol["EVT1"]["source_confidence"] == "medium"
     assert by_symbol["EVT1"]["reasons"]
 
@@ -116,6 +118,22 @@ def test_mixed_confidence_recommendation_is_not_tier_one(tmp_path: Path) -> None
     assert rec["rating"] == "recommend"
     assert rec["source_confidence"] == "mixed"
     assert rec["recommendation_tier"] == "tier_2"
+
+
+def test_long_horizon_window_is_measured_in_years() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+    )
+
+    by_symbol = {item["symbol"]: item for item in report["recommendations"]}
+
+    assert by_symbol["IDX1"]["primary_horizon"] == "long"
+    assert by_symbol["IDX1"]["primary_horizon_window"] == "1-3年"
+    assert "超过3年" in by_symbol["IDX1"]["horizon_note"]
 
 
 def test_contract_rejects_execution_enabled_report() -> None:

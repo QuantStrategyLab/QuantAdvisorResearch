@@ -97,7 +97,7 @@ Notification channel rules are documented in
 The main JSON artifact is `ModelRecommendationReport`:
 
 ```text
-schema_version = 4
+schema_version = 5
 as_of
 generated_at
 mode = model_recommendations
@@ -120,8 +120,10 @@ recommendation_tier
 recommendation_tier_label
 primary_horizon
 primary_horizon_label
+primary_horizon_window
 horizon_note
 suitable_horizons[]
+suitable_horizon_windows{}
 strategy_style
 score
 evidence_score
@@ -133,6 +135,13 @@ risk_notes[]
 evidence_refs[]
 review_checklist[]
 ```
+
+Default horizon windows:
+
+- short: `1-10 trading days`
+- medium: `2-12 weeks`
+- long: `1-3 years`
+- not_applicable: source check, defer, or monitor only
 
 ## Regulatory Boundary
 

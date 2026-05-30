@@ -35,8 +35,10 @@ recommendation_tier
 recommendation_tier_label
 primary_horizon
 primary_horizon_label
+primary_horizon_window
 horizon_note
 suitable_horizons[]
+suitable_horizon_windows{}
 strategy_style
 score
 evidence_score
@@ -67,12 +69,12 @@ Telegram 适合中等长度，最多展示前 3-5 个推荐：
 ```text
 Quant Model Recommendations | Weekly | 2026-05-30
 
-1. EVT1 | 一级推荐 | 重点推荐 | 中线 | 来源中 | score 0.85
+1. EVT1 | 一级推荐 | 重点推荐 | 中线(2-12周) | 来源中 | score 0.85
    理由：公开事件 + 披露证据 + AI shadow 仍在观察区间。
-   周期：事件驱动以中线验证为主；短线只适合观察催化反应，波动和反转风险更高。
+   周期：事件驱动主周期为2-12周；1-10个交易日只适合观察催化反应，波动和反转风险更高。
    风险：AI 数据缺口未完全解决。
 
-2. EVT2 | 一级推荐 | 重点推荐 | 中线 | 来源高 | score 0.83
+2. EVT2 | 一级推荐 | 重点推荐 | 中线(2-12周) | 来源高 | score 0.83
    理由：政策资本事件触发，来源置信度高。
    风险：需要复核估值、财报日和最新价格行为。
 
@@ -115,8 +117,14 @@ Subject: Quant Model Recommendations Weekly Review - 2026-05-30
 ## 周期原则
 
 - 主周期只给一个：短线、中线、长线或不适用。
+- 周期窗口必须固定显示：
+  - 短线：`1-10个交易日`
+  - 中线：`2-12周`
+  - 长线：`1-3年`
 - 事件驱动默认以中线为主，短线只作为催化反应观察，不作为自动交易触发。
-- 长线推荐需要更多基本面、AI shadow 和事件持续性支持。
+- 长线推荐主窗口为 `1-3年`，需要更多基本面、AI shadow 和事件持续性支持；超过 3 年应通过年度复盘确认逻辑仍成立。
+- `primary_horizon_window` 必须给出主周期时间范围。
+- `suitable_horizon_windows` 必须给出所有可观察周期的时间范围。
 - `horizon_note` 必须解释为什么适合该周期，以及短线风险在哪里。
 
 ## 禁用表达
