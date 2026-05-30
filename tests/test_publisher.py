@@ -82,3 +82,30 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "Theme Momentum" in html
     assert "hbm_memory" in html
     assert "MU" in html
+
+
+def test_format_telegram_message_contains_themes_policy_and_link() -> None:
+    from quant_advisor_research.notifications import format_telegram_message
+
+    report = build_sample_report()
+    report["summary"]["top_theme_ids"] = ["hbm_memory"]
+    report["theme_momentum"] = {
+        "available": True,
+        "as_of": "2026-05-30",
+        "top_themes": [
+            {
+                "rank": 1,
+                "theme_id": "hbm_memory",
+                "momentum_score": 0.9,
+                "top_symbols": ["MU"],
+            }
+        ],
+    }
+
+    message = format_telegram_message(report, site_url="https://example.com/advisor")
+
+    assert "Quant Model Recommendations" in message
+    assert "hbm_memory" in message
+    assert "MU" in message
+    assert "no execution" in message
+    assert "https://example.com/advisor/2026-05-30-weekly-model-recommendations.html" in message

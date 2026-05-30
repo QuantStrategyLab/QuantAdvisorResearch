@@ -141,3 +141,11 @@ Subject: Quant Model Recommendations Weekly Review - 2026-05-30
 - 短线、中线、长线。
 - 模型分数、证据分数、风险分数。
 - 推荐理由、来源核验、估值复核、财报复核。
+
+## 当前已实现渠道
+
+- GitHub Pages：`.github/workflows/publish_advisory_site.yml` 发布 HTML、JSON、Markdown 和 RSS。
+- RSS：`scripts/publish_advisory_site.py` 生成 `feed.xml`。
+- Telegram：可选。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，`scripts/notify_advisory_telegram.py` 会在 Pages 部署成功后发送短摘要；如果缺少任一 secret，会跳过通知但不让发布失败。
+
+通知仍然只能包含标的、推荐层级、周期、来源事件数、主题动量、模型分数、理由、风险和完整报告链接；不能包含订单、目标仓位、目标股数、账户适当性或账户级配置建议。

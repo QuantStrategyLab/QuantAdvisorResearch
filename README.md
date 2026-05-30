@@ -44,6 +44,15 @@ This repository does not own:
 - model provider routing or prompt execution
 - raw paid market-data redistribution
 
+## AI Usage
+
+This repository does not call Codex, OpenAI, Anthropic, or any other model API.
+It only consumes saved `mode=shadow` artifacts from `AiLongHorizonSignalPipelines`.
+The only repository in this three-repo flow that can involve AI is
+`AiLongHorizonSignalPipelines`, and even there provider execution is delegated to
+`QuantStrategyLab/CodexAuditBridge`. Model API keys and fallback routing belong
+there, not in this repository.
+
 ## Local Example
 
 ```bash
@@ -82,6 +91,13 @@ python scripts/build_advisory_report.py \
 schedule and uploads the report as a GitHub Actions artifact. It does not commit
 files, create orders, or notify investors.
 
+`.github/workflows/publish_advisory_site.yml` publishes the HTML/JSON/RSS site on
+a weekly schedule. If `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured
+as repository secrets, the workflow sends a short non-personalized Telegram
+summary after a successful Pages deployment. If either secret is missing, the
+notification step is skipped without failing the publication. Telegram delivery
+errors are logged and do not block Pages/RSS output.
+
 Publish a static HTML + RSS preview:
 
 ```bash
@@ -110,6 +126,7 @@ gh workflow run "Publish Model Recommendations Site" \
 ```
 
 Notification channel rules are documented in
+[`docs/notification_format.md`](docs/notification_format.md) and
 [`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md).
 
 ## Output Contract

@@ -76,6 +76,12 @@ manifest 会记录 JSON/Markdown 的 SHA256、`as_of`、cadence、来源 artifac
 - 模型 provider 路由或 prompt 执行
 - 付费行情原始数据再分发
 
+## AI 使用边界
+
+本仓库不直接调用 Codex、OpenAI、Anthropic 或其他模型 API。它只读取 `AiLongHorizonSignalPipelines` 已保存的 `mode=shadow` artifact。
+
+这三个仓库里，只有 `AiLongHorizonSignalPipelines` 的月度 shadow signal 流程会涉及 AI，而且模型执行也委托给 `QuantStrategyLab/CodexAuditBridge`。模型 API key 和 fallback provider routing 都应集中在那里，不应放到本仓库。
+
 ## 合规提醒
 
 “不下单、不管仓位”会降低执行风险，但不自动消除投顾/推荐监管风险。只要面向投资者提供具体证券推荐，在不同商业模式下仍可能触发投资顾问、经纪推荐、适当性或 Reg BI 义务。
@@ -101,6 +107,8 @@ python -m pytest -q
 和 `AiLongHorizonSignalPipelines`，生成周度 `model_recommendations` 报告并上传为 GitHub Actions artifact。
 
 它不会提交文件、不会通知投资者、不会创建订单。
+
+`.github/workflows/publish_advisory_site.yml` 会每周发布 HTML/JSON/RSS 站点。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，Pages 部署成功后会发送一条非个性化 Telegram 摘要；如果没配置，通知步骤会跳过；Telegram 发送异常会记录在日志里，但不阻断网页/RSS 发布。
 
 ## RSS / 静态页面
 

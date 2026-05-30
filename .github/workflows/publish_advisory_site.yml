@@ -68,6 +68,7 @@ jobs:
         working-directory: advisor
         run: python -m pip install -e .
       - name: Build report and static site
+        id: build_report
         working-directory: advisor
         env:
           INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
@@ -101,6 +102,8 @@ jobs:
           cp "data/output/published/advisory_report_${AS_OF}.json" site/
           cp "data/output/published/advisory_report_${AS_OF}.md" site/
           cp "data/output/published/advisory_report_${AS_OF}.json.manifest.json" site/
+          echo "as_of=${AS_OF}" >> "$GITHUB_OUTPUT"
+          echo "report_path=data/output/published/advisory_report_${AS_OF}.json" >> "$GITHUB_OUTPUT"
       - name: Upload site artifact
         uses: actions/upload-artifact@v7
         with:
@@ -116,3 +119,17 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+      - name: Notify Telegram subscribers
+        if: ${{ success() }}
+        continue-on-error: true
+        working-directory: advisor
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SITE_URL: ${{ github.event.inputs.site_url || 'https://quantstrategylab.github.io/QuantAdvisorResearch' }}
+          REPORT_PATH: ${{ steps.build_report.outputs.report_path }}
+        run: |
+          set -euo pipefail
+          python scripts/notify_advisory_telegram.py \
+            --report "${REPORT_PATH}" \
+            --site-url "${SITE_URL}"
