@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from .advisory_report import display_number, display_percent
+from .advisory_report import display_number, display_percent, sector_label, theme_label
 
 
 CADENCE_LABELS_ZH = {
@@ -47,13 +47,35 @@ def cadence_label(report: dict[str, Any]) -> str:
     return CADENCE_LABELS_ZH.get(cadence, cadence.title())
 
 
+def format_theme_ids(theme_ids: Any) -> str:
+    if isinstance(theme_ids, str):
+        theme_ids = [theme_ids]
+    if not isinstance(theme_ids, list):
+        theme_ids = []
+    return ", ".join(theme_label(theme_id) for theme_id in theme_ids) or "无"
+
+
+def format_candidate_theme_ids(candidate: dict[str, Any]) -> str:
+    theme_name_by_id = {
+        str(theme.get("theme_id", "")): str(theme.get("theme_name", ""))
+        for theme in candidate.get("themes", [])
+        if isinstance(theme, dict)
+    }
+    labels = [
+        theme_label(theme_id, theme_name_by_id.get(str(theme_id), ""))
+        for theme_id in candidate.get("theme_ids", [])
+    ]
+    return ", ".join(labels) or "无"
+
+
 def render_theme_first_candidates_html(report: dict[str, Any]) -> str:
     candidates = report.get("theme_first_candidates", [])
     if not candidates:
         return ""
     cards = []
     for candidate in candidates:
-        theme_ids = ", ".join(candidate.get("theme_ids", [])) or "无"
+        theme_ids = format_candidate_theme_ids(candidate)
+        primary_theme = theme_label(candidate.get("primary_theme_id"), candidate.get("primary_theme_name"))
         reasons = candidate.get("reasons", [])
         reason = reasons[0] if reasons else ""
         cards.append(
@@ -67,10 +89,10 @@ def render_theme_first_candidates_html(report: dict[str, Any]) -> str:
                 </div>
               </header>
               <dl>
-                <div><dt>主题</dt><dd>{html.escape(str(candidate.get('primary_theme_id', '')))}</dd></div>
+                <div><dt>主题</dt><dd>{html.escape(primary_theme)}</dd></div>
                 <div><dt>动量强度</dt><dd>{html.escape(display_number(candidate.get('symbol_momentum_score')))}</dd></div>
                 <div><dt>近3个月</dt><dd>{html.escape(display_percent(candidate.get('return_3m')))}</dd></div>
-                <div><dt>事件确认</dt><dd>{html.escape(str(candidate.get('source_confirmation', '')))}</dd></div>
+                <div><dt>事件证据</dt><dd>{html.escape(str(candidate.get('source_confirmation', '')))}</dd></div>
                 <div><dt>当前结论</dt><dd>{html.escape(str(candidate.get('advisor_status', '')))}</dd></div>
               </dl>
               <p><strong>为什么入选：</strong>{html.escape(str(candidate.get('recommendation_summary') or reason))}</p>
@@ -82,9 +104,9 @@ def render_theme_first_candidates_html(report: dict[str, Any]) -> str:
     return f"""
     <section class="theme-candidates">
       <h2>本期重点股票池</h2>
-      <p><strong>先看这里：</strong>每期选出 5-10 个股票/公司标的，说明行业主题、入选理由、事件确认和主要风险。</p>
-      <p><strong>怎么理解：</strong>这是非个性化模型股票池，不是买入清单；“待事件确认”表示稳定事件证据还不足；
-      “背景跟踪”表示证据较弱，仅保留为研究背景。</p>
+      <p><strong>先看这里：</strong>每期选出 5-10 个股票/公司标的，说明行业主题、入选理由、事件证据和主要风险。</p>
+      <p><strong>怎么理解：</strong>这是非个性化模型股票池，不是买入清单；“暂无明确事件催化”表示该标的主要来自主题/动量排序，
+      还没有足够稳定的新闻、政策或公司事件证据。</p>
       <div class="candidate-grid">{''.join(cards)}</div>
     </section>
     """
@@ -97,11 +119,12 @@ def render_theme_momentum_html(report: dict[str, Any]) -> str:
     rows = []
     for theme in theme_momentum.get("top_themes", []):
         symbols = ", ".join(theme.get("top_symbols", [])) or "无"
+        theme_name = theme_label(theme.get("theme_id"), theme.get("theme_name"))
         rows.append(
             "<tr>"
             f"<td>{html.escape(str(theme.get('rank', '')))}</td>"
-            f"<td><code>{html.escape(str(theme.get('theme_id', '')))}</code><br>{html.escape(str(theme.get('theme_name', '')))}</td>"
-            f"<td>{html.escape(str(theme.get('sector', '')))}</td>"
+            f"<td>{html.escape(theme_name)}</td>"
+            f"<td>{html.escape(sector_label(theme.get('sector', '')))}</td>"
             f"<td>{html.escape(display_number(theme.get('momentum_score')))}</td>"
             f"<td>{html.escape(display_percent(theme.get('breadth_3m')))}</td>"
             f"<td>{html.escape(symbols)}</td>"
@@ -135,15 +158,17 @@ def render_report_html(report: dict[str, Any]) -> str:
     theme_candidates_html = render_theme_first_candidates_html(report)
     theme_momentum_html = render_theme_momentum_html(report)
     recommendation_cards = []
-    background_cards = []
+    background_count = 0
     for rec in report["recommendations"]:
         reasons = "\n".join(f"<li>{html.escape(reason)}</li>" for reason in rec["reasons"])
         risks = "\n".join(f"<li>{html.escape(risk)}</li>" for risk in rec["risk_notes"])
-        checklist = "\n".join(f"<li>{html.escape(check)}</li>" for check in rec["review_checklist"])
         refs = "\n".join(
             f'<li><a href="{html.escape(ref)}">{html.escape(ref)}</a></li>' if ref.startswith("http") else f"<li>{html.escape(ref)}</li>"
             for ref in rec["evidence_refs"]
         )
+        if rec.get("recommendation_tier") == "monitor":
+            background_count += 1
+            continue
         card_html = f"""
             <article class="recommendation">
               <header>
@@ -165,24 +190,15 @@ def render_report_html(report: dict[str, Any]) -> str:
               <ul>{reasons}</ul>
               <h3>风险提示</h3>
               <ul>{risks}</ul>
-              <h3>复核清单</h3>
-              <ul>{checklist}</ul>
               <h3>证据链接</h3>
               <ul>{refs}</ul>
             </article>
             """
-        if rec.get("recommendation_tier") == "monitor":
-            background_cards.append(card_html)
-        else:
-            recommendation_cards.append(card_html)
+        recommendation_cards.append(card_html)
     background_html = ""
-    if background_cards:
+    if background_count:
         background_html = f"""
-    <details class="background-list">
-      <summary>背景跟踪（非推荐，{len(background_cards)}项）</summary>
-      <p>这些标的只保留为研究背景，当前证据不足，不进入推荐或观察摘要。</p>
-      {''.join(background_cards)}
-    </details>
+    <p class="monitor-note">另有 {background_count} 个仅监控标的未在页面展开；完整 JSON 保留用于复盘。页面只展示推荐、观察和来源核验标的。</p>
         """
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -212,9 +228,7 @@ def render_report_html(report: dict[str, Any]) -> str:
     .theme-momentum {{ background: #eef6ff; border: 1px solid #bfdbfe; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
     .recommendation-section {{ margin: 22px 0 8px; }}
     .recommendation-section p {{ color: #57606a; line-height: 1.55; }}
-    .background-list {{ margin-top: 18px; background: #fff; border: 1px dashed #d0d7de; border-radius: 8px; padding: 14px 16px; }}
-    .background-list summary {{ cursor: pointer; font-weight: 800; }}
-    .background-list > p {{ color: #57606a; }}
+    .monitor-note {{ color: #57606a; background: #fff; border: 1px dashed #d0d7de; border-radius: 8px; padding: 12px 14px; }}
     table {{ width: 100%; border-collapse: collapse; background: #fff; }}
     th, td {{ text-align: left; border-bottom: 1px solid #eaeef2; padding: 8px; vertical-align: top; }}
     .recommendation {{ background: #fff; border: 1px solid #d8dee4; border-radius: 8px; padding: 18px; margin: 16px 0; }}
@@ -252,8 +266,8 @@ def render_report_html(report: dict[str, Any]) -> str:
     {theme_candidates_html}
     {theme_momentum_html}
     <section class="recommendation-section">
-      <h2>事件确认推荐与观察列表</h2>
-      <p>这里基于事件证据、来源置信度和 AI 长周期背景生成。“背景跟踪”表示证据不足，不进入推荐；
+      <h2>推荐与观察</h2>
+      <p>这里只展开已进入推荐、观察或来源核验的标的；纯监控标的不作为本期结论展示。
       “先核验来源”表示低置信来源不能直接升级。</p>
     </section>
     {''.join(recommendation_cards)}
@@ -270,7 +284,7 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
         filename = report_filename(report)
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
         theme_candidate_symbols = ", ".join(report["summary"].get("top_theme_candidate_symbols", []))
-        top_themes = ", ".join(report["summary"].get("top_theme_ids", []))
+        top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
         source_mode = str(report["summary"].get("source_mode", "unknown"))
         items.append(
             f"""
@@ -325,7 +339,7 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
         ET.SubElement(item, "pubDate").text = format_datetime(report["generated_at"])
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
         theme_candidate_symbols = ", ".join(report["summary"].get("top_theme_candidate_symbols", []))
-        top_themes = ", ".join(report["summary"].get("top_theme_ids", []))
+        top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
         source_mode = str(report["summary"].get("source_mode", "unknown"))
         ET.SubElement(item, "description").text = (
             f"模式={report['mode']}；来源={source_mode}；主题={top_themes or '无'}；"

@@ -347,5 +347,6 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert "## 本期重点股票池" in markdown
     assert "为什么入选" in markdown
     assert "## 主题动量" in markdown
-    assert "hbm_memory" in markdown
+    assert "HBM / 存储" in markdown
+    assert "事件证据" in markdown
     assert "DELL" in markdown

@@ -5,7 +5,7 @@ from typing import Any
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from .advisory_report import display_number, display_percent
+from .advisory_report import display_number, display_percent, theme_label
 from .publisher import cadence_label, report_filename
 
 
@@ -20,7 +20,8 @@ def _format_themes(report: dict[str, Any], *, limit: int) -> list[str]:
     lines = ["主题动量："]
     for theme in theme_momentum.get("top_themes", [])[:limit]:
         symbols = ", ".join(theme.get("top_symbols", [])[:5]) or "无"
-        lines.append(f"- #{theme.get('rank')} {theme.get('theme_id')} 分数={display_number(theme.get('momentum_score'))} 标的={symbols}")
+        label = theme_label(theme.get("theme_id"), theme.get("theme_name"))
+        lines.append(f"- #{theme.get('rank')} {label} 分数={display_number(theme.get('momentum_score'))} 标的={symbols}")
     return lines
 
 
@@ -31,7 +32,7 @@ def _format_theme_candidates(report: dict[str, Any], *, limit: int) -> list[str]
     lines = ["本期重点股票池（5-10只，非个性化，不等于买入）："]
     for item in candidates:
         lines.append(
-            "- #{rank} {symbol} | {background} | 近3月 {ret3m} | 事件：{confirmation} | 结论：{status}".format(
+            "- #{rank} {symbol} | {background} | 近3月 {ret3m} | 事件证据：{confirmation} | 结论：{status}".format(
                 rank=item.get("rank", ""),
                 symbol=item.get("symbol", ""),
                 background=item.get("industry_background", item.get("primary_theme_id", "")),
@@ -53,7 +54,7 @@ def _format_recommendations(report: dict[str, Any], *, limit: int) -> list[str]:
         if item.get("recommendation_tier") in {"tier_1", "tier_2", "watchlist", "source_check"}
     ][:limit]
     if not publishable:
-        return ["推荐/观察摘要：暂无升级标的，请查看完整报告中的背景跟踪列表。"]
+        return ["推荐/观察摘要：暂无升级标的；仅监控标的保留在完整 JSON 中用于复盘。"]
     lines = ["推荐/观察摘要："]
     for item in publishable:
         lines.append(
