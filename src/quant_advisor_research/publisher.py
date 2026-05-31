@@ -296,20 +296,76 @@ def render_report_html(report: dict[str, Any]) -> str:
 """
 
 
-def render_index_html(reports: list[dict[str, Any]]) -> str:
-    items = []
-    for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
-        filename = report_filename(report)
-        top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
-        top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
-        items.append(
+def format_horizon_summary(report: dict[str, Any]) -> list[tuple[str, str, str, list[str]]]:
+    decisions = report.get("final_decisions", {})
+    buckets = decisions.get("horizon_buckets", {}) if isinstance(decisions, dict) else {}
+    return [
+        (horizon, label, window, [str(symbol) for symbol in buckets.get(horizon, [])])
+        for horizon, label, window in HORIZON_COLUMNS
+    ]
+
+
+def render_symbol_tags(symbols: list[str], *, empty_label: str = "暂无") -> str:
+    if not symbols:
+        return f'<span class="symbol-tag empty">{html.escape(empty_label)}</span>'
+    return "".join(f'<span class="symbol-tag">{html.escape(symbol)}</span>' for symbol in symbols)
+
+
+def render_horizon_snapshot(report: dict[str, Any], *, linked: bool = False) -> str:
+    columns = []
+    href = report_filename(report)
+    for horizon, label, window, symbols in format_horizon_summary(report):
+        tags = render_symbol_tags(symbols)
+        body = f'<a class="horizon-link" href="{html.escape(href)}">{tags}</a>' if linked else tags
+        columns.append(
             f"""
-            <li>
-              <a href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
-              <span>主要信号：{html.escape(top_themes or '无')}；推荐：{html.escape(top_symbols or '无')}</span>
-            </li>
+            <section class="snapshot-column snapshot-{html.escape(horizon)}">
+              <p class="snapshot-label">{html.escape(label)}</p>
+              <p class="snapshot-window">{html.escape(window)}</p>
+              <div class="symbol-strip">{body}</div>
+            </section>
             """
         )
+    return f'<div class="snapshot-grid">{"".join(columns)}</div>'
+
+
+def render_index_html(reports: list[dict[str, Any]]) -> str:
+    sorted_reports = sorted(reports, key=lambda item: item["as_of"], reverse=True)
+    latest = sorted_reports[0] if sorted_reports else None
+    latest_block = ""
+    if latest:
+        latest_filename = report_filename(latest)
+        top_themes = format_theme_ids(latest["summary"].get("top_theme_ids", []))
+        top_symbols = latest["summary"].get("top_recommended_symbols", [])
+        latest_block = f"""
+        <section class="latest-panel">
+          <div class="latest-copy">
+            <p class="eyebrow">Latest briefing</p>
+            <h2>{html.escape(latest['as_of'])} {html.escape(cadence_label(latest))}模型推荐</h2>
+            <p class="lead">用主题动量、市场确认和事件证据生成的非个性化研究页面。</p>
+            <div class="theme-line"><span>主要信号</span>{html.escape(top_themes or '无')}</div>
+            <div class="symbol-strip hero-symbols">{render_symbol_tags([str(symbol) for symbol in top_symbols])}</div>
+            <a class="primary-action" href="{html.escape(latest_filename)}">打开最新报告</a>
+          </div>
+          {render_horizon_snapshot(latest)}
+        </section>
+        """
+    items = []
+    for report in sorted_reports:
+        filename = report_filename(report)
+        top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
+        top_symbols = [str(symbol) for symbol in report["summary"].get("top_recommended_symbols", [])]
+        items.append(
+            f"""
+            <article class="archive-card">
+              <a class="archive-title" href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
+              <p>主要信号：{html.escape(top_themes or '无')}</p>
+              <div class="archive-symbols">{render_symbol_tags(top_symbols)}</div>
+              {render_horizon_snapshot(report, linked=True)}
+            </article>
+            """
+        )
+    archive = "".join(items) or '<p class="empty-archive">暂无报告。</p>'
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -318,22 +374,110 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
   <title>量化模型推荐</title>
   <link rel="alternate" type="application/rss+xml" title="量化模型推荐 RSS" href="feed.xml">
   <style>
-    body {{ margin: 0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #f6f7f9; color: #1b1f24; }}
-    main {{ max-width: 900px; margin: 0 auto; padding: 40px 20px; }}
-    h1 {{ margin-bottom: 8px; }}
-    p {{ color: #57606a; }}
-    ul {{ list-style: none; padding: 0; }}
-    li {{ background: #fff; border: 1px solid #d8dee4; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }}
-    a {{ color: #0969da; font-weight: 700; text-decoration: none; }}
-    span {{ display: block; color: #57606a; margin-top: 6px; }}
+    :root {{
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9e2ef;
+      --paper: #fffaf0;
+      --panel: rgba(255, 255, 255, .78);
+      --blue: #1e4dd8;
+      --cyan: #00a6c8;
+      --gold: #d99b2b;
+      --green: #0f8b62;
+      font-family: "Avenir Next", "Gill Sans", ui-sans-serif, system-ui, sans-serif;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(0,166,200,.18), transparent 28rem),
+        radial-gradient(circle at 88% 0%, rgba(217,155,43,.18), transparent 24rem),
+        linear-gradient(135deg, #f8fafc 0%, #eef4fb 52%, #fff7e6 100%);
+      min-height: 100vh;
+    }}
+    body::before {{
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(23,32,51,.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23,32,51,.045) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.75), transparent 78%);
+    }}
+    main {{ max-width: 1180px; margin: 0 auto; padding: 34px 20px 64px; position: relative; }}
+    .hero {{ display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; padding: 22px 0 28px; }}
+    .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }}
+    h1 {{ margin: 0; max-width: 780px; font-family: "Iowan Old Style", Georgia, ui-serif, serif; font-size: clamp(2.55rem, 7vw, 5.7rem); line-height: .92; letter-spacing: -.07em; }}
+    .hero p {{ margin: 18px 0 0; max-width: 680px; color: var(--muted); font-size: 1.06rem; line-height: 1.7; }}
+    .rss-card {{ justify-self: end; min-width: 170px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.66); box-shadow: 0 18px 45px rgba(31,45,61,.08); }}
+    .rss-card a {{ color: var(--ink); text-decoration: none; font-weight: 800; }}
+    .rss-card span {{ display: block; color: var(--muted); margin-top: 5px; font-size: .88rem; }}
+    .latest-panel {{ position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr); gap: 22px; border: 1px solid rgba(30,77,216,.16); border-radius: 30px; padding: 26px; background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(255,250,240,.76)); box-shadow: 0 26px 70px rgba(31,45,61,.13); }}
+    .latest-panel::after {{ content: ""; position: absolute; right: -80px; top: -110px; width: 260px; height: 260px; border-radius: 999px; background: rgba(0,166,200,.16); filter: blur(2px); }}
+    .latest-copy {{ position: relative; z-index: 1; }}
+    h2 {{ margin: 0; font-size: clamp(1.7rem, 3vw, 2.55rem); letter-spacing: -.04em; }}
+    .lead {{ color: var(--muted); line-height: 1.7; max-width: 620px; }}
+    .theme-line {{ display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 14px; color: var(--ink); }}
+    .theme-line span {{ color: var(--blue); font-weight: 800; }}
+    .symbol-strip {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
+    .hero-symbols {{ margin-bottom: 20px; }}
+    .symbol-tag {{ display: inline-flex; align-items: center; min-height: 30px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(30,77,216,.22); background: #fff; color: var(--ink); font-weight: 800; box-shadow: 0 6px 16px rgba(31,45,61,.06); }}
+    .symbol-tag.empty {{ color: var(--muted); font-weight: 700; }}
+    .primary-action {{ display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--ink); color: #fff; text-decoration: none; font-weight: 900; box-shadow: 0 12px 24px rgba(23,32,51,.22); }}
+    .primary-action:hover {{ transform: translateY(-1px); }}
+    .snapshot-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-self: stretch; position: relative; z-index: 1; }}
+    .snapshot-column {{ padding: 16px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.72); backdrop-filter: blur(10px); min-height: 168px; }}
+    .snapshot-label {{ margin: 0; font-size: 1.28rem; font-weight: 900; letter-spacing: -.03em; }}
+    .snapshot-window {{ margin: 4px 0 14px; color: var(--muted); font-size: .9rem; }}
+    .snapshot-long {{ border-top: 4px solid var(--green); }}
+    .snapshot-medium {{ border-top: 4px solid var(--blue); }}
+    .snapshot-short {{ border-top: 4px solid var(--gold); }}
+    .horizon-link {{ color: inherit; text-decoration: none; }}
+    .section-title {{ display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 34px 0 14px; }}
+    .section-title h2 {{ font-size: 1.45rem; }}
+    .section-title p {{ margin: 0; color: var(--muted); }}
+    .archive-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }}
+    .archive-card {{ border: 1px solid var(--line); border-radius: 24px; padding: 18px; background: var(--panel); box-shadow: 0 12px 34px rgba(31,45,61,.08); }}
+    .archive-title {{ color: var(--ink); font-size: 1.08rem; font-weight: 900; text-decoration: none; }}
+    .archive-card p {{ margin: 10px 0; color: var(--muted); line-height: 1.55; }}
+    .archive-symbols {{ margin: 0 0 14px; }}
+    .archive-card .snapshot-grid {{ grid-template-columns: 1fr; gap: 8px; }}
+    .archive-card .snapshot-column {{ min-height: auto; padding: 12px; border-radius: 16px; }}
+    .archive-card .snapshot-label {{ font-size: 1rem; }}
+    .archive-card .snapshot-window {{ margin-bottom: 8px; }}
+    .empty-archive {{ color: var(--muted); }}
+    @media (max-width: 880px) {{
+      .hero, .latest-panel {{ grid-template-columns: 1fr; }}
+      .rss-card {{ justify-self: start; }}
+      .snapshot-grid {{ grid-template-columns: 1fr; }}
+    }}
   </style>
 </head>
 <body>
   <main>
-    <h1>量化模型推荐</h1>
-    <p>展示非个性化模型推荐、理由、周期和风险提示。不包含下单、仓位配置或个性化建议。</p>
-    <p><a href="feed.xml">RSS 订阅</a></p>
-    <ul>{''.join(items)}</ul>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">QuantStrategyLab</p>
+        <h1>量化模型推荐</h1>
+        <p>把主题动量、市场确认和政策/新闻证据合成为非个性化研究结论。页面只展示推荐、周期、背景、理由和风险。</p>
+      </div>
+      <aside class="rss-card">
+        <a href="feed.xml">RSS 订阅</a>
+        <span>周度更新 · 静态页面</span>
+      </aside>
+    </section>
+    {latest_block}
+    <section class="archive">
+      <div class="section-title">
+        <h2>历史报告</h2>
+        <p>按发布日期倒序</p>
+      </div>
+      <div class="archive-grid">{archive}</div>
+    </section>
   </main>
 </body>
 </html>

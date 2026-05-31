@@ -72,6 +72,13 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "来源：" not in index_html
     assert "主要信号" in index_html
     assert "最终推荐" not in index_html
+    assert "Latest briefing" in index_html
+    assert "latest-panel" in index_html
+    assert "snapshot-grid" in index_html
+    assert "<p class=\"snapshot-label\">长线</p>" in index_html
+    assert "<p class=\"snapshot-label\">中线</p>" in index_html
+    assert "<p class=\"snapshot-label\">短线</p>" in index_html
+    assert "打开最新报告" in index_html
 
 
 def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_path: Path) -> None:
