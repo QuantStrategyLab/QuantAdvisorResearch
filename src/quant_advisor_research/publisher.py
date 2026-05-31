@@ -155,7 +155,7 @@ def render_theme_first_candidates_html(report: dict[str, Any]) -> str:
     return f"""
     <section class="theme-candidates">
       <h2>主题候选（解释材料，不是最终推荐）</h2>
-      <p><strong>用途：</strong>这里只解释哪些股票进入主题/动量候选池，最终推荐以上方“本期最终结论”为准。</p>
+      <p><strong>用途：</strong>这里只解释哪些股票进入主题/动量候选池，公开页面默认只显示最终推荐。</p>
       <p><strong>怎么理解：</strong>这是非个性化模型股票池，不是买入清单；“暂无明确事件催化”表示该标的主要来自主题/动量排序，
       还没有足够稳定的新闻、政策或公司事件证据。</p>
       <div class="candidate-grid">{''.join(cards)}</div>

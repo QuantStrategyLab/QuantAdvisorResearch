@@ -353,6 +353,7 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert report_with_theme["final_decisions"]["recommendations"][0]["business_summary"]
     assert "存储周期" in report_with_theme["final_decisions"]["recommendations"][0]["risk_summary"]
     assert "ai_signal_score" in report_with_theme["final_decisions"]["recommendations"][0]
+    assert "AiLongHorizonSignalPipelines" not in report_with_theme["final_decisions"]["method"]
     assert report_with_theme["final_decisions"]["watchlist"][0]["symbol"] == "DELL"
     assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
     assert report_with_theme["recommendations"][0]["score"] == report_without_theme["recommendations"][0]["score"]

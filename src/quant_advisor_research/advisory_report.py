@@ -972,7 +972,7 @@ def build_final_decisions(
         for horizon in ("short", "medium", "long")
     }
     return {
-        "method": "AiLongHorizonSignalPipelines signal and price momentum first; policy/news evidence is a confidence and risk modifier",
+        "method": "Final recommendation blend for model scoring.",
         "recommendations": recommendations_out,
         "watchlist": watchlist_out,
         "horizon_buckets": horizon_buckets,
