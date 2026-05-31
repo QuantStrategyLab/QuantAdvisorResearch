@@ -1,5 +1,15 @@
 # 智慧投顾研究系统设计
 
+
+## English summary
+
+- Full English version: [`system_design.md`](system_design.md). This summary keeps an English entry point in the Chinese file.
+- Purpose: this document covers `智慧投顾研究系统设计` for `QuantAdvisorResearch`.
+- Main topics: `当前架构理解`, `智慧投顾研究数据流`, `设计模式`, `不推荐方案`, `MVP 验证标准`.
+- Read the boundaries, inputs, outputs, and permission requirements before running commands, CI jobs, dry-runs, releases, or runtime switches.
+- For live trading, secrets, Cloud Run, exchange, or broker API changes, validate in test or dry-run mode first and do not change production only from examples.
+- If this summary differs from the detailed Chinese body, follow the concrete commands, configuration keys, and constraints in the body.
+
 [English](system_design.md) | [简体中文](system_design.zh-CN.md)
 
 ## 当前架构理解
