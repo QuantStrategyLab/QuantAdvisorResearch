@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from quant_advisor_research.advisory_report import build_advisory_report, render_markdown
+from quant_advisor_research.advisory_report import build_advisory_report, primary_horizon_from_actions, render_markdown
 from quant_advisor_research.artifacts import write_report_manifest
 from quant_advisor_research.contracts import AdvisoryValidationError, validate_advisory_report
 
@@ -410,6 +410,25 @@ def test_market_confirmation_is_optional_audit_input_not_public_copy() -> None:
     markdown = render_markdown(report)
     assert "market_confirmation" not in markdown
 
+
+
+
+def test_primary_horizon_requires_decisive_short_edge() -> None:
+    actions = {"short": "recommend", "medium": "recommend", "long": "recommend"}
+
+    near_tie_scores = {
+        "short": {"score": 0.859},
+        "medium": {"score": 0.845},
+        "long": {"score": 0.657},
+    }
+    decisive_short_scores = {
+        "short": {"score": 0.781},
+        "medium": {"score": 0.688},
+        "long": {"score": 0.631},
+    }
+
+    assert primary_horizon_from_actions(near_tie_scores, actions) == ("medium", "recommend")
+    assert primary_horizon_from_actions(decisive_short_scores, actions) == ("short", "recommend")
 
 def test_contract_rejects_final_decision_account_action_fields() -> None:
     report = build_advisory_report(

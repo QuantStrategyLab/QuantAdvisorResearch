@@ -51,6 +51,7 @@ HORIZON_WINDOWS = {
     "long": "1-3年",
     "not_applicable": "不适用",
 }
+SHORT_PRIMARY_MIN_SCORE_EDGE = 0.05
 THEME_MOMENTUM_ARTIFACT_TYPE = "medium_horizon_theme_context"
 
 CADENCE_LABELS_ZH = {
@@ -1173,9 +1174,17 @@ def primary_horizon_from_actions(
 ) -> tuple[str, str]:
     for target_action in ("recommend", "watch"):
         eligible = [horizon for horizon, action in horizon_actions.items() if action == target_action]
-        if eligible:
-            eligible.sort(key=lambda horizon: (-as_float(horizon_scores[horizon]["score"]), horizon))
-            return eligible[0], target_action
+        if not eligible:
+            continue
+
+        if "short" in eligible and "medium" in eligible:
+            short_score = as_float(horizon_scores["short"]["score"])
+            medium_score = as_float(horizon_scores["medium"]["score"])
+            if short_score < medium_score + SHORT_PRIMARY_MIN_SCORE_EDGE:
+                eligible = [horizon for horizon in eligible if horizon != "short"]
+
+        eligible.sort(key=lambda horizon: (-as_float(horizon_scores[horizon]["score"]), horizon))
+        return eligible[0], target_action
     return "medium", "skip"
 
 

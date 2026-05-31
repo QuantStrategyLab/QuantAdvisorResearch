@@ -129,12 +129,15 @@ def as_sortable_float(value: Any) -> float:
 
 
 def ranked_horizon_picks(final_picks: list[dict[str, Any]], horizon: str) -> list[dict[str, Any]]:
-    picks = [
-        pick
-        for pick in final_picks
-        if pick.get("primary_horizon") == horizon
-        or pick.get("horizon_actions", {}).get(horizon) in {"recommend", "watch"}
-    ]
+    primary_picks = [pick for pick in final_picks if pick.get("primary_horizon") == horizon]
+    if horizon == "long" and not primary_picks:
+        picks = [
+            pick
+            for pick in final_picks
+            if pick.get("horizon_actions", {}).get(horizon) in {"recommend", "watch"}
+        ]
+    else:
+        picks = primary_picks
     return sorted(picks, key=lambda pick: (-horizon_pick_score(pick, horizon), str(pick.get("symbol", ""))))
 
 

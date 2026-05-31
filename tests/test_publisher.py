@@ -236,6 +236,66 @@ def test_render_report_html_groups_final_cards_by_horizon_and_rank() -> None:
     assert "最终推荐" not in html
 
 
+
+
+def test_short_and_medium_columns_use_primary_horizon_only() -> None:
+    report = build_sample_report()
+    report["final_decisions"]["recommendations"] = [
+        {
+            "symbol": "MU",
+            "name": "Micron",
+            "primary_horizon": "medium",
+            "primary_horizon_label": "中线",
+            "primary_horizon_window": "2-12周",
+            "combined_score": 0.9,
+            "source_score": 0.6,
+            "momentum_score": 1.0,
+            "medium_context_score": 0.9,
+            "long_context_score": 0.6,
+            "horizon_scores": {
+                "short": {"score": 0.88},
+                "medium": {"score": 0.9},
+                "long": {"score": 0.7},
+            },
+            "horizon_actions": {"short": "recommend", "medium": "recommend", "long": "recommend"},
+            "business_summary": "MU background",
+            "prospect_summary": "MU reason",
+            "why_selected": ["ranked"],
+            "risk_summary": "risk",
+        },
+        {
+            "symbol": "DELL",
+            "name": "Dell",
+            "primary_horizon": "short",
+            "primary_horizon_label": "短线",
+            "primary_horizon_window": "1-10个交易日",
+            "combined_score": 0.8,
+            "source_score": 0.6,
+            "momentum_score": 0.7,
+            "medium_context_score": 0.7,
+            "long_context_score": 0.6,
+            "horizon_scores": {
+                "short": {"score": 0.8},
+                "medium": {"score": 0.7},
+                "long": {"score": 0.65},
+            },
+            "horizon_actions": {"short": "recommend", "medium": "recommend", "long": "recommend"},
+            "business_summary": "DELL background",
+            "prospect_summary": "DELL reason",
+            "why_selected": ["ranked"],
+            "risk_summary": "risk",
+        },
+    ]
+
+    html = render_report_html(report)
+
+    assert "本期结论：长线：MU、DELL；中线：MU；短线：DELL。" in html
+    assert "<h2>短线</h2>" in html
+    short_start = html.index("<h2>短线</h2>")
+    short_block = html[short_start:]
+    assert "#1</span>DELL" in short_block
+    assert "#1</span>MU" not in short_block
+
 def test_render_report_html_renders_long_context_as_full_card_when_primary_bucket_is_medium() -> None:
     report = build_sample_report()
     report["final_decisions"]["recommendations"] = [
