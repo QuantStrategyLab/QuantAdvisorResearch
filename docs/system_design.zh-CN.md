@@ -89,7 +89,7 @@ broker platform repositories
 - `PoliticalEventTrackingResearch`：事件/RSS 事实层周更，必要时手工触发；
 - `AiLongHorizonSignalPipelines`：主题动量周更，长周期 AI shadow signal 月更；
 - `QuantAdvisorResearch`：公开 HTML/JSON/RSS 推荐继续周更；
-- 月度复盘后续可以新增，用来回顾上月推荐表现，不替代周度公开推荐。
+- 月度复盘单独生成 artifact，用来回顾本月最终推荐和相对上次变化，不替代周度公开推荐。
 
 ## 跨板块长期主题层
 

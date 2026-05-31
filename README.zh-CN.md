@@ -6,7 +6,7 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 
 线上站点：<https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
-当前运行节奏是：**周度公开推荐 + 周度事件/主题刷新 + 月度 AI shadow 背景**。后续可以新增月度复盘，用来回顾上月推荐表现，但只要报告里仍保留短线 `1-10个交易日` 和中线 `2-12周` 窗口，公开推荐就不应改成月更。
+当前运行节奏是：**周度公开推荐 + 周度事件/主题刷新 + 月度 AI shadow 背景 + 单独月度复盘 artifact**。月度复盘只做变化回顾和月末检查；只要报告里仍保留短线 `1-10个交易日` 和中线 `2-12周` 窗口，公开推荐就不应改成月更。
 
 ## 仓库定位
 
@@ -50,7 +50,7 @@ python scripts/build_advisory_report.py \
 
 ## 版本管理
 
-- Python 包版本：`0.1.1`
+- Python 包版本：`0.1.2`
 - 报告 schema：`schema_version = 5`
 - 报告 contract：`model_recommendations.v5`
 - 报告 manifest：`<output-json>.manifest.json`
@@ -113,6 +113,21 @@ python -m pytest -q
 `.github/workflows/publish_advisory_site.yml` 会每周发布 HTML/JSON/RSS 站点。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，Pages 部署成功后会发送一条非个性化 Telegram 摘要；如果没配置，通知步骤会跳过；Telegram 发送异常会记录在日志里，但不阻断网页/RSS 发布。
 
 周度发布是有意保留的：短线结论如果只月更会过期；月度 AI shadow 只提供长周期背景，不作为每周追热点的模型输入。
+
+## 月度复盘
+
+`.github/workflows/monthly_advisory_review.yml` 每月生成一次 `monthly_advisory_review` artifact，用来检查本月最终推荐、短/中/长线分布，以及相对上一份报告的新增、移除和保留标的。
+
+本地生成：
+
+```bash
+python scripts/build_monthly_review.py \
+  --current-report data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
+  --output-json data/output/monthly_advisory_review/monthly_review_2026-05-30.json \
+  --output-md data/output/monthly_advisory_review/monthly_review_2026-05-30.md
+```
+
+如果传入 `--previous-report`，会输出新增、移除和保留标的；不传时仍能生成本月快照，但会记录数据质量提示。这个 workflow 只上传 artifact，不发布网页，也不替代周度公开推荐。
 
 ## RSS / 静态页面
 

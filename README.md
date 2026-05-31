@@ -21,9 +21,9 @@ system:
 
 The current operating cadence is a weekly public recommendation snapshot,
 supported by weekly event/theme refreshes and monthly long-horizon AI shadow
-context. Monthly review reports can be added later for performance review, but
-they should not replace the weekly publication while short-horizon windows are
-part of the contract.
+context. Monthly review reports are generated separately for change review and
+month-end inspection. They do not replace the weekly publication while
+short-horizon windows are part of the contract.
 
 Live site:
 
@@ -106,6 +106,19 @@ contains short-horizon (`1-10 trading days`) and medium-horizon (`2-12 weeks`)
 windows, so a monthly-only public report would make short-horizon conclusions
 stale. The AI shadow input remains monthly because it is long-horizon context,
 not a weekly trading signal.
+
+Build the separate monthly review artifact:
+
+```bash
+python scripts/build_monthly_review.py \
+  --current-report data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
+  --output-json data/output/monthly_advisory_review/monthly_review_2026-05-30.json \
+  --output-md data/output/monthly_advisory_review/monthly_review_2026-05-30.md
+```
+
+`.github/workflows/monthly_advisory_review.yml` runs monthly and uploads the
+monthly report/review artifacts only. It is intentionally separate from the
+weekly public HTML/RSS publication.
 
 Publish a static HTML + RSS preview:
 
