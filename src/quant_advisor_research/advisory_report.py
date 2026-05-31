@@ -1438,7 +1438,7 @@ def build_advisory_report(
             "market_confirmation_count": len(market_confirmations),
             "top_theme_candidate_symbols": [item["symbol"] for item in theme_first_candidates[:8]],
             "top_recommended_symbols": [item["symbol"] for item in final_decisions["recommendations"][:5]],
-            "review_note": "Non-personalized model recommendations. No order, target quantity, account suitability, or portfolio allocation is encoded.",
+            "review_note": "Intelligent advisory research output. No order, target quantity, account suitability, or portfolio allocation is encoded.",
         },
         "recommendations": recommendations,
         "final_decisions": final_decisions,
@@ -1450,7 +1450,7 @@ def build_advisory_report(
             "portfolio_allocation_allowed": False,
             "personalized_advice_allowed": False,
             "account_specific_advice_allowed": False,
-            "downstream_use": "Model recommendation research only; do not route to broker execution or account-level allocation.",
+            "downstream_use": "Intelligent advisory research only; do not route to broker execution or account-level allocation.",
         },
     }
     validate_advisory_report(report)
@@ -1460,14 +1460,14 @@ def build_advisory_report(
 def render_markdown(report: dict[str, Any]) -> str:
     cadence_label = CADENCE_LABELS_ZH.get(str(report["cadence"]), str(report["cadence"]).title())
     lines = [
-        f"# 量化模型推荐{cadence_label}复盘 - {report['as_of']}",
+        f"# 智慧投顾研究{cadence_label}复盘 - {report['as_of']}",
         "",
     ]
     final_decisions = report.get("final_decisions", {})
     if final_decisions:
         horizon_buckets = final_decisions.get("horizon_buckets", {})
         for horizon, label in (("short", "短线"), ("medium", "中线"), ("long", "长线")):
-            symbols = ", ".join(horizon_buckets.get(horizon, [])) or "暂无最终推荐"
+            symbols = ", ".join(horizon_buckets.get(horizon, [])) or "暂无系统结论"
             lines.append(f"- {label}({HORIZON_WINDOWS[horizon]}): {symbols}")
         lines.append("")
         for pick in final_decisions.get("recommendations", []):
@@ -1573,7 +1573,7 @@ def write_text(path: str | Path, content: str) -> None:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build a non-personalized model recommendation report.")
+    parser = argparse.ArgumentParser(description="Build an intelligent advisory research report.")
     parser.add_argument("--as-of", required=True, help="Report date in YYYY-MM-DD format.")
     parser.add_argument("--cadence", required=True, choices=sorted(ALLOWED_CADENCES))
     parser.add_argument("--political-events", required=True, help="Political event CSV.")

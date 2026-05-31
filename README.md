@@ -2,24 +2,24 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-Non-personalized model recommendation orchestration for QuantStrategyLab.
+Intelligent advisory research system for QuantStrategyLab.
 
-This repository combines deterministic event evidence and saved AI shadow context
-into audit-ready model recommendation reports. It does not place orders, store
-broker credentials, manage portfolios, or personalize advice for a specific
-investor.
+This repository combines deterministic event evidence, theme momentum, market
+confirmation, and saved AI shadow context into investor-readable advisory
+research reports. It does not place orders, store broker credentials, manage
+portfolios, or personalize advice for a specific investor.
 
 ## Repository Role
 
-`QuantAdvisorResearch` is the coordinator for a future smart advisory research
-system:
+`QuantAdvisorResearch` is the coordinator for the Intelligent Advisory Research
+System:
 
 - consume political/public-event context from `PoliticalEventTrackingResearch`
 - consume saved AI shadow context from `ResearchSignalContextPipelines`
 - keep other strategy and snapshot repositories independent from this pipeline
 - leave broker execution in platform repositories
 
-The current operating cadence is a weekly public recommendation snapshot,
+The current operating cadence is a weekly public intelligent-advisory snapshot,
 supported by weekly event/theme refreshes and monthly long-horizon AI shadow
 context. Monthly review reports are generated separately for change review and
 month-end inspection. They do not replace the weekly publication while
@@ -45,17 +45,17 @@ Advisor is the final composition layer. Source ownership by horizon is:
 - Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `ResearchSignalContextPipelines`, now explicitly marked as `medium_horizon_theme_context`, focused on theme momentum and symbol momentum.
 - Long term (`1-3 years`): `latest_signal.json` / `signal_history/*.json` from `ResearchSignalContextPipelines` as AI shadow context.
 
-Final recommendations are still deterministic Advisor outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine. Advisor now records separate short/medium/long horizon scores and gates for each final pick; public pages keep the simpler final recommendation layout.
+Final recommendations are still deterministic Intelligent Advisory outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine. Advisor now records separate short/medium/long horizon scores and gates for each final pick; public pages keep the simpler final recommendation layout.
 
 ## Boundary
 
 This repository owns:
 
-- model recommendation artifact schemas
+- intelligent advisory artifact schemas
 - deterministic scoring and review policy
 - daily/weekly/monthly report generation
 - evidence and risk summaries
-- model recommendation history for later review
+- intelligent advisory history for later review
 
 This repository does not own:
 
@@ -114,7 +114,7 @@ files, create orders, or notify investors.
 
 `.github/workflows/publish_advisory_site.yml` publishes the HTML/JSON/RSS site on
 a weekly schedule. If `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured
-as repository secrets, the workflow sends a short non-personalized Telegram
+as repository secrets, the workflow sends a short intelligent-advisory Telegram
 summary after a successful Pages deployment. If either secret is missing, the
 notification step is skipped without failing the publication. Telegram delivery
 errors are logged and do not block Pages/RSS output.
@@ -154,15 +154,14 @@ GitHub Pages:
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
 The published HTML, RSS feed title, and Telegram summary default to Simplified
-Chinese (`zh-CN`) because the current audience is Chinese-language retail
-research readers. JSON field names remain stable English contract keys.
+Chinese (`zh-CN`) and use the public-facing Intelligent Advisory Research System wording because the current audience is Chinese-language retail research readers. JSON field names remain stable English contract keys.
 
 The scheduled publish workflow defaults to live source artifacts inside sibling
 repositories. Manual dispatch can normally pass only `as_of`; override paths only
 when intentionally testing a different artifact:
 
 ```bash
-gh workflow run "Publish Model Recommendations Site" \
+gh workflow run "Publish Intelligent Advisory Site" \
   --repo QuantStrategyLab/QuantAdvisorResearch \
   -f as_of=2026-05-30
 ```
@@ -269,7 +268,7 @@ Default horizon windows:
 
 ## Versioning
 
-The Python package version is `0.1.2`. Report artifacts are versioned separately:
+The Python package version is `0.1.3`. Report artifacts are versioned separately:
 
 - report schema: `schema_version = 5`
 - report contract: `model_recommendations.v5`

@@ -168,7 +168,7 @@ def test_render_markdown_keeps_public_report_direct() -> None:
 
     markdown = render_markdown(report)
 
-    assert "# 量化模型推荐周度复盘 - 2026-05-30" in markdown
+    assert "# 智慧投顾研究周度复盘 - 2026-05-30" in markdown
     assert "股票背景" in markdown
     assert "推荐理由" in markdown
     assert "主要风险" in markdown

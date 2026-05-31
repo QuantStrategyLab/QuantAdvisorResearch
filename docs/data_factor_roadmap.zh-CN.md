@@ -4,10 +4,10 @@
 
 ## 当前结论
 
-`QuantAdvisorResearch` 当前应该继续做推荐结论仓库，而不是把所有量化因子仓库接进来。原因是现有组织里已经有两条性质不同的链路：
+`QuantAdvisorResearch` 当前应该继续做智慧投顾研究系统的最终合成仓库，而不是把所有量化因子仓库接进来。原因是现有组织里已经有两条性质不同的链路：
 
 - 可回测、可执行链路：价格、技术、动量、波动、快照和策略仓库，最后可进入券商平台。
-- 新闻、政策、公开事件、AI shadow 链路：证据不稳定、样本少、回测难，应该只进入非个性化模型推荐和复盘。
+- 新闻、政策、公开事件、AI shadow 链路：证据不稳定、样本少、回测难，应该只进入非个性化智慧投顾研究和复盘。
 
 因此本仓库短期只消费 `PoliticalEventTrackingResearch` 和 `ResearchSignalContextPipelines` 的研究产物；`UsEquitySnapshotPipelines`、`UsEquityStrategies`、`CryptoSnapshotPipelines`、`CryptoStrategies` 保持独立，只作为方法参考和未来人工复核资料来源。
 
@@ -51,7 +51,7 @@
 
 ### QuantAdvisorResearch
 
-当前负责最终非个性化模型推荐：
+当前负责最终非个性化智慧投顾研究输出：
 
 - 输入：事件 CSV、watchlist CSV、AI shadow JSON、可选主题动量、可选市场确认 CSV。
 - 输出：`model_recommendations` JSON、Markdown、HTML、RSS。

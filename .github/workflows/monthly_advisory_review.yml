@@ -1,4 +1,4 @@
-name: Monthly Advisory Review
+name: Monthly Intelligent Advisory Review
 
 on:
   workflow_dispatch:

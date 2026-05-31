@@ -1,4 +1,4 @@
-# Smart Advisory Research System Design
+# Intelligent Advisory Research System Design
 
 [English](system_design.md) | [简体中文](system_design.zh-CN.md)
 
@@ -11,13 +11,13 @@ and broker execution separated:
   dates, and source confidence.
 - `ResearchSignalContextPipelines`: reusable research signal context, including
   medium-horizon theme momentum and long-horizon AI shadow context.
-- `QuantAdvisorResearch`: deterministic final composition layer for
-  non-personalized model recommendations.
+- `QuantAdvisorResearch`: deterministic final composition layer for the
+  Intelligent Advisory Research System.
 - Broker/platform repositories: execution, credentials, runtime adapters, and
   operational alerts.
 
 `QuantAdvisorResearch` does not merge with execution repositories and does not
-turn recommendation artifacts into target allocations or orders.
+turn advisory research artifacts into target allocations or orders.
 
 ## Data Flow
 
@@ -31,7 +31,7 @@ event evidence + source confidence
 QuantAdvisorResearch <--- ResearchSignalContextPipelines latest_signal.json / theme_momentum_snapshot.json
         |
         v
-model-recommendation artifact
+intelligent-advisory artifact
         |
         v
 GitHub artifact / static HTML / RSS / optional Telegram / manual review
@@ -69,7 +69,7 @@ traced back to short-, medium-, and long-horizon inputs and gates.
 - Strategy: keep scoring rules replaceable without changing the report contract.
 - Pipeline: load inputs, aggregate candidates, score, apply risk rules, and
   render reports in separate stages.
-- Repository: preserve point-in-time recommendation artifacts for replay.
+- Repository: preserve point-in-time advisory artifacts for replay.
 - Specification: encode non-personalized, no-execution, and no-allocation policy
   as explicit contract rules.
 
@@ -84,7 +84,7 @@ Recommended cadence:
   dispatch when needed.
 - `ResearchSignalContextPipelines`: weekly theme momentum; monthly long-horizon
   AI shadow signal.
-- `QuantAdvisorResearch`: weekly public HTML/JSON/RSS publication.
+- `QuantAdvisorResearch`: weekly public Intelligent Advisory HTML/JSON/RSS publication.
 - Monthly advisory review: separate artifact for month-end change review; it does
   not replace weekly publication.
 

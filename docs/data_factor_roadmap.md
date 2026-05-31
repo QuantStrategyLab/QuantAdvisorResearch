@@ -4,15 +4,15 @@
 
 ## Current Direction
 
-`QuantAdvisorResearch` should remain the final recommendation repository instead
-of becoming a full multi-factor trading platform.
+`QuantAdvisorResearch` should remain the Intelligent Advisory Research System
+coordinator instead of becoming a full multi-factor trading platform.
 
 Two different research paths should stay separated:
 
 - Backtestable/executable path: price, technical, momentum, volatility, snapshot,
   and strategy repositories that may eventually connect to broker platforms.
 - Event/policy/news/AI-shadow path: less stable evidence that should only produce
-  non-personalized recommendation reports and review artifacts.
+  non-personalized intelligent-advisory reports and review artifacts.
 
 For now, this repository consumes only:
 
@@ -56,7 +56,7 @@ must not directly generate orders, target weights, or account actions.
 
 ### QuantAdvisorResearch
 
-Owns final non-personalized model recommendations:
+Owns final non-personalized intelligent-advisory research output:
 
 - inputs: event CSV, watchlist CSV, saved AI shadow JSON, optional theme momentum, optional market confirmation CSV;
 - outputs: JSON, Markdown, HTML, RSS, and optional Telegram summary;

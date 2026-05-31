@@ -23,7 +23,7 @@ def build_sample_report() -> dict:
 def test_render_report_html_is_direct_public_recommendation_page() -> None:
     html = render_report_html(build_sample_report())
 
-    assert "量化模型推荐周度复盘 - 2026-05-30" in html
+    assert "智慧投顾研究周度复盘 - 2026-05-30" in html
     assert "text-align: center" in html
     assert "report-shell" in html
     assert "report-hero" in html
@@ -57,12 +57,12 @@ def test_render_feed_xml_contains_report_item() -> None:
     feed = render_feed_xml([build_sample_report()], site_url="https://example.com/advisor", feed_title="Test Feed")
 
     assert "<rss version=\"2.0\">" in feed
-    assert "2026-05-30 周度模型推荐" in feed
+    assert "2026-05-30 周度智慧投顾研究" in feed
     assert "来源=fixture" not in feed
     assert "来源=" not in feed
     assert "主要信号=" in feed
     assert "最终推荐" not in feed
-    assert "非个性化模型输出；不包含下单、仓位配置或账户级建议。" in feed
+    assert "智慧投顾研究输出；不包含下单、仓位配置或账户级建议。" in feed
 
 
 def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
@@ -86,7 +86,7 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "site-mark" in index_html
     assert "<svg" in favicon
     assert "#172033" in favicon
-    assert "Latest briefing" in index_html
+    assert "Latest advisory" in index_html
     assert "latest-panel" in index_html
     assert "snapshot-grid" in index_html
     assert "<p class=\"snapshot-label\">长线</p>" in index_html
@@ -280,7 +280,7 @@ def test_format_telegram_message_is_direct_and_links_report() -> None:
 
     message = format_telegram_message(report, site_url="https://example.com/advisor")
 
-    assert "量化模型推荐" in message
+    assert "智慧投顾研究系统" in message
     assert "本期推荐" in message
     assert "AI信号仓库" not in message
     assert "股票背景" in message

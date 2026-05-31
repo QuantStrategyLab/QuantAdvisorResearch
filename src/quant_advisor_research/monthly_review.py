@@ -110,13 +110,13 @@ def build_monthly_review(
             "execution_allowed": False,
             "portfolio_allocation_allowed": False,
             "personalized_advice_allowed": False,
-            "downstream_use": "Monthly review of non-personalized model recommendations only.",
+            "downstream_use": "Monthly review of intelligent advisory research output only.",
         },
     }
 
 
 def render_monthly_review_markdown(review: dict[str, Any]) -> str:
-    lines = [f"# 月度模型推荐复盘 - {review.get('as_of', '')}", ""]
+    lines = [f"# 智慧投顾研究月度复盘 - {review.get('as_of', '')}", ""]
     summary = review.get("summary", {})
     buckets = summary.get("current_horizon_buckets", {})
     lines.append("## 本月最终推荐")
@@ -124,7 +124,7 @@ def render_monthly_review_markdown(review: dict[str, Any]) -> str:
     for horizon in ("short", "medium", "long"):
         label = HORIZON_LABELS_ZH[horizon]
         window = HORIZON_WINDOWS_ZH[horizon]
-        value = ", ".join(buckets.get(horizon, [])) or "暂无最终推荐"
+        value = ", ".join(buckets.get(horizon, [])) or "暂无系统结论"
         lines.append(f"- {label}（{window}）：{value}")
     lines.append("")
     lines.append("## 较上次变化")

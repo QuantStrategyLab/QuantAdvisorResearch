@@ -1,4 +1,4 @@
-# 智慧顾投研究系统设计
+# 智慧投顾研究系统设计
 
 [English](system_design.md) | [简体中文](system_design.zh-CN.md)
 
@@ -13,7 +13,7 @@ QuantStrategyLab 现有仓库已经天然分层：
 
 `QuantAdvisorResearch` 只协调事件证据和 AI shadow context，不侵入其他量化策略、快照或券商执行仓库。
 
-## 模型推荐数据流
+## 智慧投顾研究数据流
 
 ```text
 PoliticalEventTrackingResearch
@@ -25,7 +25,7 @@ event evidence + source confidence
 QuantAdvisorResearch <--- ResearchSignalContextPipelines latest_signal.json
         |
         v
-model-recommendation artifact
+intelligent-advisory artifact
         |
         v
 GitHub Issue / Markdown / static HTML / RSS / manual review
@@ -46,9 +46,9 @@ broker platform repositories
 - Ports and Adapters：隔离事件来源和 AI shadow context。
 - Strategy：不同推荐规则可替换，如事件驱动、政策资金、公开点名、风险暂缓。
 - Pipeline：输入载入、候选聚合、评分、风控、报告渲染分阶段执行。
-- Repository：保存 point-in-time model recommendation artifact，用于后续 replay。
+- Repository：保存 point-in-time 智慧投顾研究 artifact，用于后续 replay。
 - Command：日评、周评、月评、历史回顾都用可审计命令触发。
-- Specification：把“允许非个性化模型推荐”“不能下单”“不能给账户级仓位”的政策写成显式规则。
+- Specification：把“允许非个性化智慧投顾研究输出”“不能下单”“不能给账户级仓位”的政策写成显式规则。
 
 ## 不推荐方案
 
@@ -60,25 +60,25 @@ broker platform repositories
 
 不建议直接接券商仓库：
 
-- 会模糊“模型推荐”与“执行”边界。
-- 容易把 model recommendation artifact 误用成 target allocation。
+- 会模糊“智慧投顾研究结论”与“执行”边界。
+- 容易把智慧投顾研究 artifact 误用成 target allocation。
 - 增加合规和操作风险。
 
 也不建议在当前阶段接入 `UsEquitySnapshotPipelines` 或 `UsEquityStrategies`：
 
-- 当前产品目标是政策/新闻/AI 驱动的模型推荐，不是全量多因子选股。
+- 当前产品目标是政策/新闻/AI 驱动的智慧投顾研究，不是全量多因子选股。
 - 接入策略仓库会让“推荐结论”和“可执行策略”边界变模糊。
 - 接入快照仓库会引入数据 freshness、样本外回测和因子版本管理问题，MVP 过重。
 
 ## MVP 验证标准
 
 - 能读取政治事件 CSV 和 AI shadow JSON。
-- 能生成 `model_recommendations` JSON artifact。
+- 能生成 `model_recommendations` 智慧投顾研究 JSON artifact。
 - 能生成 `<output-json>.manifest.json`，记录 contract version、hash、Git SHA 和来源。
-- 能生成周度公开推荐报告，并保留日/月 cadence 的手工生成能力。
+- 能生成周度公开智慧投顾研究报告，并保留日/月 cadence 的手工生成能力。
 - 能生成静态 HTML 和 RSS feed 供非个性化订阅。
-- 所有 artifact 明确允许非个性化模型推荐，但禁止下单、调仓、账户级仓位和个性化建议。
-- 后续可以 replay 历史模型推荐，而不是重写过去判断。
+- 所有 artifact 明确允许非个性化智慧投顾研究输出，但禁止下单、调仓、账户级仓位和个性化建议。
+- 后续可以 replay 历史智慧投顾研究结论，而不是重写过去判断。
 
 数据源和因子完善路线见 [data_factor_roadmap.zh-CN.md](data_factor_roadmap.zh-CN.md)。
 
@@ -90,7 +90,7 @@ broker platform repositories
 
 - `PoliticalEventTrackingResearch`：事件/RSS 事实层周更，必要时手工触发；
 - `ResearchSignalContextPipelines`：主题动量周更，长周期 AI shadow signal 月更；
-- `QuantAdvisorResearch`：公开 HTML/JSON/RSS 推荐继续周更；
+- `QuantAdvisorResearch`：公开 HTML/JSON/RSS 智慧投顾研究继续周更；
 - 月度复盘单独生成 artifact，用来回顾本月最终推荐和相对上次变化，不替代周度公开推荐。
 
 ## 跨板块长期主题层

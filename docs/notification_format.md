@@ -1,4 +1,4 @@
-# Model Recommendation Notification Format
+# Intelligent Advisory Notification Format
 
 ## Implemented Channels
 
@@ -14,7 +14,7 @@
 
 ## Boundary
 
-Default notifications show final recommendations, stock background,
+Default Intelligent Advisory notifications show final recommendations, stock background,
 recommendation reasons, horizon, combined score, and the full report link. Theme
 candidates stay in JSON/Markdown audit material and are not included in the
 default notification summary. Notifications must not show orders, target
@@ -24,7 +24,7 @@ allocation advice.
 ## Telegram Summary Shape
 
 ```text
-量化模型推荐 | 周度 | 2026-05-31
+智慧投顾研究系统 | 周度 | 2026-05-31
 
 本期推荐：
 - MU | 中线 | 综合分=0.85 | 股票背景：Micron 主要做 DRAM、NAND 和 HBM 等存储芯片。
@@ -42,5 +42,5 @@ RSS remains intentionally short for feed readers:
 
 ```text
 主要信号=HBM / 存储, AI 算力平台；推荐=MU, INTC, AMD, VRT, DELL。
-非个性化模型输出；不包含下单、仓位配置或账户级建议。
+智慧投顾研究输出；不包含下单、仓位配置或账户级建议。
 ```

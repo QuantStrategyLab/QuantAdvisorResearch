@@ -1,4 +1,4 @@
-# Model Recommendation Artifact Contract
+# Intelligent Advisory Artifact Contract
 
 ## Report
 
@@ -21,7 +21,7 @@ policy: object
 
 ## Policy
 
-The policy block allows non-personalized model recommendations but keeps account
+The policy block allows non-personalized intelligent-advisory research output but keeps account
 actions and execution disabled:
 
 ```json
@@ -31,7 +31,7 @@ actions and execution disabled:
   "portfolio_allocation_allowed": false,
   "personalized_advice_allowed": false,
   "account_specific_advice_allowed": false,
-  "downstream_use": "Model recommendation research only; do not route to broker execution or account-level allocation."
+  "downstream_use": "Intelligent advisory research only; do not route to broker execution or account-level allocation."
 }
 ```
 
@@ -148,7 +148,7 @@ risk_notes
 
 ## Final Decisions
 
-`final_decisions` is the public recommendation layer. It keeps the simple public
+`final_decisions` is the public Intelligent Advisory recommendation layer. It keeps the simple public
 list while preserving audit details in JSON:
 
 ```text

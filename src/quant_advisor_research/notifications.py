@@ -103,7 +103,7 @@ def format_telegram_message(
     max_themes: int = 5,
 ) -> str:
     lines = [
-        f"量化模型推荐 | {cadence_label(report)} | {report.get('as_of', '')}",
+        f"智慧投顾研究系统 | {cadence_label(report)} | {report.get('as_of', '')}",
         "",
         *_format_final_decisions(report),
         "",

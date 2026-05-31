@@ -1,4 +1,4 @@
-name: Publish Model Recommendations Site
+name: Publish Intelligent Advisory Site
 
 on:
   workflow_dispatch:
@@ -142,7 +142,7 @@ jobs:
             --reports "data/output/published/advisory_report_${AS_OF}.json" \
             --output-dir site \
             --site-url "${SITE_URL}" \
-            --feed-title "量化模型推荐"
+            --feed-title "智慧投顾研究系统"
           cp "data/output/published/advisory_report_${AS_OF}.json" site/
           cp "data/output/published/advisory_report_${AS_OF}.md" site/
           cp "data/output/published/advisory_report_${AS_OF}.json.manifest.json" site/

@@ -260,7 +260,7 @@ def render_theme_momentum_html(report: dict[str, Any]) -> str:
     """
 
 def render_report_html(report: dict[str, Any]) -> str:
-    title = f"量化模型推荐{cadence_label(report)}复盘 - {report['as_of']}"
+    title = f"智慧投顾研究{cadence_label(report)}复盘 - {report['as_of']}"
     final_decisions_html = render_final_decisions_html(report)
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -269,7 +269,7 @@ def render_report_html(report: dict[str, Any]) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
   <link rel="icon" type="image/svg+xml" href="{SITE_ICON_FILENAME}">
-  <link rel="alternate" type="application/rss+xml" title="量化模型推荐 RSS" href="feed.xml">
+  <link rel="alternate" type="application/rss+xml" title="智慧投顾研究 RSS" href="feed.xml">
   <style>
     :root {{
       color-scheme: light;
@@ -464,9 +464,9 @@ def render_report_html(report: dict[str, Any]) -> str:
     <section class="report-hero">
       <div class="report-hero-copy">
         {render_site_mark()}
-        <p class="eyebrow">Model briefing</p>
+        <p class="eyebrow">Advisory briefing</p>
         <h1>{html.escape(title)}</h1>
-        <p class="report-lead">按长线、中线、短线分栏展示模型结果；每张卡片保留股票背景、推荐理由、多源依据和主要风险。</p>
+        <p class="report-lead">按长线、中线、短线分栏展示系统结论；每张卡片保留股票背景、推荐理由、多源依据和主要风险。</p>
       </div>
       <aside class="date-card" aria-label="报告日期">
         <p class="date-label">Report date</p>
@@ -525,9 +525,9 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
         latest_block = f"""
         <section class="latest-panel">
           <div class="latest-copy">
-            <p class="eyebrow">Latest briefing</p>
-            <h2>{html.escape(latest['as_of'])} {html.escape(cadence_label(latest))}模型推荐</h2>
-            <p class="lead">用主题动量、市场确认和事件证据生成的非个性化研究页面。</p>
+            <p class="eyebrow">Latest advisory</p>
+            <h2>{html.escape(latest['as_of'])} {html.escape(cadence_label(latest))}智慧投顾研究</h2>
+            <p class="lead">结合主题动量、市场确认和事件证据，生成普通投资者更容易阅读的研究结论。</p>
             <div class="theme-line"><span>主要信号</span>{html.escape(top_themes or '无')}</div>
             <div class="symbol-strip hero-symbols">{render_symbol_tags([str(symbol) for symbol in top_symbols])}</div>
             <a class="primary-action" href="{html.escape(latest_filename)}">打开最新报告</a>
@@ -556,9 +556,9 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>量化模型推荐</title>
+  <title>智慧投顾研究系统</title>
   <link rel="icon" type="image/svg+xml" href="{SITE_ICON_FILENAME}">
-  <link rel="alternate" type="application/rss+xml" title="量化模型推荐 RSS" href="feed.xml">
+  <link rel="alternate" type="application/rss+xml" title="智慧投顾研究 RSS" href="feed.xml">
   <style>
     :root {{
       color-scheme: light;
@@ -658,10 +658,10 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
           {render_site_mark()}
           <div>
             <p class="eyebrow">QuantStrategyLab</p>
-            <h1>量化模型推荐</h1>
+            <h1>智慧投顾研究系统</h1>
           </div>
         </div>
-        <p>把主题动量、市场确认和政策/新闻证据合成为非个性化研究结论。页面只展示推荐、周期、背景、理由和风险。</p>
+        <p>把主题动量、市场确认和政策/新闻证据整理成普通投资者能读懂的研究结论。页面只展示推荐、周期、背景、理由和风险。</p>
       </div>
       <aside class="rss-card">
         <a href="feed.xml">RSS 订阅</a>
@@ -686,20 +686,20 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
     channel = ET.Element("channel")
     ET.SubElement(channel, "title").text = feed_title
     ET.SubElement(channel, "link").text = site_url
-    ET.SubElement(channel, "description").text = "QuantStrategyLab 非个性化模型推荐，包含理由、周期和风险提示。"
+    ET.SubElement(channel, "description").text = "QuantStrategyLab 智慧投顾研究系统，包含推荐理由、周期和风险提示。"
     for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
         filename = report_filename(report)
         link = f"{site_url.rstrip('/')}/{quote(filename)}"
         item = ET.SubElement(channel, "item")
-        ET.SubElement(item, "title").text = f"{report['as_of']} {cadence_label(report)}模型推荐"
+        ET.SubElement(item, "title").text = f"{report['as_of']} {cadence_label(report)}智慧投顾研究"
         ET.SubElement(item, "link").text = link
         ET.SubElement(item, "guid").text = link
         ET.SubElement(item, "pubDate").text = format_datetime(report["generated_at"])
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
         ET.SubElement(item, "description").text = (
-            f"主要信号={top_themes or '无'}；推荐={top_symbols or '无'}。"
-            "非个性化模型输出；不包含下单、仓位配置或账户级建议。"
+            f"主要信号={top_themes or '无'}；系统结论={top_symbols or '无'}。"
+            "智慧投顾研究输出；不包含下单、仓位配置或账户级建议。"
         )
     rss = ET.Element("rss", {"version": "2.0"})
     rss.append(channel)
@@ -728,11 +728,11 @@ def publish_reports(report_paths: list[str | Path], output_dir: str | Path, *, s
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Publish model recommendation reports as static HTML and RSS.")
+    parser = argparse.ArgumentParser(description="Publish intelligent advisory research reports as static HTML and RSS.")
     parser.add_argument("--reports", nargs="+", required=True, help="One or more advisory report JSON files.")
     parser.add_argument("--output-dir", required=True, help="Static site output directory.")
     parser.add_argument("--site-url", default="https://quantstrategylab.github.io/QuantAdvisorResearch")
-    parser.add_argument("--feed-title", default="量化模型推荐")
+    parser.add_argument("--feed-title", default="智慧投顾研究系统")
     return parser
 
 

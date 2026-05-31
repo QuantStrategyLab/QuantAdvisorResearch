@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化模型推荐、推荐理由、适合周期和日/周/月复盘，不下单、不管理仓位、不接券商凭证。
+QuantStrategyLab 的“智慧投顾研究系统”协调仓库。它把事件证据、主题动量、市场确认和 AI shadow 背景整理成普通投资者能读懂的研究结论；不下单、不管理仓位、不接券商凭证，也不做账户级个性化建议。
 
 线上站点：<https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
@@ -13,11 +13,11 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 - [通知格式](docs/notification_format.zh-CN.md) / [Notification format](docs/notification_format.md)
 - [Artifact contract](docs/advisory_contract.md)
 
-当前运行节奏是：**周度公开推荐 + 周度事件/主题刷新 + 月度 AI shadow 背景 + 单独月度复盘 artifact**。月度复盘只做变化回顾和月末检查；只要报告里仍保留短线 `1-10个交易日` 和中线 `2-12周` 窗口，公开推荐就不应改成月更。
+当前运行节奏是：**周度公开智慧投顾研究 + 周度事件/主题刷新 + 月度 AI shadow 背景 + 单独月度复盘 artifact**。月度复盘只做变化回顾和月末检查；只要报告里仍保留短线 `1-10个交易日` 和中线 `2-12周` 窗口，公开推荐就不应改成月更。
 
 ## 仓库定位
 
-这个仓库把事件研究和 AI shadow 产物组合成 model recommendation artifact：
+这个仓库把事件研究、主题动量、市场确认和 AI shadow 产物组合成智慧投顾研究 artifact：
 
 - `PoliticalEventTrackingResearch`：政治/公开事件事实、催化剂、来源置信度。
 - `ResearchSignalContextPipelines`：已保存的长周期 AI shadow context。
@@ -27,17 +27,17 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 
 ## 短中长线来源分工
 
-Advisor 是最终合成层，三个周期的输入分工如下：
+智慧投顾研究系统由本仓库做最终合成，三个周期的输入分工如下：
 
 - 短线（1-10 个交易日）：事件/新闻政策催化 + 自动生成的 `market_confirmation.csv`，重点看相对强度、成交量、回撤和波动。
 - 中线（2-12 周）：`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json`，现在明确标记为 `medium_horizon_theme_context`，重点看主题动量和个股动量。
 - 长线（1-3 年）：`ResearchSignalContextPipelines` 的 `latest_signal.json` / `signal_history/*.json`，作为 AI shadow 背景。
 
-最终推荐仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。本仓库会为最终推荐记录短/中/长线独立评分和独立门槛，但公开页面仍保持简洁，只展示最终列表、背景、理由和风险。
+最终研究结论仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。本仓库会为最终推荐记录短/中/长线独立评分和独立门槛，但公开页面仍保持简洁，只展示最终列表、背景、理由和风险。
 
 ## 当前 MVP
 
-当前实现一个确定性报告生成器：
+当前实现一个确定性的智慧投顾研究报告生成器：
 
 ```bash
 python scripts/build_advisory_report.py \
@@ -85,10 +85,10 @@ manifest 会记录 JSON/Markdown 的 SHA256、`as_of`、cadence、来源 artifac
 
 本仓库负责：
 
-- model recommendation artifact schema
+- 智慧投顾研究 artifact schema
 - 确定性评分和复核规则
 - 日/周/月报告生成
-- 历史模型推荐记录和后续复盘入口
+- 历史智慧投顾研究记录和后续复盘入口
 
 本仓库不负责：
 
@@ -126,11 +126,11 @@ python -m pytest -q
 ## 周度复盘
 
 `.github/workflows/weekly_advisory_review.yml` 会 checkout 本仓库、`PoliticalEventTrackingResearch`
-和 `ResearchSignalContextPipelines`，生成周度 `model_recommendations` 报告并上传为 GitHub Actions artifact。
+和 `ResearchSignalContextPipelines`，生成周度 `model_recommendations` 智慧投顾研究报告并上传为 GitHub Actions artifact。
 
 它不会提交文件、不会通知投资者、不会创建订单。
 
-`.github/workflows/publish_advisory_site.yml` 会每周发布 HTML/JSON/RSS 站点。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，Pages 部署成功后会发送一条非个性化 Telegram 摘要；如果没配置，通知步骤会跳过；Telegram 发送异常会记录在日志里，但不阻断网页/RSS 发布。
+`.github/workflows/publish_advisory_site.yml` 会每周发布 HTML/JSON/RSS 站点。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，Pages 部署成功后会发送一条智慧投顾研究 Telegram 摘要；如果没配置，通知步骤会跳过；Telegram 发送异常会记录在日志里，但不阻断网页/RSS 发布。
 
 周度发布是有意保留的：短线结论如果只月更会过期；月度 AI shadow 只提供长周期背景，不作为每周追热点的模型输入。
 
@@ -164,13 +164,13 @@ python scripts/publish_advisory_site.py \
 `.github/workflows/publish_advisory_site.yml` 会部署到 GitHub Pages：
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
-当前公开页面、RSS 标题和 Telegram 摘要默认使用简体中文（`zh-CN`）。
+当前公开页面、RSS 标题和 Telegram 摘要默认使用简体中文（`zh-CN`），并统一使用“智慧投顾研究系统”的对外表述。
 JSON 字段名继续保持英文契约键，避免破坏下游程序读取。
 
 发布 workflow 默认已经读取 `PoliticalEventTrackingResearch` 内的真实 CSV。手工触发通常只需要传日期；只有刻意测试其他 artifact 时才覆盖路径：
 
 ```bash
-gh workflow run "Publish Model Recommendations Site" \
+gh workflow run "Publish Intelligent Advisory Site" \
   --repo QuantStrategyLab/QuantAdvisorResearch \
   -f as_of=2026-05-30
 ```
