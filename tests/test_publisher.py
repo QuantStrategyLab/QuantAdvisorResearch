@@ -181,7 +181,7 @@ def test_render_report_html_groups_final_cards_by_horizon_and_rank() -> None:
     assert "最终推荐" not in html
 
 
-def test_render_report_html_shows_long_context_when_primary_bucket_is_medium() -> None:
+def test_render_report_html_renders_long_context_as_full_card_when_primary_bucket_is_medium() -> None:
     report = build_sample_report()
     report["final_decisions"]["recommendations"] = [
         {
@@ -214,8 +214,11 @@ def test_render_report_html_shows_long_context_when_primary_bucket_is_medium() -
 
     html = render_report_html(report)
 
-    assert "长线观察" in html
-    assert '<span class="context-symbol">MU</span>' in html
+    assert "长线观察" not in html
+    assert "#1</span>MU" in html
+    assert "长线 / 1-3年" in html
+    assert "MU background" in html
+    assert "MU reason" in html
     assert "最终推荐" not in html
 
 

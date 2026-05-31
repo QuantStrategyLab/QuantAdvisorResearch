@@ -98,8 +98,8 @@ The public HTML/RSS/Telegram outputs should stay direct:
   and risks;
 - render public recommendations as long-, medium-, and short-horizon columns,
   sorted by each horizon score inside the column;
-- show a compact long-context symbol strip when the primary long bucket is empty
-  but final picks still pass long-horizon watch/recommend gates;
+- render a full card in every horizon where a final pick passes that horizon
+  gate, even when another horizon is the pick's primary bucket;
 - hide internal tags such as `source_mode`, mode labels, audience labels, and
   repository names;
 - keep `theme_first_candidates[]`, `horizon_scores`, and `selection_trace` in

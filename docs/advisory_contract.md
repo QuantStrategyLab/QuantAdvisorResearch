@@ -188,9 +188,9 @@ Scoring and gate intent by horizon:
 
 These fields are audit metadata. Public HTML/RSS/Telegram renderers still show
 only final recommendations, stock background, recommendation reasons, and risks.
-If the primary long bucket is empty but final picks still pass the long-horizon
-`watch` or `recommend` gate, the public HTML may show a compact long-context
-symbol strip instead of exposing internal scores.
+Public HTML renders final picks independently per horizon. If a pick passes both
+medium and long gates, it can appear as a full card in both columns, with the
+column-specific horizon window and score.
 
 ## Long-context Diagnostics
 
