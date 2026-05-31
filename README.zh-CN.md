@@ -215,4 +215,12 @@ python scripts/build_market_confirmation.py \
 
 字段包括 `return_5d`、`return_20d`、`return_63d`、相对 SPY 收益、成交量 z-score、63 日回撤、21 日年化波动和 `market_score`。线上 weekly/monthly/publish workflow 会自动生成该文件，再传给报告生成器。
 
-Yahoo chart 下载只是当前无依赖的免费行情入口；如果不可用，脚本会退回到 `theme_momentum_snapshot.json` 里的价格动量信息，报告仍能生成。不要把随机免费代理 IP 池作为稳定生产方案；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。
+可选代理参数：
+
+- `--proxy-urls`：逗号或换行分隔的代理列表。
+- `--proxy-list`：本地代理列表文件。
+- `--proxy-pool-url`：公共代理池文本 URL，一行一个代理。
+
+线上 workflow 也支持仓库变量 `MARKET_DATA_PROXY_URLS` 和 `MARKET_DATA_PROXY_POOL_URL`。脚本会先直连 Yahoo，失败后再尝试代理；日志只记录代理序号，不输出代理完整地址。
+
+Yahoo chart 下载只是当前无依赖的免费行情入口；如果不可用，脚本会退回到 `theme_momentum_snapshot.json` 里的价格动量信息，报告仍能生成。免费公共代理池可以作为应急补充，但不应当作稳定生产数据源；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。

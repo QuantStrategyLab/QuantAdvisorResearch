@@ -18,3 +18,5 @@ def test_public_workflows_default_to_live_event_inputs() -> None:
         assert "market_confirmation_path" in text
         assert "scripts/build_market_confirmation.py" in text
         assert "GENERATED_MARKET_CONFIRMATION" in text
+        assert "market_data_proxy_urls" in text
+        assert "MARKET_DATA_PROXY_POOL_URL" in text

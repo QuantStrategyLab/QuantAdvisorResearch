@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener, urlopen
 
 from .advisory_report import as_float, clamp
 from .csv_utils import read_csv_rows
@@ -237,7 +237,87 @@ def yahoo_symbol(symbol: str) -> str:
     return symbol.replace(".", "-").upper()
 
 
-def fetch_yahoo_bars(symbol: str, *, as_of: dt.date, lookback_days: int = 460, timeout: int = 20) -> list[PriceBar]:
+def normalize_proxy_url(value: str) -> str:
+    text = value.strip()
+    if not text:
+        return ""
+    if "://" not in text:
+        text = f"http://{text}"
+    return text
+
+
+def parse_proxy_lines(text: str) -> list[str]:
+    proxies: list[str] = []
+    seen: set[str] = set()
+    for raw_line in text.replace(",", "\n").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        # Common public proxy lists may add comments or extra columns after whitespace.
+        candidate = normalize_proxy_url(line.split()[0])
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            proxies.append(candidate)
+    return proxies
+
+
+def fetch_text_url(url: str, *, timeout: int = 20) -> str:
+    request = Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; QuantAdvisorResearch/0.1; +https://github.com/QuantStrategyLab)",
+            "Accept": "text/plain,*/*",
+        },
+    )
+    with urlopen(request, timeout=timeout) as response:  # noqa: S310 - user-supplied public proxy-list URL.
+        return response.read().decode("utf-8", errors="replace")
+
+
+def load_proxy_urls(
+    *,
+    proxy_list_path: str | Path | None = None,
+    proxy_urls_text: str = "",
+    proxy_pool_url: str = "",
+    timeout: int = 20,
+) -> list[str]:
+    proxies: list[str] = []
+    if proxy_urls_text.strip():
+        proxies.extend(parse_proxy_lines(proxy_urls_text))
+    if proxy_list_path:
+        path = Path(proxy_list_path)
+        if path.exists():
+            proxies.extend(parse_proxy_lines(path.read_text(encoding="utf-8")))
+    if proxy_pool_url.strip():
+        try:
+            proxies.extend(parse_proxy_lines(fetch_text_url(proxy_pool_url.strip(), timeout=timeout)))
+        except (HTTPError, URLError, TimeoutError, OSError) as exc:
+            print(f"market_data_notice: proxy_pool_unavailable reason={type(exc).__name__}")
+    seen: set[str] = set()
+    result: list[str] = []
+    for proxy in proxies:
+        if proxy not in seen:
+            seen.add(proxy)
+            result.append(proxy)
+    return result
+
+
+def open_request(request: Request, *, timeout: int, proxy_url: str | None = None) -> bytes:
+    if proxy_url:
+        opener = build_opener(ProxyHandler({"http": proxy_url, "https": proxy_url}))
+        with opener.open(request, timeout=timeout) as response:  # noqa: S310 - public market-data endpoint only.
+            return response.read()
+    with urlopen(request, timeout=timeout) as response:  # noqa: S310 - public market-data endpoint only.
+        return response.read()
+
+
+def fetch_yahoo_bars(
+    symbol: str,
+    *,
+    as_of: dt.date,
+    lookback_days: int = 460,
+    timeout: int = 20,
+    proxy_url: str | None = None,
+) -> list[PriceBar]:
     end_date = as_of + dt.timedelta(days=2)
     start_date = as_of - dt.timedelta(days=lookback_days)
     params = urlencode(
@@ -257,8 +337,7 @@ def fetch_yahoo_bars(symbol: str, *, as_of: dt.date, lookback_days: int = 460, t
             "Accept": "application/json,text/plain,*/*",
         },
     )
-    with urlopen(request, timeout=timeout) as response:  # noqa: S310 - public market-data endpoint only.
-        payload = json.loads(response.read().decode("utf-8"))
+    payload = json.loads(open_request(request, timeout=timeout, proxy_url=proxy_url).decode("utf-8"))
     result = payload.get("chart", {}).get("result", [])
     if not result:
         return []
@@ -284,6 +363,32 @@ def fetch_yahoo_bars(symbol: str, *, as_of: dt.date, lookback_days: int = 460, t
         volume = volumes[index] if index < len(volumes) and volumes[index] is not None else 0
         bars.append(PriceBar(date=bar_date, close=float(close), volume=float(volume)))
     return bars
+
+
+def fetch_yahoo_bars_with_fallback(
+    symbol: str,
+    *,
+    as_of: dt.date,
+    proxy_urls: list[str],
+) -> tuple[list[PriceBar], str]:
+    attempts = [None, *proxy_urls]
+    last_error: Exception | None = None
+    for proxy_index, proxy_url in enumerate(attempts):
+        try:
+            bars = fetch_yahoo_bars(symbol, as_of=as_of, proxy_url=proxy_url)
+            if bars:
+                return bars, "yahoo_chart_proxy" if proxy_url else "yahoo_chart"
+            last_error = ValueError("empty_price_bars")
+        except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError, OSError) as exc:
+            last_error = exc
+            if proxy_url:
+                print(
+                    "market_data_notice: proxy_fetch_unavailable "
+                    f"symbol={symbol} proxy_index={proxy_index} reason={type(exc).__name__}"
+                )
+    if last_error:
+        raise last_error
+    raise ValueError("price_fetch_unavailable")
 
 
 def load_theme_momentum(path: str | Path | None) -> dict[str, Any] | None:
@@ -388,14 +493,16 @@ def build_market_confirmation_rows(
     theme_momentum: dict[str, Any] | None = None,
     use_network: bool = True,
     request_pause_seconds: float = 0.2,
+    proxy_urls: list[str] | None = None,
 ) -> list[MarketConfirmationRow]:
     symbol_set = set(symbols)
     fallback_rows = fallback_rows_from_theme_momentum(theme_momentum, symbols=symbol_set, as_of=as_of)
     rows: dict[str, MarketConfirmationRow] = {}
+    proxy_urls = proxy_urls or []
     if use_network:
         benchmark_bars: list[PriceBar] = []
         try:
-            benchmark_bars = fetch_yahoo_bars(benchmark, as_of=as_of)
+            benchmark_bars, _ = fetch_yahoo_bars_with_fallback(benchmark, as_of=as_of, proxy_urls=proxy_urls)
         except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError, OSError) as exc:
             benchmark_bars = []
             print(f"market_data_notice: benchmark_fetch_unavailable benchmark={benchmark} reason={type(exc).__name__}")
@@ -403,12 +510,12 @@ def build_market_confirmation_rows(
             if index and request_pause_seconds > 0:
                 time.sleep(request_pause_seconds)
             try:
-                bars = fetch_yahoo_bars(symbol, as_of=as_of)
+                bars, data_source = fetch_yahoo_bars_with_fallback(symbol, as_of=as_of, proxy_urls=proxy_urls)
                 row = compute_market_confirmation(
                     symbol,
                     bars,
                     benchmark_bars,
-                    data_source="yahoo_chart",
+                    data_source=data_source,
                     warning="" if len(benchmark_bars) >= 22 else "benchmark_unavailable",
                 )
                 if row:
@@ -444,6 +551,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--benchmark", default="SPY", help="Benchmark symbol for relative returns. Defaults to SPY.")
     parser.add_argument("--max-symbols", type=int, default=80)
     parser.add_argument("--request-pause-seconds", type=float, default=0.2)
+    parser.add_argument("--proxy-list", help="Optional local text file with one HTTP/HTTPS proxy per line.")
+    parser.add_argument("--proxy-urls", default="", help="Optional comma/newline-separated HTTP/HTTPS proxy URLs.")
+    parser.add_argument("--proxy-pool-url", default="", help="Optional public text URL returning one proxy per line.")
     parser.add_argument("--no-network", action="store_true", help="Skip price API calls and use theme momentum fallback only.")
     parser.add_argument("--output", required=True, help="Output CSV path.")
     return parser
@@ -459,6 +569,13 @@ def main(argv: list[str] | None = None) -> None:
         theme_momentum=theme_momentum,
         max_symbols=args.max_symbols,
     )
+    proxy_urls = load_proxy_urls(
+        proxy_list_path=args.proxy_list,
+        proxy_urls_text=args.proxy_urls,
+        proxy_pool_url=args.proxy_pool_url,
+    )
+    if proxy_urls:
+        print(f"market_data_notice: proxy_pool_loaded count={len(proxy_urls)}")
     rows = build_market_confirmation_rows(
         symbols=symbols,
         as_of=as_of,
@@ -466,6 +583,7 @@ def main(argv: list[str] | None = None) -> None:
         theme_momentum=theme_momentum,
         use_network=not args.no_network,
         request_pause_seconds=args.request_pause_seconds,
+        proxy_urls=proxy_urls,
     )
     write_market_confirmation_csv(args.output, rows)
     print(f"market_confirmation_rows={len(rows)} symbols_requested={len(symbols)} output={args.output}")

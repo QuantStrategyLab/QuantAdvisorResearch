@@ -3,12 +3,16 @@ from __future__ import annotations
 import datetime as dt
 import json
 from pathlib import Path
+from urllib.error import URLError
 
+import pytest
+import quant_advisor_research.market_confirmation as market_confirmation_module
 from quant_advisor_research.market_confirmation import (
     PriceBar,
     build_market_confirmation_rows,
     collect_symbols,
     compute_market_confirmation,
+    load_proxy_urls,
     write_market_confirmation_csv,
 )
 
@@ -103,3 +107,60 @@ def test_collect_symbols_reads_watchlist_signal_and_theme_momentum(tmp_path: Pat
     symbols = collect_symbols(political_watchlist_path=watchlist, ai_signal_path=signal, theme_momentum=theme)
 
     assert symbols == ["AMD", "DELL", "INTC", "MU", "VRT"]
+
+
+def test_load_proxy_urls_normalizes_dedupes_local_and_inline_inputs(tmp_path: Path) -> None:
+    proxy_file = tmp_path / "proxies.txt"
+    proxy_file.write_text(
+        "\n".join(
+            [
+                "# comment",
+                "1.2.3.4:8080",
+                "http://5.6.7.8:3128 extra-column",
+                "1.2.3.4:8080",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    proxies = load_proxy_urls(proxy_list_path=proxy_file, proxy_urls_text="https://9.9.9.9:9443, 5.6.7.8:3128")
+
+    assert proxies == [
+        "https://9.9.9.9:9443",
+        "http://5.6.7.8:3128",
+        "http://1.2.3.4:8080",
+    ]
+
+
+def test_market_confirmation_retries_with_proxy_when_direct_fetch_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    start = dt.date(2026, 1, 1)
+    bars = make_bars(start, [100 + index for index in range(70)], base_volume=100)
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_fetch_yahoo_bars(
+        symbol: str,
+        *,
+        as_of: dt.date,
+        lookback_days: int = 460,
+        timeout: int = 20,
+        proxy_url: str | None = None,
+    ) -> list[PriceBar]:
+        calls.append((symbol, proxy_url))
+        if proxy_url is None:
+            raise URLError("rate limited")
+        return bars
+
+    monkeypatch.setattr(market_confirmation_module, "fetch_yahoo_bars", fake_fetch_yahoo_bars)
+
+    rows = build_market_confirmation_rows(
+        symbols=["MU"],
+        as_of=dt.date(2026, 5, 31),
+        benchmark="SPY",
+        proxy_urls=["http://127.0.0.1:8080"],
+        request_pause_seconds=0,
+    )
+
+    assert rows[0].symbol == "MU"
+    assert rows[0].data_source == "yahoo_chart_proxy"
+    assert ("MU", None) in calls
+    assert ("MU", "http://127.0.0.1:8080") in calls

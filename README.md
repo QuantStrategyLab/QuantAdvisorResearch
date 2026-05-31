@@ -191,11 +191,23 @@ relative returns versus SPY, volume z-score, 63-day drawdown, 21-day annualized
 volatility, and `market_score`. The weekly/monthly/publish workflows generate
 this file automatically before building advisory reports.
 
+Optional proxy inputs:
+
+- `--proxy-urls`: comma/newline-separated proxy URLs.
+- `--proxy-list`: local text file with one proxy per line.
+- `--proxy-pool-url`: public text URL returning one proxy per line.
+
+The scheduled workflows also read repository variables `MARKET_DATA_PROXY_URLS`
+and `MARKET_DATA_PROXY_POOL_URL`. The script tries direct Yahoo access first and
+then retries through proxies. Logs record proxy indexes only, not full proxy
+URLs.
+
 Yahoo chart is currently the no-dependency free price endpoint. If it is
 unavailable, the script falls back to price-momentum fields already saved in
 `theme_momentum_snapshot.json`, so report generation continues. Random free
-proxy pools should not be treated as a stable production data source; prefer
-organization-owned price snapshots, caches, or auditable controlled proxies.
+proxy pools can be used as an emergency supplement, but should not be treated as
+a stable production data source; prefer organization-owned price snapshots,
+caches, or auditable controlled proxies.
 
 ## Output Contract
 

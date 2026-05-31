@@ -93,7 +93,10 @@ Priority order:
    returns, abnormal volume, drawdown, volatility, `market_score`, source, row
    count, and warnings. `scripts/build_market_confirmation.py` generates it from
    watchlists, saved signal context, and theme momentum snapshots; if the free
-   price endpoint is unavailable, it falls back to saved theme momentum fields.
+   price endpoint is unavailable, it can retry through `--proxy-urls`,
+   `--proxy-list`, `--proxy-pool-url`, or the workflow variables
+   `MARKET_DATA_PROXY_URLS` / `MARKET_DATA_PROXY_POOL_URL` before falling back to
+   saved theme momentum fields.
    It must not contain target weights or trade instructions.
 4. Add event review inputs for 1/5/20/60 trading-day follow-up.
 5. Add fundamentals/valuation snapshots for risk explanation, not execution.

@@ -29,8 +29,8 @@ def _format_final_decisions(report: dict[str, Any]) -> list[str]:
     decisions = report.get("final_decisions", {})
     picks = decisions.get("recommendations", [])
     if not picks:
-        return ["本期最终推荐：暂无"]
-    lines = ["本期最终推荐："]
+        return ["本期推荐：暂无"]
+    lines = ["本期推荐："]
     for item in picks:
         lines.append(
             "- {symbol} | {horizon} | 综合分={score} | 股票背景：{business}".format(
@@ -55,7 +55,7 @@ def _format_theme_candidates(report: dict[str, Any], *, limit: int) -> list[str]
     candidates = report.get("theme_first_candidates", [])[:limit]
     if not candidates:
         return ["主题候选：暂无"]
-    lines = ["主题候选（不是最终推荐）："]
+    lines = ["主题候选（不是推荐）："]
     for item in candidates:
         lines.append(
             "- #{rank} {symbol} | {background} | 近3月 {ret3m} | 事件证据：{confirmation} | 结论：{status}".format(

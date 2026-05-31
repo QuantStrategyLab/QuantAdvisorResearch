@@ -120,6 +120,7 @@ symbol_theme_exposure
 `QuantAdvisorResearch` 可以消费 `theme_momentum_snapshot.json`，用途分两层：
 
 - 公开页面只展示最终推荐，不展示主题候选池；
+- 公开页面按长线 / 中线 / 短线三列展示，每列内按对应周期分数排序；
 - JSON/Markdown 保留 `theme_first_candidates[]` 供审计；
 - `final_decisions` 可以把主题动量作为中线评分的重要输入；
 - 基础 `recommendations[]` 评级仍由事件、watchlist 和 AI 背景生成；

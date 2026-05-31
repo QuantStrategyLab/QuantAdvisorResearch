@@ -42,6 +42,7 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     assert "背景跟踪（非推荐" not in html
     assert "复核清单" not in html
     assert "主题候选（解释材料，不是最终推荐）" not in html
+    assert "最终推荐" not in html
 
 
 def test_render_feed_xml_contains_report_item() -> None:
@@ -52,6 +53,7 @@ def test_render_feed_xml_contains_report_item() -> None:
     assert "来源=fixture" not in feed
     assert "来源=" not in feed
     assert "主要信号=" in feed
+    assert "最终推荐" not in feed
     assert "非个性化模型输出；不包含下单、仓位配置或账户级建议。" in feed
 
 
@@ -69,6 +71,7 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     index_html = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
     assert "来源：" not in index_html
     assert "主要信号" in index_html
+    assert "最终推荐" not in index_html
 
 
 def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_path: Path) -> None:
@@ -97,6 +100,50 @@ def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_pat
     assert report["summary"]["data_quality_warnings"] == []
     assert "来源模式" not in html
     assert "Input artifacts include example fixture paths" not in html
+
+
+def test_render_report_html_groups_final_cards_by_horizon_and_rank() -> None:
+    report = build_sample_report()
+
+    def pick(symbol: str, horizon: str, score: float) -> dict:
+        labels = {"long": "长线", "medium": "中线", "short": "短线"}
+        windows = {"long": "1-3年", "medium": "2-12周", "short": "1-10个交易日"}
+        return {
+            "symbol": symbol,
+            "name": symbol,
+            "primary_horizon": horizon,
+            "primary_horizon_label": labels[horizon],
+            "primary_horizon_window": windows[horizon],
+            "combined_score": score,
+            "source_score": 0.0,
+            "momentum_score": score,
+            "medium_context_score": score,
+            "horizon_scores": {
+                "long": {"score": score if horizon == "long" else 0.0},
+                "medium": {"score": score if horizon == "medium" else 0.0},
+                "short": {"score": score if horizon == "short" else 0.0},
+            },
+            "business_summary": f"{symbol} background",
+            "prospect_summary": f"{symbol} reason",
+            "why_selected": ["ranked"],
+            "risk_summary": "risk",
+        }
+
+    report["final_decisions"]["recommendations"] = [
+        pick("MID2", "medium", 0.6),
+        pick("SHORT1", "short", 0.7),
+        pick("LONG1", "long", 0.8),
+        pick("MID1", "medium", 0.9),
+    ]
+
+    html = render_report_html(report)
+
+    assert "horizon-columns" in html
+    assert html.index("<h2>长线</h2>") < html.index("<h2>中线</h2>") < html.index("<h2>短线</h2>")
+    assert html.index("#1</span>MID1") < html.index("#2</span>MID2")
+    assert "#1</span>LONG1" in html
+    assert "#1</span>SHORT1" in html
+    assert "最终推荐" not in html
 
 
 def test_render_report_html_includes_theme_momentum_context() -> None:
@@ -156,7 +203,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "<span class=\"pill\">模式：" not in html
     assert "受众：" not in html
     assert "AI 状态：" not in html
-    assert "中线主题" in html
+    assert "主题/背景" in html
     assert "AI信号仓库" not in html
     assert "ResearchSignalContextPipelines" not in html
     assert "股票背景" in html
@@ -169,6 +216,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "买多少" not in html
     assert "仓位/数量" not in html
     assert "主题候选（解释材料，不是最终推荐）" not in html
+    assert "最终推荐" not in html
     assert "主题动量" not in html
     assert "事件证据" not in html
     assert "hbm_memory" not in html
@@ -209,7 +257,7 @@ def test_format_telegram_message_is_direct_and_links_report() -> None:
     message = format_telegram_message(report, site_url="https://example.com/advisor")
 
     assert "量化模型推荐" in message
-    assert "本期最终推荐" in message
+    assert "本期推荐" in message
     assert "AI信号仓库" not in message
     assert "股票背景" in message
     assert "推荐理由" in message

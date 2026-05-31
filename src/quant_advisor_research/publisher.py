@@ -19,6 +19,12 @@ CADENCE_LABELS_ZH = {
     "monthly": "月度",
 }
 
+HORIZON_COLUMNS = (
+    ("long", "长线", "1-3年"),
+    ("medium", "中线", "2-12周"),
+    ("short", "短线", "1-10个交易日"),
+)
+
 
 def slug(value: str) -> str:
     text = re.sub(r"[^a-zA-Z0-9]+", "-", value.strip().lower()).strip("-")
@@ -68,53 +74,77 @@ def format_candidate_theme_ids(candidate: dict[str, Any]) -> str:
     return ", ".join(labels) or "无"
 
 
+def horizon_pick_score(pick: dict[str, Any], horizon: str) -> float:
+    score = pick.get("horizon_scores", {}).get(horizon, {}).get("score")
+    return float(score) if isinstance(score, (int, float)) else as_sortable_float(pick.get("combined_score"))
+
+
+def as_sortable_float(value: Any) -> float:
+    if isinstance(value, bool):
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def ranked_horizon_picks(final_picks: list[dict[str, Any]], horizon: str) -> list[dict[str, Any]]:
+    picks = [pick for pick in final_picks if pick.get("primary_horizon") == horizon]
+    return sorted(picks, key=lambda pick: (-horizon_pick_score(pick, horizon), str(pick.get("symbol", ""))))
+
+
+def render_final_card(pick: dict[str, Any], *, rank: int) -> str:
+    reasons = "".join(f"<li>{html.escape(str(reason))}</li>" for reason in pick.get("why_selected", []))
+    return f"""
+    <article class="final-card">
+      <header>
+        <h3><span class="rank">#{rank}</span>{html.escape(str(pick.get('symbol', '')))}</h3>
+        <p>{html.escape(str(pick.get('name', '')))}</p>
+      </header>
+      <dl>
+        <div><dt>周期</dt><dd>{html.escape(str(pick.get('primary_horizon_label', '')))} / {html.escape(str(pick.get('primary_horizon_window', '')))}</dd></div>
+        <div><dt>综合分</dt><dd>{html.escape(display_number(pick.get('combined_score')))}</dd></div>
+        <div><dt>政策/新闻</dt><dd>{html.escape(display_number(pick.get('source_score')))}</dd></div>
+        <div><dt>动量</dt><dd>{html.escape(display_number(pick.get('momentum_score')))}</dd></div>
+        <div><dt>主题/背景</dt><dd>{html.escape(display_number(pick.get('medium_context_score', pick.get('ai_signal_score'))))}</dd></div>
+      </dl>
+      <p><strong>股票背景：</strong>{html.escape(str(pick.get('business_summary', '')))}</p>
+      <p><strong>推荐理由：</strong>{html.escape(str(pick.get('prospect_summary', '')))}</p>
+      <p><strong>多源依据：</strong></p>
+      <ul>{reasons}</ul>
+      <p><strong>主要风险：</strong>{html.escape(str(pick.get('risk_summary', '')))}</p>
+    </article>
+    """
+
+
 def render_final_decisions_html(report: dict[str, Any]) -> str:
     decisions = report.get("final_decisions", {})
     if not decisions:
         return ""
-    final_picks = decisions.get("recommendations", [])
-    buckets = decisions.get("horizon_buckets", {})
-    horizon_rows = []
-    for horizon, label, window in (
-        ("short", "短线", "1-10个交易日"),
-        ("medium", "中线", "2-12周"),
-        ("long", "长线", "1-3年"),
-    ):
-        symbols = buckets.get(horizon, [])
-        horizon_rows.append(
-            f"<li><strong>{label}（{window}）：</strong>{html.escape(', '.join(symbols) if symbols else '暂无最终推荐')}</li>"
-        )
-
-    cards = []
-    for pick in final_picks:
-        reasons = "".join(f"<li>{html.escape(str(reason))}</li>" for reason in pick.get("why_selected", []))
-        cards.append(
+    final_picks = [pick for pick in decisions.get("recommendations", []) if isinstance(pick, dict)]
+    columns = []
+    for horizon, label, window in HORIZON_COLUMNS:
+        cards = [
+            render_final_card(pick, rank=index)
+            for index, pick in enumerate(ranked_horizon_picks(final_picks, horizon), start=1)
+        ]
+        body = "".join(cards) if cards else '<p class="empty-column">暂无</p>'
+        columns.append(
             f"""
-            <article class="final-card">
-              <header>
-                <h3>{html.escape(str(pick.get('symbol', '')))} <span>{html.escape(str(pick.get('action_label', '')))}</span></h3>
-                <p>{html.escape(str(pick.get('name', '')))}</p>
+            <section class="horizon-column horizon-{html.escape(horizon)}">
+              <header class="horizon-column-header">
+                <h2>{html.escape(label)}</h2>
+                <p>{html.escape(window)}</p>
               </header>
-              <dl>
-                <div><dt>周期</dt><dd>{html.escape(str(pick.get('primary_horizon_label', '')))} / {html.escape(str(pick.get('primary_horizon_window', '')))}</dd></div>
-                <div><dt>综合分</dt><dd>{html.escape(display_number(pick.get('combined_score')))}</dd></div>
-                <div><dt>政策/新闻</dt><dd>{html.escape(display_number(pick.get('source_score')))}</dd></div>
-                <div><dt>动量</dt><dd>{html.escape(display_number(pick.get('momentum_score')))}</dd></div>
-                <div><dt>主题/背景</dt><dd>{html.escape(display_number(pick.get('medium_context_score', pick.get('ai_signal_score'))))}</dd></div>
-              </dl>
-              <p><strong>股票背景：</strong>{html.escape(str(pick.get('business_summary', '')))}</p>
-              <p><strong>推荐理由：</strong>{html.escape(str(pick.get('prospect_summary', '')))}</p>
-              <p><strong>多源依据：</strong></p>
-              <ul>{reasons}</ul>
-              <p><strong>主要风险：</strong>{html.escape(str(pick.get('risk_summary', '')))}</p>
-            </article>
+              <div class="horizon-cards">{body}</div>
+            </section>
             """
         )
-
     return f"""
     <section class="final-decisions">
-      <ul class="horizon-list">{''.join(horizon_rows)}</ul>
-      <div class="final-grid">{''.join(cards)}</div>
+      <div class="horizon-columns">{''.join(columns)}</div>
     </section>
     """
 
@@ -211,14 +241,18 @@ def render_report_html(report: dict[str, Any]) -> str:
     h1 {{ margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.15; letter-spacing: -0.04em; }}
     .warning {{ background: #fff1f2; border: 1px solid #fecdd3; padding: 14px 16px; margin-bottom: 20px; }}
     .final-decisions {{ margin-bottom: 20px; }}
-    .horizon-list {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; list-style: none; padding: 0; margin: 0 0 22px; }}
-    .horizon-list li {{ background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 12px 14px; }}
-    .final-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }}
+    .horizon-columns {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }}
+    .horizon-column {{ background: #eef6ff; border: 1px solid #bfdbfe; border-radius: 14px; padding: 14px; min-height: 160px; }}
+    .horizon-column-header {{ text-align: center; margin-bottom: 12px; }}
+    .horizon-column-header h2 {{ margin: 0; font-size: 1.35rem; }}
+    .horizon-column-header p {{ margin: 4px 0 0; color: #57606a; }}
+    .horizon-cards {{ display: grid; gap: 12px; }}
+    .empty-column {{ margin: 22px 0; color: #57606a; text-align: center; }}
     .final-card {{ background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; box-shadow: 0 1px 2px rgb(27 31 36 / 4%); }}
     .final-card h3 {{ margin: 0; font-size: 1.35rem; }}
-    .final-card h3 span {{ font-size: .85rem; color: #57606a; margin-left: 8px; }}
     .final-card header p {{ margin: 4px 0 12px; color: #57606a; }}
     .final-card p {{ line-height: 1.55; color: #334155; }}
+    .final-card .rank {{ min-width: 34px; color: #0969da; }}
     .theme-candidates {{ background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
     .candidate-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }}
     .candidate-card {{ background: #fff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; }}
@@ -245,6 +279,9 @@ def render_report_html(report: dict[str, Any]) -> str:
     h3 {{ margin: 18px 0 8px; font-size: 1rem; }}
     li {{ margin: 5px 0; }}
     a {{ color: #0969da; word-break: break-word; }}
+    @media (max-width: 920px) {{
+      .horizon-columns {{ grid-template-columns: 1fr; }}
+    }}
   </style>
 </head>
 <body>
@@ -269,7 +306,7 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
             f"""
             <li>
               <a href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
-              <span>主要信号：{html.escape(top_themes or '无')}；最终推荐：{html.escape(top_symbols or '无')}</span>
+              <span>主要信号：{html.escape(top_themes or '无')}；推荐：{html.escape(top_symbols or '无')}</span>
             </li>
             """
         )
@@ -319,7 +356,7 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
         ET.SubElement(item, "description").text = (
-            f"主要信号={top_themes or '无'}；最终推荐={top_symbols or '无'}。"
+            f"主要信号={top_themes or '无'}；推荐={top_symbols or '无'}。"
             "非个性化模型输出；不包含下单、仓位配置或账户级建议。"
         )
     rss = ET.Element("rss", {"version": "2.0"})

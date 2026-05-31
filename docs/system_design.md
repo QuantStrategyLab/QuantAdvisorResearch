@@ -94,6 +94,8 @@ The public HTML/RSS/Telegram outputs should stay direct:
 
 - show final recommendations, horizons, stock background, recommendation reasons,
   and risks;
+- render public recommendations as long-, medium-, and short-horizon columns,
+  sorted by each horizon score inside the column;
 - hide internal tags such as `source_mode`, mode labels, audience labels, and
   repository names;
 - keep `theme_first_candidates[]`, `horizon_scores`, and `selection_trace` in

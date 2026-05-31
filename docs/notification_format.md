@@ -26,7 +26,7 @@ allocation advice.
 ```text
 量化模型推荐 | 周度 | 2026-05-31
 
-本期最终推荐：
+本期推荐：
 - MU | 中线 | 综合分=0.85 | 股票背景：Micron 主要做 DRAM、NAND 和 HBM 等存储芯片。
   推荐理由：前景主要来自 AI 服务器对 HBM 和高端 DRAM 的需求，以及存储周期修复。
 - INTC | 中线 | 综合分=0.77 | 股票背景：Intel 主要做 CPU、数据中心芯片、制造工艺和晶圆代工。
@@ -41,6 +41,6 @@ allocation advice.
 RSS remains intentionally short for feed readers:
 
 ```text
-主要信号=HBM / 存储, AI 算力平台；最终推荐=MU, INTC, AMD, VRT, DELL。
+主要信号=HBM / 存储, AI 算力平台；推荐=MU, INTC, AMD, VRT, DELL。
 非个性化模型输出；不包含下单、仓位配置或账户级建议。
 ```

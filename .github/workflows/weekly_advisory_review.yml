@@ -32,6 +32,16 @@ on:
         required: false
         default: ""
         type: string
+      market_data_proxy_urls:
+        description: "Optional comma/newline-separated public proxy URLs for free market data fetches."
+        required: false
+        default: ""
+        type: string
+      market_data_proxy_pool_url:
+        description: "Optional public text URL returning one proxy per line for free market data fetches."
+        required: false
+        default: ""
+        type: string
   schedule:
     - cron: "30 12 * * 6"
 
@@ -68,6 +78,8 @@ jobs:
           AI_SIGNAL_PATH: ${{ github.event.inputs.ai_signal_path || 'data/output/latest_signal.json' }}
           THEME_MOMENTUM_PATH: ${{ github.event.inputs.theme_momentum_path || 'data/output/theme_momentum_snapshot.json' }}
           MARKET_CONFIRMATION_PATH: ${{ github.event.inputs.market_confirmation_path || '' }}
+          MARKET_DATA_PROXY_URLS: ${{ github.event.inputs.market_data_proxy_urls || vars.MARKET_DATA_PROXY_URLS || '' }}
+          MARKET_DATA_PROXY_POOL_URL: ${{ github.event.inputs.market_data_proxy_pool_url || vars.MARKET_DATA_PROXY_POOL_URL || '' }}
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
@@ -91,6 +103,12 @@ jobs:
             )
             if [ -n "${RESOLVED_THEME_MOMENTUM}" ]; then
               MARKET_BUILD_ARGS+=(--theme-momentum "${RESOLVED_THEME_MOMENTUM}")
+            fi
+            if [ -n "${MARKET_DATA_PROXY_URLS}" ]; then
+              MARKET_BUILD_ARGS+=(--proxy-urls "${MARKET_DATA_PROXY_URLS}")
+            fi
+            if [ -n "${MARKET_DATA_PROXY_POOL_URL}" ]; then
+              MARKET_BUILD_ARGS+=(--proxy-pool-url "${MARKET_DATA_PROXY_POOL_URL}")
             fi
             python scripts/build_market_confirmation.py "${MARKET_BUILD_ARGS[@]}"
             MARKET_ARGS=(--market-confirmation "${GENERATED_MARKET_CONFIRMATION}")
