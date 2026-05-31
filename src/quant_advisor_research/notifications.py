@@ -29,8 +29,8 @@ def _format_final_decisions(report: dict[str, Any]) -> list[str]:
     decisions = report.get("final_decisions", {})
     picks = decisions.get("recommendations", [])
     if not picks:
-        return ["本期最终推荐：暂无（口径：AI信号仓库 + 动量为主，政策/新闻辅助）"]
-    lines = ["本期最终推荐（AI信号仓库 + 动量为主，政策/新闻辅助）："]
+        return ["本期最终推荐：暂无"]
+    lines = ["本期最终推荐："]
     for item in picks:
         lines.append(
             "- {symbol} | {horizon} | 综合分={score} | 股票背景：{business}".format(
@@ -102,17 +102,11 @@ def format_telegram_message(
     max_recommendations: int = 8,
     max_themes: int = 5,
 ) -> str:
-    summary = report.get("summary", {})
     lines = [
         f"量化模型推荐 | {cadence_label(report)} | {report.get('as_of', '')}",
         "",
-        f"模式：{report.get('mode', '')}",
-        f"来源：{summary.get('source_mode', 'unknown')}",
-        f"来源事件：{summary.get('source_event_count', 0)}",
-        "",
         *_format_final_decisions(report),
         "",
-        "说明：非个性化模型输出；不包含下单、仓位配置或账户级建议。",
         f"完整报告：{report_public_url(report, site_url=site_url)}",
     ]
     return "\n".join(str(line) for line in lines if line is not None)

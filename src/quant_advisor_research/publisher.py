@@ -111,11 +111,8 @@ def render_final_decisions_html(report: dict[str, Any]) -> str:
             """
         )
 
-    final_intro = "、".join(str(pick.get("symbol", "")) for pick in final_picks) or "暂无"
     return f"""
     <section class="final-decisions">
-      <h2>本期最终结论</h2>
-      <p><strong>最终推荐：</strong>{html.escape(final_intro)}。合成口径以 AI信号仓库（AiLongHorizonSignalPipelines）和动量为主，政策/新闻事件用于提高置信度和提示风险。</p>
       <ul class="horizon-list">{''.join(horizon_rows)}</ul>
       <div class="final-grid">{''.join(cards)}</div>
     </section>
@@ -221,19 +218,16 @@ def render_report_html(report: dict[str, Any]) -> str:
     :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
     body {{ margin: 0; background: #f6f7f9; color: #1b1f24; }}
     main {{ max-width: 1080px; margin: 0 auto; padding: 32px 20px 56px; }}
-    .hero {{ border-bottom: 1px solid #d8dee4; padding-bottom: 20px; margin-bottom: 24px; }}
-    h1 {{ margin: 0 0 12px; font-size: 2rem; line-height: 1.2; }}
-    .meta {{ display: flex; flex-wrap: wrap; gap: 10px; color: #57606a; }}
-    .pill {{ border: 1px solid #d0d7de; border-radius: 999px; padding: 5px 10px; background: #fff; }}
-    .policy {{ background: #fff7ed; border: 1px solid #fed7aa; padding: 14px 16px; margin-bottom: 20px; }}
+    .hero {{ text-align: center; padding: 8px 0 22px; margin-bottom: 10px; }}
+    h1 {{ margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.15; letter-spacing: -0.04em; }}
     .warning {{ background: #fff1f2; border: 1px solid #fecdd3; padding: 14px 16px; margin-bottom: 20px; }}
-    .final-decisions {{ background: #ecfeff; border: 1px solid #67e8f9; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
-    .final-decisions > p {{ color: #334155; line-height: 1.55; }}
-    .horizon-list {{ background: #fff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 16px 12px 32px; }}
-    .final-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }}
-    .final-card {{ background: #fff; border: 1px solid #67e8f9; border-radius: 8px; padding: 16px; }}
-    .final-card h3 {{ margin: 0; font-size: 1.2rem; }}
-    .final-card h3 span {{ font-size: .85rem; color: #0f766e; margin-left: 8px; }}
+    .final-decisions {{ margin-bottom: 20px; }}
+    .horizon-list {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; list-style: none; padding: 0; margin: 0 0 22px; }}
+    .horizon-list li {{ background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 12px 14px; }}
+    .final-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }}
+    .final-card {{ background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; box-shadow: 0 1px 2px rgb(27 31 36 / 4%); }}
+    .final-card h3 {{ margin: 0; font-size: 1.35rem; }}
+    .final-card h3 span {{ font-size: .85rem; color: #57606a; margin-left: 8px; }}
     .final-card header p {{ margin: 4px 0 12px; color: #57606a; }}
     .final-card p {{ line-height: 1.55; color: #334155; }}
     .theme-candidates {{ background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
@@ -268,17 +262,6 @@ def render_report_html(report: dict[str, Any]) -> str:
   <main>
     <section class="hero">
       <h1>{html.escape(title)}</h1>
-      <div class="meta">
-        <span class="pill">模式：{html.escape(report['mode'])}</span>
-        <span class="pill">受众：{html.escape(report['audience_scope'])}</span>
-        <span class="pill">AI 状态：{html.escape(str(report['summary']['ai_regime']))}</span>
-        <span class="pill">来源：{html.escape(source_mode)}</span>
-        <span class="pill">最终推荐：{len(report.get('final_decisions', {}).get('recommendations', []))}</span>
-      </div>
-    </section>
-    <section class="policy">
-      <strong>政策边界：</strong>当前只允许非个性化模型推荐；
-      不允许下单、组合配置、账户适当性判断或个性化建议。
     </section>
     {warning_html}
     {final_decisions_html}

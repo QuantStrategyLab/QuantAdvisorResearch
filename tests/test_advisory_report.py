@@ -156,20 +156,29 @@ def test_contract_rejects_execution_enabled_report() -> None:
         validate_advisory_report(report)
 
 
-def test_render_markdown_contains_policy_section() -> None:
+def test_render_markdown_keeps_public_report_direct() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
     )
 
     markdown = render_markdown(report)
 
-    assert "## 政策边界" in markdown
-    assert "允许下单: `false`" in markdown
-    assert "允许非个性化模型推荐: `true`" in markdown
+    assert "# 量化模型推荐周度复盘 - 2026-05-30" in markdown
+    assert "股票背景" in markdown
+    assert "推荐理由" in markdown
+    assert "主要风险" in markdown
+    assert "## 政策边界" not in markdown
+    assert "允许下单" not in markdown
+    assert "模式:" not in markdown
+    assert "受众:" not in markdown
+    assert "AI 状态" not in markdown
+    assert "本期最终结论" not in markdown
+    assert "AiLongHorizonSignalPipelines" not in markdown
 
 
 def test_contract_rejects_account_action_fields() -> None:
@@ -342,15 +351,17 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert report_with_theme["theme_first_candidates"][2]["symbol"] == "DELL"
     assert report_with_theme["final_decisions"]["recommendations"][0]["symbol"] == "MU"
     assert report_with_theme["final_decisions"]["recommendations"][0]["business_summary"]
+    assert "存储周期" in report_with_theme["final_decisions"]["recommendations"][0]["risk_summary"]
     assert "ai_signal_score" in report_with_theme["final_decisions"]["recommendations"][0]
     assert report_with_theme["final_decisions"]["watchlist"][0]["symbol"] == "DELL"
     assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
     assert report_with_theme["recommendations"][0]["score"] == report_without_theme["recommendations"][0]["score"]
 
     markdown = render_markdown(report_with_theme)
-    assert "## 本期最终结论" in markdown
+    assert "## 本期最终结论" not in markdown
     assert "股票背景" in markdown
     assert "推荐理由" in markdown
+    assert "AiLongHorizonSignalPipelines" not in markdown
     assert "## 主题候选（解释材料，不是最终推荐）" not in markdown
     assert "为什么入选" not in markdown
     assert "买多少" not in markdown

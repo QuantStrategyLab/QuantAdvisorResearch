@@ -139,6 +139,21 @@ COMPANY_PROFILES_ZH = {
     },
 }
 
+COMPANY_RISKS_ZH = {
+    "AMD": "主要风险是 AI 加速器竞争强、客户订单兑现不及预期、毛利率波动，以及股价快速上涨后的回撤风险。",
+    "AVGO": "主要风险是云厂商资本开支节奏放缓、定制芯片订单集中、软件整合不及预期，以及估值对 AI 需求预期较敏感。",
+    "COIN": "主要风险是加密资产价格和交易量波动大、监管规则变化、手续费率下行，以及平台合规成本上升。",
+    "CVX": "主要风险是油气价格回落、项目资本开支超预期、地缘政治和政策变化，以及能源股周期性回撤。",
+    "DELL": "主要风险是 AI 服务器利润率偏低、订单转收入节奏不稳定、企业硬件需求周期波动，以及股价已反映较高增长预期。",
+    "INTC": "主要风险是晶圆代工转型执行难度高、资本开支和现金流压力大、先进制程追赶不及预期，以及竞争格局仍然激烈。",
+    "MSTR": "主要风险是比特币价格大幅波动、融资环境变化、资产净值溢价收缩，以及监管规则变化。",
+    "MU": "主要风险是存储周期反转、HBM 供需和价格不及预期、客户集中度较高，以及强动量后的估值和回撤压力。",
+    "NEE": "主要风险是利率上行压制公用事业估值、电网和新能源项目审批延迟、资本开支压力，以及电力需求兑现慢于预期。",
+    "TSM": "主要风险是先进制程资本开支高、客户需求周期波动、地缘政治风险，以及 AI 芯片需求预期过高。",
+    "VRT": "主要风险是数据中心建设节奏放缓、订单转收入和交付能力不及预期、液冷竞争加剧，以及估值已反映较高成长预期。",
+    "XOM": "主要风险是油气价格回落、炼化利润收缩、地缘政治和政策变化，以及能源股周期性回撤。",
+}
+
 EXCLUDED_THEME_PICK_SYMBOLS = {
     "DIA",
     "IWM",
@@ -335,6 +350,14 @@ def company_profile(symbol: Any, name: Any = "") -> dict[str, str]:
         "business": f"{display_name}（{symbol_text}）为当前观察股票池标的。",
         "prospect": "推荐理由需要结合行业需求、公司财报、估值和价格趋势继续复核。",
     }
+
+
+def company_risk_summary(symbol: Any) -> str:
+    symbol_text = str(symbol or "").upper()
+    return COMPANY_RISKS_ZH.get(
+        symbol_text,
+        "主要风险是行业需求不及预期、估值对增长假设较敏感、业绩兑现延后，以及股价波动带来的回撤。",
+    )
 
 
 def normalize_ai_mapping(mapping: Any) -> dict[str, Any]:
@@ -925,7 +948,7 @@ def build_final_decisions(
                 "business_summary": profile["business"],
                 "prospect_summary": profile["prospect"],
                 "why_selected": dedupe(reasons),
-                "risk_summary": rec.get("risk_notes", ["需复核估值、财报、回撤和流动性。"])[0] if rec else "需复核估值、财报、回撤和流动性。",
+                "risk_summary": company_risk_summary(symbol),
             }
         )
 
@@ -1054,26 +1077,11 @@ def build_advisory_report(
 def render_markdown(report: dict[str, Any]) -> str:
     cadence_label = CADENCE_LABELS_ZH.get(str(report["cadence"]), str(report["cadence"]).title())
     lines = [
-        f"# 量化模型推荐{cadence_label}复盘",
-        "",
-        f"- 日期: `{report['as_of']}`",
-        f"- 模式: `{report['mode']}`",
-        f"- 受众: `{report['audience_scope']}`",
-        f"- AI 状态: `{report['summary']['ai_regime']}`",
-        "",
-        "## 政策边界",
-        "",
-        "- 允许下单: `false`",
-        "- 允许组合配置: `false`",
-        "- 允许个性化建议: `false`",
-        "- 允许非个性化模型推荐: `true`",
-        "- 允许账户级建议: `false`",
+        f"# 量化模型推荐{cadence_label}复盘 - {report['as_of']}",
         "",
     ]
     final_decisions = report.get("final_decisions", {})
     if final_decisions:
-        lines.extend(["## 本期最终结论", ""])
-        lines.append("- 口径: 以 AI信号仓库（AiLongHorizonSignalPipelines）和动量为主，政策/新闻事件用于提高置信度和提示风险。")
         horizon_buckets = final_decisions.get("horizon_buckets", {})
         for horizon, label in (("short", "短线"), ("medium", "中线"), ("long", "长线")):
             symbols = ", ".join(horizon_buckets.get(horizon, [])) or "暂无最终推荐"

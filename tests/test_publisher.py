@@ -20,15 +20,25 @@ def build_sample_report() -> dict:
     )
 
 
-def test_render_report_html_contains_policy_boundary() -> None:
+def test_render_report_html_is_direct_public_recommendation_page() -> None:
     html = render_report_html(build_sample_report())
 
-    assert "政策边界" in html
-    assert "不允许下单" in html
+    assert "量化模型推荐周度复盘 - 2026-05-30" in html
+    assert "text-align: center" in html
     assert "2-12周" in html
     assert "来源模式：fixture" in html
-    assert "本期最终结论" in html
     assert "股票背景" in html
+    assert "推荐理由" in html
+    assert "主要风险" in html
+    assert "<span class=\"pill\">模式：" not in html
+    assert "受众：" not in html
+    assert "AI 状态：" not in html
+    assert "政策边界" not in html
+    assert "不允许下单" not in html
+    assert "本期最终结论" not in html
+    assert "最终推荐：" not in html
+    assert "合成口径" not in html
+    assert "AiLongHorizonSignalPipelines" not in html
     assert "背景跟踪（非推荐" not in html
     assert "复核清单" not in html
     assert "主题候选（解释材料，不是最终推荐）" not in html
@@ -106,12 +116,20 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
 
     html = render_report_html(report)
 
-    assert "本期最终结论" in html
-    assert "最终推荐" in html
+    assert "本期最终结论" not in html
+    assert "最终推荐：" not in html
+    assert "合成口径" not in html
+    assert "政策边界" not in html
+    assert "<span class=\"pill\">模式：" not in html
+    assert "受众：" not in html
+    assert "AI 状态：" not in html
     assert "AI信号仓库" in html
-    assert "AiLongHorizonSignalPipelines" in html
+    assert "AiLongHorizonSignalPipelines" not in html
     assert "股票背景" in html
     assert "推荐理由" in html
+    assert "主要风险" in html
+    assert "存储周期" in html
+    assert "需复核估值、财报、回撤和流动性" not in html
     assert "做什么" not in html
     assert "为什么有前景" not in html
     assert "买多少" not in html
@@ -123,7 +141,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "MU" in html
 
 
-def test_format_telegram_message_contains_themes_policy_and_link() -> None:
+def test_format_telegram_message_is_direct_and_links_report() -> None:
     from quant_advisor_research.notifications import format_telegram_message
 
     report = build_sample_report()
@@ -158,12 +176,14 @@ def test_format_telegram_message_contains_themes_policy_and_link() -> None:
 
     assert "量化模型推荐" in message
     assert "本期最终推荐" in message
-    assert "AI信号仓库" in message
+    assert "AI信号仓库" not in message
     assert "股票背景" in message
     assert "推荐理由" in message
     assert "买多少" not in message
     assert "主题候选" not in message
     assert "事件证据" not in message
+    assert "模式：" not in message
+    assert "来源：" not in message
+    assert "不包含下单" not in message
     assert "MU" in message
-    assert "不包含下单" in message
     assert "https://example.com/advisor/2026-05-30-weekly-model-recommendations.html" in message
