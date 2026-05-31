@@ -349,10 +349,9 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
 
     markdown = render_markdown(report_with_theme)
     assert "## 本期最终结论" in markdown
-    assert "## 主题候选（解释材料，不是最终推荐）" in markdown
-    assert "为什么入选" in markdown
-    assert "买入数量、仓位" in markdown
-    assert "## 主题动量" in markdown
-    assert "HBM / 存储" in markdown
-    assert "事件证据" in markdown
-    assert "DELL" in markdown
+    assert "股票背景" in markdown
+    assert "推荐理由" in markdown
+    assert "## 主题候选（解释材料，不是最终推荐）" not in markdown
+    assert "为什么入选" not in markdown
+    assert "买多少" not in markdown
+    assert "## 主题动量" not in markdown

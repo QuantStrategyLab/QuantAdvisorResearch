@@ -73,7 +73,6 @@ def render_final_decisions_html(report: dict[str, Any]) -> str:
     if not decisions:
         return ""
     final_picks = decisions.get("recommendations", [])
-    watchlist = decisions.get("watchlist", [])
     buckets = decisions.get("horizon_buckets", {})
     horizon_rows = []
     for horizon, label, window in (
@@ -102,49 +101,23 @@ def render_final_decisions_html(report: dict[str, Any]) -> str:
                 <div><dt>政策/新闻</dt><dd>{html.escape(display_number(pick.get('source_score')))}</dd></div>
                 <div><dt>动量</dt><dd>{html.escape(display_number(pick.get('momentum_score')))}</dd></div>
                 <div><dt>AI信号仓库</dt><dd>{html.escape(display_number(pick.get('ai_signal_score')))}</dd></div>
-                <div><dt>仓位/数量</dt><dd>不提供</dd></div>
               </dl>
-              <p><strong>做什么：</strong>{html.escape(str(pick.get('business_summary', '')))}</p>
-              <p><strong>为什么有前景：</strong>{html.escape(str(pick.get('prospect_summary', '')))}</p>
+              <p><strong>股票背景：</strong>{html.escape(str(pick.get('business_summary', '')))}</p>
+              <p><strong>推荐理由：</strong>{html.escape(str(pick.get('prospect_summary', '')))}</p>
               <p><strong>多源依据：</strong></p>
               <ul>{reasons}</ul>
               <p><strong>主要风险：</strong>{html.escape(str(pick.get('risk_summary', '')))}</p>
-              <p class="position-note"><strong>买多少：</strong>{html.escape(str(pick.get('buy_amount_guidance', '不提供买入数量或仓位。')))}</p>
             </article>
             """
         )
-
-    watch_rows = []
-    for item in watchlist:
-        watch_rows.append(
-            "<tr>"
-            f"<td>{html.escape(str(item.get('symbol', '')))}</td>"
-            f"<td>{html.escape(str(item.get('primary_horizon_label', '')))}</td>"
-            f"<td>{html.escape(display_number(item.get('combined_score')))}</td>"
-            f"<td>{html.escape(str(item.get('business_summary', '')))}</td>"
-            f"<td>{html.escape(str(item.get('prospect_summary', '')))}</td>"
-            "</tr>"
-        )
-    watch_html = ""
-    if watch_rows:
-        watch_html = f"""
-        <h3>观察名单（不是最终推荐）</h3>
-        <p>这些标的可能有主题或动量，但事件证据、风险或推荐层级还不足，不作为本期最终推荐。</p>
-        <table>
-          <thead><tr><th>股票</th><th>周期</th><th>综合分</th><th>做什么</th><th>为什么可跟踪</th></tr></thead>
-          <tbody>{''.join(watch_rows)}</tbody>
-        </table>
-        """
 
     final_intro = "、".join(str(pick.get("symbol", "")) for pick in final_picks) or "暂无"
     return f"""
     <section class="final-decisions">
       <h2>本期最终结论</h2>
       <p><strong>最终推荐：</strong>{html.escape(final_intro)}。合成口径以 AI信号仓库（AiLongHorizonSignalPipelines）和动量为主，政策/新闻事件用于提高置信度和提示风险。</p>
-      <p><strong>买多少：</strong>不提供买入金额、股数、仓位或账户级配置；这里只能作为非个性化模型研究。</p>
       <ul class="horizon-list">{''.join(horizon_rows)}</ul>
       <div class="final-grid">{''.join(cards)}</div>
-      {watch_html}
     </section>
     """
 
@@ -236,52 +209,7 @@ def render_report_html(report: dict[str, Any]) -> str:
       <ul>{warning_items}</ul>
     </section>
         """
-    theme_candidates_html = render_theme_first_candidates_html(report)
-    theme_momentum_html = render_theme_momentum_html(report)
     final_decisions_html = render_final_decisions_html(report)
-    recommendation_cards = []
-    background_count = 0
-    for rec in report["recommendations"]:
-        reasons = "\n".join(f"<li>{html.escape(reason)}</li>" for reason in rec["reasons"])
-        risks = "\n".join(f"<li>{html.escape(risk)}</li>" for risk in rec["risk_notes"])
-        refs = "\n".join(
-            f'<li><a href="{html.escape(ref)}">{html.escape(ref)}</a></li>' if ref.startswith("http") else f"<li>{html.escape(ref)}</li>"
-            for ref in rec["evidence_refs"]
-        )
-        if rec.get("recommendation_tier") == "monitor":
-            background_count += 1
-            continue
-        card_html = f"""
-            <article class="recommendation">
-              <header>
-                <h2>{html.escape(rec['symbol'])} <span>{html.escape(rec['rating_label'])}</span></h2>
-                <p>{html.escape(rec.get('name') or rec['symbol'])}</p>
-              </header>
-              <dl>
-                <div><dt>周期</dt><dd>{html.escape(rec['primary_horizon_label'])}</dd></div>
-                <div><dt>窗口</dt><dd>{html.escape(rec['primary_horizon_window'])}</dd></div>
-                <div><dt>层级</dt><dd>{html.escape(rec['recommendation_tier_label'])}</dd></div>
-                <div><dt>来源</dt><dd>{html.escape(rec['source_confidence_label'])}</dd></div>
-                <div><dt>风格</dt><dd>{html.escape(rec['strategy_style'])}</dd></div>
-                <div><dt>分数</dt><dd>{rec['score']}</dd></div>
-                <div><dt>证据</dt><dd>{rec['evidence_score']}</dd></div>
-                <div><dt>风险</dt><dd>{rec['risk_score']}</dd></div>
-              </dl>
-              <p class="horizon-note">{html.escape(rec['horizon_note'])}</p>
-              <h3>推荐理由</h3>
-              <ul>{reasons}</ul>
-              <h3>风险提示</h3>
-              <ul>{risks}</ul>
-              <h3>证据链接</h3>
-              <ul>{refs}</ul>
-            </article>
-            """
-        recommendation_cards.append(card_html)
-    background_html = ""
-    if background_count:
-        background_html = f"""
-    <p class="monitor-note">另有 {background_count} 个仅监控标的未在页面展开；完整 JSON 保留用于复盘。页面只展示推荐、观察和来源核验标的。</p>
-        """
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -308,7 +236,6 @@ def render_report_html(report: dict[str, Any]) -> str:
     .final-card h3 span {{ font-size: .85rem; color: #0f766e; margin-left: 8px; }}
     .final-card header p {{ margin: 4px 0 12px; color: #57606a; }}
     .final-card p {{ line-height: 1.55; color: #334155; }}
-    .position-note {{ background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 12px; }}
     .theme-candidates {{ background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
     .candidate-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }}
     .candidate-card {{ background: #fff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; }}
@@ -346,8 +273,7 @@ def render_report_html(report: dict[str, Any]) -> str:
         <span class="pill">受众：{html.escape(report['audience_scope'])}</span>
         <span class="pill">AI 状态：{html.escape(str(report['summary']['ai_regime']))}</span>
         <span class="pill">来源：{html.escape(source_mode)}</span>
-        <span class="pill">主题候选：{report['summary'].get('theme_first_candidate_count', 0)}</span>
-        <span class="pill">推荐数：{report['summary']['recommendation_count']}</span>
+        <span class="pill">最终推荐：{len(report.get('final_decisions', {}).get('recommendations', []))}</span>
       </div>
     </section>
     <section class="policy">
@@ -356,15 +282,6 @@ def render_report_html(report: dict[str, Any]) -> str:
     </section>
     {warning_html}
     {final_decisions_html}
-    {theme_candidates_html}
-    {theme_momentum_html}
-    <section class="recommendation-section">
-      <h2>推荐与观察</h2>
-      <p>这里只展开已进入推荐、观察或来源核验的标的；纯监控标的不作为本期结论展示。
-      “先核验来源”表示低置信来源不能直接升级。</p>
-    </section>
-    {''.join(recommendation_cards)}
-    {background_html}
   </main>
 </body>
 </html>
@@ -376,14 +293,13 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
         filename = report_filename(report)
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
-        theme_candidate_symbols = ", ".join(report["summary"].get("top_theme_candidate_symbols", []))
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
         source_mode = str(report["summary"].get("source_mode", "unknown"))
         items.append(
             f"""
             <li>
               <a href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
-              <span>来源：{html.escape(source_mode)}；主题：{html.escape(top_themes or '无')}；主题候选：{html.escape(theme_candidate_symbols or '无')}；推荐：{html.escape(top_symbols or '无')}</span>
+              <span>来源：{html.escape(source_mode)}；主要信号：{html.escape(top_themes or '无')}；最终推荐：{html.escape(top_symbols or '无')}</span>
             </li>
             """
         )
@@ -431,12 +347,11 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
         ET.SubElement(item, "guid").text = link
         ET.SubElement(item, "pubDate").text = format_datetime(report["generated_at"])
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
-        theme_candidate_symbols = ", ".join(report["summary"].get("top_theme_candidate_symbols", []))
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
         source_mode = str(report["summary"].get("source_mode", "unknown"))
         ET.SubElement(item, "description").text = (
             f"模式={report['mode']}；来源={source_mode}；主题={top_themes or '无'}；"
-            f"主题候选={theme_candidate_symbols or '无'}；推荐={top_symbols or '无'}。"
+            f"最终推荐={top_symbols or '无'}。"
             "非个性化模型输出；不包含下单、仓位配置或账户级建议。"
         )
     rss = ET.Element("rss", {"version": "2.0"})

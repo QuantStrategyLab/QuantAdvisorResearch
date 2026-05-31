@@ -29,27 +29,25 @@ def _format_final_decisions(report: dict[str, Any]) -> list[str]:
     decisions = report.get("final_decisions", {})
     picks = decisions.get("recommendations", [])
     if not picks:
-        return [
-            "本期最终推荐：暂无（口径：AI信号仓库 + 动量为主，政策/新闻辅助）",
-            "买多少：不提供买入数量、仓位或账户级配置。",
-        ]
+        return ["本期最终推荐：暂无（口径：AI信号仓库 + 动量为主，政策/新闻辅助）"]
     lines = ["本期最终推荐（AI信号仓库 + 动量为主，政策/新闻辅助）："]
     for item in picks:
         lines.append(
-            "- {symbol} | {horizon} | 综合分={score} | 做什么：{business}".format(
+            "- {symbol} | {horizon} | 综合分={score} | 股票背景：{business}".format(
                 symbol=item.get("symbol", ""),
                 horizon=item.get("primary_horizon_label", ""),
                 score=display_number(item.get("combined_score")),
                 business=item.get("business_summary", ""),
             )
         )
+        if item.get("prospect_summary"):
+            lines.append(f"  推荐理由：{item.get('prospect_summary')}")
     buckets = decisions.get("horizon_buckets", {})
     lines.append("周期：短线={short}；中线={medium}；长线={long}".format(
         short=", ".join(buckets.get("short", [])) or "暂无",
         medium=", ".join(buckets.get("medium", [])) or "暂无",
         long=", ".join(buckets.get("long", [])) or "暂无",
     ))
-    lines.append("买多少：不提供买入数量、仓位或账户级配置。")
     return lines
 
 
@@ -113,12 +111,6 @@ def format_telegram_message(
         f"来源事件：{summary.get('source_event_count', 0)}",
         "",
         *_format_final_decisions(report),
-        "",
-        *_format_themes(report, limit=max_themes),
-        "",
-        *_format_theme_candidates(report, limit=max_recommendations),
-        "",
-        *_format_recommendations(report, limit=max_recommendations),
         "",
         "说明：非个性化模型输出；不包含下单、仓位配置或账户级建议。",
         f"完整报告：{report_public_url(report, site_url=site_url)}",

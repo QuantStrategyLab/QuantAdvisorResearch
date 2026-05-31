@@ -333,7 +333,7 @@ def company_profile(symbol: Any, name: Any = "") -> dict[str, str]:
     display_name = str(name or symbol_text).strip() or symbol_text
     return {
         "business": f"{display_name}（{symbol_text}）为当前观察股票池标的。",
-        "prospect": "前景需要结合行业需求、公司财报、估值、事件证据和价格趋势继续复核。",
+        "prospect": "推荐理由需要结合行业需求、公司财报、估值和价格趋势继续复核。",
     }
 
 
@@ -926,7 +926,6 @@ def build_final_decisions(
                 "prospect_summary": profile["prospect"],
                 "why_selected": dedupe(reasons),
                 "risk_summary": rec.get("risk_notes", ["需复核估值、财报、回撤和流动性。"])[0] if rec else "需复核估值、财报、回撤和流动性。",
-                "buy_amount_guidance": "不提供买入数量或仓位；这是非个性化模型研究，不知道你的账户规模、风险承受能力和现有持仓。",
             }
         )
 
@@ -1074,7 +1073,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     final_decisions = report.get("final_decisions", {})
     if final_decisions:
         lines.extend(["## 本期最终结论", ""])
-        lines.append("- 口径: 以 AI信号仓库（AiLongHorizonSignalPipelines）和动量为主，政策/新闻事件用于提高置信度和提示风险；不包含买入数量、仓位或账户级配置。")
+        lines.append("- 口径: 以 AI信号仓库（AiLongHorizonSignalPipelines）和动量为主，政策/新闻事件用于提高置信度和提示风险。")
         horizon_buckets = final_decisions.get("horizon_buckets", {})
         for horizon, label in (("short", "短线"), ("medium", "中线"), ("long", "长线")):
             symbols = ", ".join(horizon_buckets.get(horizon, [])) or "暂无最终推荐"
@@ -1086,8 +1085,8 @@ def render_markdown(report: dict[str, Any]) -> str:
                     f"### {pick.get('symbol')} - {pick.get('action_label')}",
                     "",
                     f"- 周期: {pick.get('primary_horizon_label')}({pick.get('primary_horizon_window')})",
-                    f"- 做什么: {pick.get('business_summary')}",
-                    f"- 为什么有前景: {pick.get('prospect_summary')}",
+                    f"- 股票背景: {pick.get('business_summary')}",
+                    f"- 推荐理由: {pick.get('prospect_summary')}",
                     "- 多源依据:",
                 ]
             )
@@ -1095,14 +1094,10 @@ def render_markdown(report: dict[str, Any]) -> str:
             lines.extend(
                 [
                     f"- 主要风险: {pick.get('risk_summary')}",
-                    f"- 买多少: {pick.get('buy_amount_guidance')}",
                     "",
                 ]
             )
-        if final_decisions.get("watchlist"):
-            watch_symbols = ", ".join(item.get("symbol", "") for item in final_decisions["watchlist"])
-            lines.append(f"- 观察名单，不是最终推荐: {watch_symbols}")
-            lines.append("")
+        return "\n".join(lines).rstrip() + "\n"
     theme_candidates = report.get("theme_first_candidates", [])
     if theme_candidates:
         lines.extend(["## 主题候选（解释材料，不是最终推荐）", ""])

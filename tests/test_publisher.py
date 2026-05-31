@@ -16,6 +16,7 @@ def build_sample_report() -> dict:
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
     )
 
 
@@ -24,12 +25,13 @@ def test_render_report_html_contains_policy_boundary() -> None:
 
     assert "政策边界" in html
     assert "不允许下单" in html
-    assert "EVT1" in html
     assert "2-12周" in html
     assert "来源模式：fixture" in html
-    assert "仅监控标的未在页面展开" in html
+    assert "本期最终结论" in html
+    assert "股票背景" in html
     assert "背景跟踪（非推荐" not in html
     assert "复核清单" not in html
+    assert "主题候选（解释材料，不是最终推荐）" not in html
 
 
 def test_render_feed_xml_contains_report_item() -> None:
@@ -61,6 +63,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
     )
     report["summary"]["top_theme_ids"] = ["hbm_memory"]
     report["theme_momentum"] = {
@@ -105,18 +108,17 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
 
     assert "本期最终结论" in html
     assert "最终推荐" in html
-    assert "买多少" in html
-    assert "不提供买入金额" in html
     assert "AI信号仓库" in html
     assert "AiLongHorizonSignalPipelines" in html
-    assert "主题候选（解释材料，不是最终推荐）" in html
-    assert "最终推荐以上方“本期最终结论”为准" in html
-    assert "+28.0%" in html
-    assert "为什么入选" in html
-    assert "主题动量" in html
-    assert "HBM / 存储" in html
-    assert "事件证据" in html
-    assert "暂无明确事件催化" in html
+    assert "股票背景" in html
+    assert "推荐理由" in html
+    assert "做什么" not in html
+    assert "为什么有前景" not in html
+    assert "买多少" not in html
+    assert "仓位/数量" not in html
+    assert "主题候选（解释材料，不是最终推荐）" not in html
+    assert "主题动量" not in html
+    assert "事件证据" not in html
     assert "hbm_memory" not in html
     assert "MU" in html
 
@@ -156,13 +158,12 @@ def test_format_telegram_message_contains_themes_policy_and_link() -> None:
 
     assert "量化模型推荐" in message
     assert "本期最终推荐" in message
-    assert "买多少：不提供" in message
     assert "AI信号仓库" in message
-    assert "主题候选（不是最终推荐）" in message
-    assert "近3月" in message
-    assert "事件证据" in message
-    assert "为什么" in message
-    assert "HBM / 存储" in message
+    assert "股票背景" in message
+    assert "推荐理由" in message
+    assert "买多少" not in message
+    assert "主题候选" not in message
+    assert "事件证据" not in message
     assert "MU" in message
     assert "不包含下单" in message
     assert "https://example.com/advisor/2026-05-30-weekly-model-recommendations.html" in message
