@@ -361,6 +361,9 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert "ai_signal_score" in first_pick
     assert first_pick["medium_context_score"] == first_pick["ai_signal_score"]
     assert first_pick["supporting_context"]["medium"] == ["theme_momentum_snapshot"]
+    assert set(first_pick["horizon_scores"]) == {"short", "medium", "long"}
+    assert first_pick["horizon_scores"]["medium"]["score"] == first_pick["combined_score"]
+    assert first_pick["selection_trace"]
     assert "ResearchSignalContextPipelines" not in report_with_theme["final_decisions"]["method"]
     assert report_with_theme["final_decisions"]["watchlist"][0]["symbol"] == "DELL"
     assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
@@ -377,3 +380,40 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert "为什么入选" not in markdown
     assert "买多少" not in markdown
     assert "## 主题动量" not in markdown
+
+
+def test_market_confirmation_is_optional_audit_input_not_public_copy() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
+        market_confirmation_path=ROOT / "examples/market_confirmation.example.csv",
+    )
+
+    pick = report["final_decisions"]["recommendations"][0]
+    assert report["source_artifacts"]["market_confirmation"].endswith("market_confirmation.example.csv")
+    assert report["summary"]["market_confirmation_count"] == 5
+    assert "market_confirmation" in pick["horizon_scores"]["medium"]["drivers"]
+    assert "market_confirmation" in pick["supporting_context"]["medium"]
+    assert any("medium_score=" in item for item in pick["selection_trace"])
+
+    markdown = render_markdown(report)
+    assert "market_confirmation" not in markdown
+
+
+def test_contract_rejects_final_decision_account_action_fields() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
+    )
+    report["final_decisions"]["recommendations"][0]["target_weight"] = 0.1
+
+    with pytest.raises(AdvisoryValidationError):
+        validate_advisory_report(report)

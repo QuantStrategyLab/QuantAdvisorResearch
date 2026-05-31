@@ -58,7 +58,7 @@ must not directly generate orders, target weights, or account actions.
 
 Owns final non-personalized model recommendations:
 
-- inputs: event CSV, watchlist CSV, saved AI shadow JSON, optional theme momentum;
+- inputs: event CSV, watchlist CSV, saved AI shadow JSON, optional theme momentum, optional market confirmation CSV;
 - outputs: JSON, Markdown, HTML, RSS, and optional Telegram summary;
 - contract blocks orders, target weights, target share quantities, broker routing,
   account information, and suitability claims.
@@ -89,7 +89,9 @@ Priority order:
    releases, SEC/EDGAR, company IR, policy/procurement sources, alias maps, and
    source registry coverage.
 3. Add optional market confirmation CSVs while keeping report generation working
-   when the data is absent.
+   when the data is absent. The CSV should carry point-in-time returns, relative
+   returns, abnormal volume, drawdown, and volatility; it should not contain
+   target weights or trade instructions.
 4. Add event review inputs for 1/5/20/60 trading-day follow-up.
 5. Add fundamentals/valuation snapshots for risk explanation, not execution.
 6. Only then consider read-only references from existing snapshot repositories.

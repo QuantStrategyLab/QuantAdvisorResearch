@@ -195,6 +195,30 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
             _require_string(item.get("symbol"), f"theme_first_candidates[{index}].symbol")
             _require_string(item.get("candidate_type"), f"theme_first_candidates[{index}].candidate_type")
 
+    if "final_decisions" in payload:
+        final_decisions = _require_mapping(payload["final_decisions"], "final_decisions")
+        for section in ("recommendations", "watchlist"):
+            for index, pick in enumerate(_require_sequence(final_decisions.get(section, []), f"final_decisions.{section}")):
+                item = _require_mapping(pick, f"final_decisions.{section}[{index}]")
+                account_keys = sorted(DISALLOWED_ACCOUNT_ACTION_KEYS & set(item))
+                if account_keys:
+                    raise AdvisoryValidationError(
+                        f"final_decisions.{section}[{index}] contains account-action fields: {', '.join(account_keys)}"
+                    )
+                _require_string(item.get("symbol"), f"final_decisions.{section}[{index}].symbol")
+                if "horizon_scores" in item:
+                    horizon_scores = _require_mapping(
+                        item["horizon_scores"], f"final_decisions.{section}[{index}].horizon_scores"
+                    )
+                    for horizon in ("short", "medium", "long"):
+                        score_item = _require_mapping(
+                            horizon_scores.get(horizon),
+                            f"final_decisions.{section}[{index}].horizon_scores.{horizon}",
+                        )
+                        _require_number_0_1(score_item.get("score"), f"final_decisions.{section}[{index}].{horizon}.score")
+                if "selection_trace" in item:
+                    _require_sequence(item["selection_trace"], f"final_decisions.{section}[{index}].selection_trace")
+
     policy = _require_mapping(payload["policy"], "policy")
     if policy.get("execution_allowed") is not False:
         raise AdvisoryValidationError("policy.execution_allowed must be false")

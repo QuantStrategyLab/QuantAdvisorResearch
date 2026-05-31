@@ -26,7 +26,7 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     assert "量化模型推荐周度复盘 - 2026-05-30" in html
     assert "text-align: center" in html
     assert "2-12周" in html
-    assert "来源模式：fixture" in html
+    assert "来源模式：fixture" not in html
     assert "股票背景" in html
     assert "推荐理由" in html
     assert "主要风险" in html

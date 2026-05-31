@@ -117,12 +117,13 @@ symbol_theme_exposure
 
 ## Theme momentum 展示边界
 
-`QuantAdvisorResearch` 可以消费 `theme_momentum_snapshot.json`，但只用于报告展示：
+`QuantAdvisorResearch` 可以消费 `theme_momentum_snapshot.json`，用途分两层：
 
-- 展示当前强主题；
-- 展示主题内 top symbols；
-- 写入 `summary.top_theme_ids` 和 `theme_momentum.top_themes`；
-- 不改变推荐评级、评分、周期、仓位或执行策略。
+- 公开页面只展示最终推荐，不展示主题候选池；
+- JSON/Markdown 保留 `theme_first_candidates[]` 供审计；
+- `final_decisions` 可以把主题动量作为中线评分的重要输入；
+- 基础 `recommendations[]` 评级仍由事件、watchlist 和 AI 背景生成；
+- 不生成仓位、目标股数或执行策略。
 
 如果上游 `ResearchSignalContextPipelines` 没有生成该 snapshot，workflow 会跳过该输入，报告仍可正常生成。
 

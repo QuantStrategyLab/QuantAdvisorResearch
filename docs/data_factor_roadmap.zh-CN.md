@@ -53,7 +53,7 @@
 
 当前负责最终非个性化模型推荐：
 
-- 输入：事件 CSV、watchlist CSV、AI shadow JSON。
+- 输入：事件 CSV、watchlist CSV、AI shadow JSON、可选主题动量、可选市场确认 CSV。
 - 输出：`model_recommendations` JSON、Markdown、HTML、RSS。
 - 推荐字段：推荐等级、推荐层级、适合周期、周期说明、来源可信度、理由、风险、复核清单。
 - 合约禁止：目标仓位、目标股数、订单、券商、账户信息。
@@ -178,8 +178,8 @@ Crypto 可作为跨资产风险情绪参考，但暂时不应混入 US equity �
    - X / Truth Social / 社区内容暂不作为稳定默认源。
 
 3. 在 `QuantAdvisorResearch` 增加 market confirmation 输入，但保持可选：
-   - `symbol,as_of,close,volume,benchmark_close,sector_etf_close`。
-   - 如果没有市场确认数据，报告继续生成，但降级提示数据缺口。
+   - 当前 CSV 字段为 `symbol,as_of,return_5d,return_20d,return_63d,relative_return_20d,relative_return_63d,volume_zscore,drawdown_63d,volatility_21d`。
+   - 如果没有市场确认数据，报告继续生成；该输入只影响 `final_decisions` 的短/中/长线审计评分，不包含目标仓位或交易指令。
 
 4. 增加事件复盘结果输入：
    - `event_id,symbol,event_date,window,absolute_return,benchmark_relative_return`。

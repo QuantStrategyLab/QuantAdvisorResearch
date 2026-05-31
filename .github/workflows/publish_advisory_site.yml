@@ -32,6 +32,11 @@ on:
         required: false
         default: "data/output/theme_momentum_snapshot.json"
         type: string
+      market_confirmation_path:
+        description: "Optional market confirmation CSV path inside advisor repository. Empty disables this input."
+        required: false
+        default: ""
+        type: string
   schedule:
     - cron: "0 13 * * 6"
 
@@ -77,6 +82,7 @@ jobs:
           POLITICAL_WATCHLIST_PATH: ${{ github.event.inputs.political_watchlist_path || 'data/live/political_watchlist.csv' }}
           AI_SIGNAL_PATH: ${{ github.event.inputs.ai_signal_path || 'data/output/latest_signal.json' }}
           THEME_MOMENTUM_PATH: ${{ github.event.inputs.theme_momentum_path || 'data/output/theme_momentum_snapshot.json' }}
+          MARKET_CONFIRMATION_PATH: ${{ github.event.inputs.market_confirmation_path || '' }}
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
@@ -85,6 +91,10 @@ jobs:
           if [ -n "${THEME_MOMENTUM_PATH}" ] && [ -f "../research-signal-context/${THEME_MOMENTUM_PATH}" ]; then
             THEME_ARGS=(--theme-momentum "../research-signal-context/${THEME_MOMENTUM_PATH}")
           fi
+          MARKET_ARGS=()
+          if [ -n "${MARKET_CONFIRMATION_PATH}" ] && [ -f "${MARKET_CONFIRMATION_PATH}" ]; then
+            MARKET_ARGS=(--market-confirmation "${MARKET_CONFIRMATION_PATH}")
+          fi
           python scripts/build_advisory_report.py \
             --as-of "${AS_OF}" \
             --cadence weekly \
@@ -92,6 +102,7 @@ jobs:
             --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}" \
             --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}" \
             "${THEME_ARGS[@]}" \
+            "${MARKET_ARGS[@]}" \
             --output-json "data/output/published/advisory_report_${AS_OF}.json" \
             --output-md "data/output/published/advisory_report_${AS_OF}.md"
           python scripts/publish_advisory_site.py \

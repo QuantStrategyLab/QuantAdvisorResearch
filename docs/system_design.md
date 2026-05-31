@@ -94,14 +94,17 @@ The public HTML/RSS/Telegram outputs should stay direct:
   and risks;
 - hide internal tags such as `source_mode`, mode labels, audience labels, and
   repository names;
-- keep `theme_first_candidates[]` in JSON/Markdown as explanation and audit
-  material, not as a public buy list;
+- keep `theme_first_candidates[]`, `horizon_scores`, and `selection_trace` in
+  JSON/Markdown as explanation and audit material, not as public page clutter;
+- use theme momentum and optional market confirmation only inside deterministic
+  `final_decisions` ranking;
 - never show orders, target weights, target share quantities, account suitability,
   or account-specific allocation advice.
 
 ## Fixture vs Live Inputs
 
 Reports built from `examples/` are `source_mode=fixture` and are suitable for
-local tests only. Scheduled workflows default to `data/live/*` inputs from
-`PoliticalEventTrackingResearch`, so published reports should be
-`source_mode=operator_supplied` and should not show fixture warnings.
+local tests only. The public renderers no longer display fixture/source-mode
+badges. Scheduled workflows default to `data/live/*` inputs from
+`PoliticalEventTrackingResearch`, so published audit artifacts should be
+`source_mode=operator_supplied`.

@@ -191,6 +191,20 @@ class WatchlistItem:
     source_url: str
 
 
+@dataclass(frozen=True)
+class MarketConfirmation:
+    symbol: str
+    as_of: dt.date | None
+    return_5d: float
+    return_20d: float
+    return_63d: float
+    relative_return_20d: float
+    relative_return_63d: float
+    volume_zscore: float
+    drawdown_63d: float
+    volatility_21d: float
+
+
 def parse_date(value: str) -> dt.date:
     return dt.date.fromisoformat(value.strip())
 
@@ -311,6 +325,42 @@ def as_float(value: Any, *, default: float = 0.0) -> float:
         return default
 
 
+def optional_date(value: Any) -> dt.date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    return parse_date(text)
+
+
+def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[str, MarketConfirmation]:
+    if path is None:
+        return {}
+    confirmations: dict[str, MarketConfirmation] = {}
+    for row in read_csv_rows(path):
+        symbol = str(row.get("symbol", "")).upper().strip()
+        if not symbol:
+            continue
+        row_as_of = optional_date(row.get("as_of"))
+        if row_as_of and row_as_of > as_of:
+            continue
+        current = confirmations.get(symbol)
+        if current and current.as_of and row_as_of and row_as_of < current.as_of:
+            continue
+        confirmations[symbol] = MarketConfirmation(
+            symbol=symbol,
+            as_of=row_as_of,
+            return_5d=as_float(row.get("return_5d")),
+            return_20d=as_float(row.get("return_20d")),
+            return_63d=as_float(row.get("return_63d")),
+            relative_return_20d=as_float(row.get("relative_return_20d")),
+            relative_return_63d=as_float(row.get("relative_return_63d")),
+            volume_zscore=as_float(row.get("volume_zscore")),
+            drawdown_63d=as_float(row.get("drawdown_63d")),
+            volatility_21d=as_float(row.get("volatility_21d")),
+        )
+    return confirmations
+
+
 def display_number(value: Any, *, digits: int = 2) -> str:
     if value in {None, ""}:
         return "无"
@@ -372,6 +422,17 @@ def normalize_ai_mapping(mapping: Any) -> dict[str, Any]:
     return {str(key).upper(): value for key, value in mapping.items()}
 
 
+def bias_value(value: Any) -> str:
+    raw_value = value.get("bias") if isinstance(value, dict) else value
+    return str(raw_value or "").strip().lower()
+
+
+def bias_confidence(value: Any) -> float | None:
+    if isinstance(value, dict) and "confidence" in value:
+        return clamp(as_float(value.get("confidence")), 0, 1)
+    return None
+
+
 def aggregate_theme_bias(values: list[str]) -> str | None:
     if not values:
         return None
@@ -388,23 +449,32 @@ def aggregate_theme_bias(values: list[str]) -> str | None:
     return None
 
 
-def resolve_ai_bias(symbol: str, ai_signal: dict[str, Any] | None) -> tuple[str | None, list[str]]:
+def resolve_ai_bias(symbol: str, ai_signal: dict[str, Any] | None) -> tuple[str | None, list[str], float | None]:
     if not ai_signal:
-        return None, []
+        return None, [], None
     normalized_symbol = symbol.upper()
-    explicit_bias = normalize_ai_mapping(ai_signal.get("research_bias") or ai_signal.get("candidate_bias", {}))
+    explicit_bias: dict[str, Any] = {}
+    for key in ("candidate_bias", "research_bias", "symbol_bias"):
+        explicit_bias.update(normalize_ai_mapping(ai_signal.get(key) or {}))
     if normalized_symbol in explicit_bias:
-        return str(explicit_bias[normalized_symbol]), []
+        raw_value = explicit_bias[normalized_symbol]
+        return bias_value(raw_value), [], bias_confidence(raw_value)
 
-    theme_bias = {str(theme): str(bias) for theme, bias in dict(ai_signal.get("theme_bias") or {}).items()}
+    theme_bias = {str(theme): value for theme, value in dict(ai_signal.get("theme_bias") or {}).items()}
     raw_exposure = normalize_ai_mapping(ai_signal.get("symbol_theme_exposure") or {})
     theme_ids = raw_exposure.get(normalized_symbol, [])
     if isinstance(theme_ids, str):
         theme_ids = [theme_ids]
     if not isinstance(theme_ids, list):
-        return None, []
-    matched_biases = [theme_bias[theme_id] for theme_id in theme_ids if theme_id in theme_bias]
-    return aggregate_theme_bias(matched_biases), [theme_id for theme_id in theme_ids if theme_id in theme_bias]
+        return None, [], None
+    matched_values = [theme_bias[theme_id] for theme_id in theme_ids if theme_id in theme_bias]
+    matched_biases = [bias_value(value) for value in matched_values]
+    matched_confidences = [bias_confidence(value) for value in matched_values]
+    confidence_values = [value for value in matched_confidences if value is not None]
+    confidence = max(confidence_values) if confidence_values else None
+    matched_theme_ids = [theme_id for theme_id in theme_ids if theme_id in theme_bias]
+    return aggregate_theme_bias(matched_biases), matched_theme_ids, confidence
+
 
 def freshness_bonus(event_date: dt.date, as_of: dt.date) -> int:
     age_days = (as_of - event_date).days
@@ -638,8 +708,14 @@ def build_recommendation(
     ai_signal: dict[str, Any] | None,
     as_of: dt.date,
 ) -> dict[str, Any]:
-    ai_bias, ai_bias_source_themes = resolve_ai_bias(symbol, ai_signal)
-    ai_confidence = float(ai_signal.get("confidence", 0.0)) if ai_signal else 0.0
+    ai_bias, ai_bias_source_themes, ai_bias_confidence = resolve_ai_bias(symbol, ai_signal)
+    ai_confidence = (
+        ai_bias_confidence
+        if ai_bias_confidence is not None
+        else float(ai_signal.get("confidence", 0.0))
+        if ai_signal
+        else 0.0
+    )
     ai_regime = ai_signal.get("regime") if ai_signal else "unknown"
 
     evidence_score = BUCKET_WEIGHTS.get(item.bucket, 0) if item else 0
@@ -871,6 +947,137 @@ def theme_symbol_context(theme_momentum: dict[str, Any] | None) -> dict[str, dic
     return contexts
 
 
+def market_confirmation_score(market: MarketConfirmation | None) -> float | None:
+    if market is None:
+        return None
+    relative_20d = clamp(market.relative_return_20d / 0.20, -1, 1)
+    relative_63d = clamp(market.relative_return_63d / 0.35, -1, 1)
+    absolute_20d = clamp(market.return_20d / 0.20, -1, 1)
+    volume = clamp(market.volume_zscore / 3, 0, 1)
+    drawdown_penalty = clamp(abs(min(market.drawdown_63d, 0)) / 0.30, 0, 1)
+    volatility_penalty = clamp((market.volatility_21d - 0.35) / 0.45, 0, 1)
+    score = (
+        0.50
+        + relative_20d * 0.22
+        + relative_63d * 0.18
+        + absolute_20d * 0.08
+        + volume * 0.10
+        - drawdown_penalty * 0.07
+        - volatility_penalty * 0.06
+    )
+    return round(clamp(score, 0, 1), 3)
+
+
+def horizon_score_components(
+    rec: dict[str, Any] | None,
+    theme: dict[str, Any],
+    market: MarketConfirmation | None,
+) -> dict[str, float | None]:
+    source_score = normalize_source_score(rec)
+    momentum_score = as_float(theme.get("momentum_score"))
+    medium_context_score = as_float(theme.get("medium_context_score", theme.get("ai_signal_score")))
+    long_context_score = as_float(rec.get("long_horizon_ai_score")) if rec else 0.0
+    market_score = market_confirmation_score(market)
+    return {
+        "source": source_score,
+        "momentum": momentum_score,
+        "medium_context": medium_context_score,
+        "long_context": long_context_score,
+        "market_confirmation": market_score,
+    }
+
+
+def blend_optional_market(base_score: float, market_score: float | None, *, market_weight: float) -> float:
+    if market_score is None:
+        return base_score
+    return round(base_score * (1 - market_weight) + market_score * market_weight, 3)
+
+
+def build_horizon_scores(
+    rec: dict[str, Any] | None,
+    theme: dict[str, Any],
+    market: MarketConfirmation | None,
+) -> dict[str, dict[str, Any]]:
+    components = horizon_score_components(rec, theme, market)
+    source_score = as_float(components["source"])
+    momentum_score = as_float(components["momentum"])
+    medium_context_score = as_float(components["medium_context"])
+    long_context_score = as_float(components["long_context"])
+    market_score = components["market_confirmation"]
+
+    short_base = round(source_score * 0.70 + (as_float(market_score) if market_score is not None else 0.0) * 0.30, 3)
+    if market_score is None:
+        short_base = round(source_score, 3)
+    medium_base = round(source_score * 0.15 + momentum_score * 0.40 + medium_context_score * 0.45, 3)
+    long_base = round(long_context_score * 0.60 + medium_context_score * 0.20 + source_score * 0.20, 3)
+    long_score = blend_optional_market(long_base, market_score, market_weight=0.10)
+
+    scores = {
+        "short": {
+            "score": short_base,
+            "drivers": ["source_events"] if source_score >= 0.35 else [],
+        },
+        "medium": {
+            "score": blend_optional_market(medium_base, market_score, market_weight=0.15),
+            "drivers": [
+                driver
+                for driver, score in (
+                    ("theme_momentum_snapshot", max(momentum_score, medium_context_score)),
+                    ("source_events", source_score),
+                )
+                if score >= 0.35
+            ],
+        },
+        "long": {
+            "score": long_score,
+            "drivers": [
+                driver
+                for driver, score in (
+                    ("latest_signal", long_context_score),
+                    ("theme_context", medium_context_score),
+                    ("source_events", source_score),
+                )
+                if score >= 0.35
+            ],
+        },
+    }
+    if market_score is not None and market_score >= 0.35:
+        scores["short"]["drivers"].append("market_confirmation")
+        scores["medium"]["drivers"].append("market_confirmation")
+    for item in scores.values():
+        item["components"] = {
+            key: round(value, 3) if isinstance(value, float) else value for key, value in components.items()
+        }
+        item["drivers"] = dedupe(item["drivers"])
+    return scores
+
+
+def selection_trace_for(
+    symbol: str,
+    rec: dict[str, Any] | None,
+    theme: dict[str, Any],
+    horizon_scores: dict[str, dict[str, Any]],
+    action: str,
+) -> list[str]:
+    trace: list[str] = []
+    if rec:
+        trace.append("candidate_source=watchlist_or_source_events")
+    if theme:
+        trace.append("candidate_source=theme_momentum_snapshot")
+    if not trace:
+        trace.append("candidate_source=unknown")
+    trace.extend(
+        [
+            f"short_score={display_number(horizon_scores['short']['score'])}",
+            f"medium_score={display_number(horizon_scores['medium']['score'])}",
+            f"long_score={display_number(horizon_scores['long']['score'])}",
+            f"final_action={action}",
+            f"symbol={symbol}",
+        ]
+    )
+    return trace
+
+
 def final_action_for(
     rec: dict[str, Any] | None,
     combined_score: float,
@@ -909,12 +1116,17 @@ def supporting_context_for(
     momentum_score: float,
     medium_context_score: float,
     long_context_score: float,
+    market_score: float | None = None,
 ) -> dict[str, list[str]]:
     context = {"short": [], "medium": [], "long": []}
     if source_score >= 0.35 and rec:
         context["short"].append("source_events")
+    if market_score is not None and market_score >= 0.35:
+        context["short"].append("market_confirmation")
     if momentum_score >= 0.35 or medium_context_score >= 0.35:
         context["medium"].append("theme_momentum_snapshot")
+    if market_score is not None and market_score >= 0.35:
+        context["medium"].append("market_confirmation")
     if long_context_score >= 0.35 and rec:
         context["long"].append("latest_signal")
     return context
@@ -923,26 +1135,39 @@ def supporting_context_for(
 def build_final_decisions(
     recommendations: list[dict[str, Any]],
     theme_momentum: dict[str, Any] | None,
+    market_confirmations: dict[str, MarketConfirmation] | None = None,
     *,
     max_recommendations: int = 5,
     max_watchlist: int = 8,
 ) -> dict[str, Any]:
     rec_by_symbol = {str(rec.get("symbol", "")).upper(): rec for rec in recommendations}
     theme_context = theme_symbol_context(theme_momentum)
+    market_confirmations = market_confirmations or {}
     symbols = sorted(set(rec_by_symbol) | set(theme_context))
     picks: list[dict[str, Any]] = []
 
     for symbol in symbols:
         rec = rec_by_symbol.get(symbol)
         theme = theme_context.get(symbol, {})
-        source_score = normalize_source_score(rec)
-        momentum_score = as_float(theme.get("momentum_score"))
-        medium_context_score = as_float(theme.get("medium_context_score", theme.get("ai_signal_score")))
-        long_context_score = as_float(rec.get("long_horizon_ai_score")) if rec else 0.0
+        market = market_confirmations.get(symbol)
+        horizon_scores = build_horizon_scores(rec, theme, market)
+        score_components = horizon_scores["medium"]["components"]
+        source_score = as_float(score_components.get("source"))
+        momentum_score = as_float(score_components.get("momentum"))
+        medium_context_score = as_float(score_components.get("medium_context"))
+        long_context_score = as_float(score_components.get("long_context"))
+        market_score = score_components.get("market_confirmation")
         support_count = sum(
-            score >= 0.35 for score in (source_score, momentum_score, medium_context_score, long_context_score)
+            score >= 0.35
+            for score in (
+                source_score,
+                momentum_score,
+                medium_context_score,
+                long_context_score,
+                as_float(market_score) if market_score is not None else 0.0,
+            )
         )
-        combined_score = round(source_score * 0.15 + momentum_score * 0.40 + medium_context_score * 0.45, 3)
+        combined_score = round(as_float(horizon_scores["medium"]["score"]), 3)
         action = final_action_for(rec, combined_score, support_count, momentum_score, medium_context_score)
         if action == "skip":
             continue
@@ -998,7 +1223,10 @@ def build_final_decisions(
                     momentum_score=momentum_score,
                     medium_context_score=medium_context_score,
                     long_context_score=long_context_score,
+                    market_score=as_float(market_score) if market_score is not None else None,
                 ),
+                "horizon_scores": horizon_scores,
+                "selection_trace": selection_trace_for(symbol, rec, theme, horizon_scores, action),
                 "business_summary": profile["business"],
                 "prospect_summary": profile["prospect"],
                 "why_selected": dedupe(reasons),
@@ -1025,11 +1253,25 @@ def build_final_decisions(
         horizon: [item["symbol"] for item in recommendations_out if item.get("primary_horizon") == horizon]
         for horizon in ("short", "medium", "long")
     }
+    horizon_rankings = {
+        horizon: [
+            {"symbol": item["symbol"], "score": item["horizon_scores"][horizon]["score"], "action": item["action"]}
+            for item in sorted(
+                picks,
+                key=lambda candidate: (
+                    -as_float(candidate.get("horizon_scores", {}).get(horizon, {}).get("score")),
+                    str(candidate.get("symbol", "")),
+                ),
+            )[:max_recommendations]
+        ]
+        for horizon in ("short", "medium", "long")
+    }
     return {
         "method": "Final recommendation blend for model scoring.",
         "recommendations": recommendations_out,
         "watchlist": watchlist_out,
         "horizon_buckets": horizon_buckets,
+        "horizon_rankings": horizon_rankings,
         "position_policy": "No target shares, position size, portfolio weight, or account-specific allocation is provided.",
     }
 
@@ -1042,6 +1284,7 @@ def build_advisory_report(
     political_watchlist_path: str | Path,
     ai_signal_path: str | Path | None = None,
     theme_momentum_path: str | Path | None = None,
+    market_confirmation_path: str | Path | None = None,
     max_candidates: int = 12,
 ) -> dict[str, Any]:
     if cadence not in ALLOWED_CADENCES:
@@ -1051,12 +1294,14 @@ def build_advisory_report(
     events = load_events(political_events_path, as_of_date)
     ai_signal = load_ai_signal(ai_signal_path)
     theme_momentum = load_theme_momentum(theme_momentum_path)
+    market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
         political_events_path,
         political_watchlist_path,
         ai_signal_path,
         theme_momentum_path,
+        market_confirmation_path,
     )
 
     events_by_symbol: dict[str, list[Event]] = defaultdict(list)
@@ -1066,8 +1311,8 @@ def build_advisory_report(
     symbols = set(watchlist) | set(events_by_symbol)
     if ai_signal:
         symbols |= {symbol.upper() for symbol in ai_signal.get("universe", [])}
-        ai_bias_symbols = ai_signal.get("research_bias") or ai_signal.get("candidate_bias", {})
-        symbols |= {symbol.upper() for symbol in ai_bias_symbols}
+        for key in ("symbol_bias", "research_bias", "candidate_bias"):
+            symbols |= {symbol.upper() for symbol in normalize_ai_mapping(ai_signal.get(key) or {})}
 
     recommendations = [
         build_recommendation(
@@ -1082,7 +1327,7 @@ def build_advisory_report(
     recommendations.sort(key=lambda rec: (-rec["evidence_score"], rec["risk_score"], rec["symbol"]))
     recommendations = recommendations[:max_candidates]
     theme_first_candidates = build_theme_first_candidates(theme_momentum, recommendations)
-    final_decisions = build_final_decisions(recommendations, theme_momentum)
+    final_decisions = build_final_decisions(recommendations, theme_momentum, market_confirmations)
 
     report = {
         "schema_version": "5",
@@ -1096,6 +1341,7 @@ def build_advisory_report(
             "political_watchlist": str(political_watchlist_path),
             "ai_signal": str(ai_signal_path) if ai_signal_path else "",
             "theme_momentum": str(theme_momentum_path) if theme_momentum_path else "",
+            "market_confirmation": str(market_confirmation_path) if market_confirmation_path else "",
         },
         "summary": {
             "recommendation_count": len(recommendations),
@@ -1110,6 +1356,7 @@ def build_advisory_report(
             "theme_momentum_horizon_window": theme_momentum_summary.get("horizon_window_label", ""),
             "top_theme_ids": [theme["theme_id"] for theme in theme_momentum_summary["top_themes"]],
             "theme_first_candidate_count": len(theme_first_candidates),
+            "market_confirmation_count": len(market_confirmations),
             "top_theme_candidate_symbols": [item["symbol"] for item in theme_first_candidates[:8]],
             "top_recommended_symbols": [item["symbol"] for item in final_decisions["recommendations"][:5]],
             "review_note": "Non-personalized model recommendations. No order, target quantity, account suitability, or portfolio allocation is encoded.",
@@ -1254,6 +1501,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--political-watchlist", required=True, help="Political watchlist CSV.")
     parser.add_argument("--ai-signal", help="Saved AI shadow signal JSON.")
     parser.add_argument("--theme-momentum", help="Saved theme momentum snapshot JSON.")
+    parser.add_argument("--market-confirmation", help="Optional point-in-time market confirmation CSV.")
     parser.add_argument("--max-items", "--max-candidates", dest="max_candidates", type=int, default=12)
     parser.add_argument("--output-json", required=True, help="Output JSON artifact path.")
     parser.add_argument("--output-md", required=True, help="Output Markdown report path.")
@@ -1270,6 +1518,7 @@ def main(argv: list[str] | None = None) -> None:
         political_watchlist_path=args.political_watchlist,
         ai_signal_path=args.ai_signal,
         theme_momentum_path=args.theme_momentum,
+        market_confirmation_path=args.market_confirmation,
         max_candidates=args.max_candidates,
     )
     write_json(args.output_json, report)

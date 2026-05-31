@@ -45,7 +45,7 @@ Advisor is the final composition layer. Source ownership by horizon is:
 - Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `ResearchSignalContextPipelines`, now explicitly marked as `medium_horizon_theme_context`.
 - Long term (`1-3 years`): `latest_signal.json` / `signal_history/*.json` from `ResearchSignalContextPipelines` as AI shadow context.
 
-Final recommendations are still deterministic Advisor outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine.
+Final recommendations are still deterministic Advisor outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine. Advisor now records separate short/medium/long horizon scores for each final pick; public pages keep the simpler final recommendation layout.
 
 ## Boundary
 
@@ -244,14 +244,13 @@ into executable strategy targets.
 
 ## Source Mode
 
-Reports built from `examples/` inputs are marked `source_mode=fixture` and the
-individual HTML report displays a fixture warning. Scheduled weekly/monthly and
-Pages workflows now default to `data/live/*` inputs from
-`PoliticalEventTrackingResearch`, so published reports should be
-`source_mode=operator_supplied` and should not show the fixture warning.
+Reports built from `examples/` inputs are still marked `source_mode=fixture` in
+JSON, but public HTML/RSS/Telegram output no longer displays fixture or source-mode
+badges. Scheduled weekly/monthly and Pages workflows default to `data/live/*`
+inputs from `PoliticalEventTrackingResearch`, so published reports should be
+`source_mode=operator_supplied` in the audit artifact.
 
-`source_mode` remains in the JSON contract for auditability, but the public
-index, RSS, and Telegram summaries do not expose that internal field.
+`source_mode` remains in the JSON contract for auditability only.
 
 ## Regulatory Boundary
 
@@ -280,6 +279,7 @@ python scripts/build_advisory_report.py \
   --political-watchlist examples/political_watchlist.example.csv \
   --ai-signal examples/research_signal_context.example.json \
   --theme-momentum examples/theme_momentum_snapshot.example.json \
+  --market-confirmation examples/market_confirmation.example.csv \
   --output-json data/output/advisory_report.example.json \
   --output-md data/output/advisory_report.example.md
 ```
@@ -287,9 +287,11 @@ python scripts/build_advisory_report.py \
 Theme momentum is explanation-first context: it highlights strong themes and
 creates `theme_first_candidates[]` for JSON/Markdown audit material. The public
 HTML, RSS, and Telegram outputs stay focused on final recommendations only, so
-theme candidates are not mistaken for a buy list. Theme momentum does not change
-recommendation ratings, scores, allocations, or execution policy. Workflows skip
-this context when the snapshot file is absent.
+theme candidates are not mistaken for a buy list. The base `recommendations[]`
+rating still comes from event/watchlist/AI evidence; `final_decisions` can use
+medium-horizon theme momentum plus optional market confirmation to rank the final
+public list. It never changes allocation or execution policy. Workflows skip this
+context when the snapshot file is absent.
 
 Yahoo chart downloads are only a temporary fallback.  Do not rely on random free
 proxy pools for the stable pipeline; prefer audited price snapshots, cache files,

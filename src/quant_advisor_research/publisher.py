@@ -195,17 +195,6 @@ def render_theme_momentum_html(report: dict[str, Any]) -> str:
 
 def render_report_html(report: dict[str, Any]) -> str:
     title = f"量化模型推荐{cadence_label(report)}复盘 - {report['as_of']}"
-    source_mode = str(report["summary"].get("source_mode", "unknown"))
-    data_warnings = list(report["summary"].get("data_quality_warnings", []))
-    warning_html = ""
-    if source_mode == "fixture" or data_warnings:
-        warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in data_warnings)
-        warning_html = f"""
-    <section class="warning">
-      <strong>来源模式：{html.escape(source_mode)}</strong>
-      <ul>{warning_items}</ul>
-    </section>
-        """
     final_decisions_html = render_final_decisions_html(report)
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -263,7 +252,6 @@ def render_report_html(report: dict[str, Any]) -> str:
     <section class="hero">
       <h1>{html.escape(title)}</h1>
     </section>
-    {warning_html}
     {final_decisions_html}
   </main>
 </body>

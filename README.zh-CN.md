@@ -33,7 +33,7 @@ Advisor 是最终合成层，三个周期的输入分工如下：
 - 中线（2-12 周）：`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json`，现在明确标记为 `medium_horizon_theme_context`。
 - 长线（1-3 年）：`ResearchSignalContextPipelines` 的 `latest_signal.json` / `signal_history/*.json`，作为 AI shadow 背景。
 
-最终推荐仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。
+最终推荐仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。本仓库会为最终推荐记录短/中/长线独立评分，但公开页面仍保持简洁，只展示最终列表、背景、理由和风险。
 
 ## 当前 MVP
 
@@ -77,9 +77,9 @@ manifest 会记录 JSON/Markdown 的 SHA256、`as_of`、cadence、来源 artifac
 
 ## 来源模式
 
-如果报告输入来自 `examples/`，输出会标记 `source_mode=fixture`，单篇 HTML 报告会显示 fixture 警告，避免把合成样例误认为真实推荐。周度/月度和 Pages 发布 workflow 现在默认读取 `PoliticalEventTrackingResearch` 的 `data/live/*`，因此正式发布应为 `source_mode=operator_supplied`，页面不应出现 fixture 警告。
+如果报告输入来自 `examples/`，JSON 里仍会标记 `source_mode=fixture`，但公开 HTML/RSS/Telegram 不再显示 fixture 或来源模式标签。周度/月度和 Pages 发布 workflow 默认读取 `PoliticalEventTrackingResearch` 的 `data/live/*`，因此正式发布的审计 artifact 应为 `source_mode=operator_supplied`。
 
-`source_mode` 继续保留在 JSON 契约里用于审计，但公开首页、RSS 和 Telegram 摘要不再展示这个内部字段。
+`source_mode` 继续保留在 JSON 契约里用于审计，不作为公开页面文案。
 
 ## 边界
 
@@ -190,13 +190,14 @@ python scripts/build_advisory_report.py \
   --political-watchlist examples/political_watchlist.example.csv \
   --ai-signal examples/research_signal_context.example.json \
   --theme-momentum examples/theme_momentum_snapshot.example.json \
+  --market-confirmation examples/market_confirmation.example.csv \
   --output-json data/output/advisory_report.example.json \
   --output-md data/output/advisory_report.example.md
 ```
 
-主题动量会生成 `theme_first_candidates[]`，但它现在只作为 JSON/Markdown 中的解释和审计材料。公开页面、RSS 和 Telegram 摘要默认只显示最终推荐，避免把候选池误读为买入清单。
+主题动量会生成 `theme_first_candidates[]`，作为 JSON/Markdown 中的解释和审计材料。公开页面、RSS 和 Telegram 摘要默认只显示最终推荐，避免把候选池误读为买入清单。
 
-候选池仍会保留行业/主题背景、入选原因、事件确认状态和主要风险；但它不直接改变推荐评级、分数、仓位或执行状态。
+基础 `recommendations[]` 评级仍来自事件、watchlist 和 AI 背景；`final_decisions` 会用中线主题动量和可选市场确认对最终公开列表排序。候选池不改变仓位或执行状态。
 线上 workflow 如果找不到 `data/output/theme_momentum_snapshot.json`，会自动跳过这个展示区块。
 
 Yahoo chart 下载只作为临时 fallback。不要把随机免费代理 IP 池作为稳定生产方案；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。

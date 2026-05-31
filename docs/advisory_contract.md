@@ -15,6 +15,7 @@ source_artifacts: object
 summary: object
 recommendations: list
 theme_first_candidates: list, optional
+final_decisions: object, optional
 policy: object
 ```
 
@@ -114,7 +115,8 @@ Allowed strategy styles:
 - `mixed_research`
 
 The contract intentionally rejects account-action fields such as `target_weight`,
-`target_quantity`, `shares`, `order_type`, `broker`, and `account_id`.
+`target_quantity`, `shares`, `order_type`, `broker`, and `account_id`. The same
+restriction applies to final picks and theme-first candidates.
 
 ## Theme-first Candidate
 
@@ -143,6 +145,44 @@ risk_summary
 reasons
 risk_notes
 ```
+
+## Final Decisions
+
+`final_decisions` is the public recommendation layer. It keeps the simple public
+list while preserving audit details in JSON:
+
+```text
+recommendations[]
+watchlist[]
+horizon_buckets.short | medium | long
+horizon_rankings.short | medium | long
+```
+
+Each final pick may carry:
+
+```text
+combined_score
+source_score
+momentum_score
+medium_context_score
+long_context_score
+horizon_scores.short|medium|long
+supporting_context.short|medium|long
+selection_trace[]
+business_summary
+prospect_summary
+why_selected[]
+risk_summary
+```
+
+Scoring intent by horizon:
+
+- short: event/source evidence first, optionally confirmed by recent market behavior;
+- medium: theme momentum and individual momentum first, with event/news and optional market confirmation as supporting inputs;
+- long: saved AI shadow context and durable theme context first, with event/news as supporting evidence.
+
+These fields are audit metadata. Public HTML/RSS/Telegram renderers still show
+only final recommendations, stock background, recommendation reasons, and risks.
 
 ## Artifact Manifest
 
@@ -176,7 +216,7 @@ generated_at
 
 `summary.source_mode` is:
 
-- `fixture`: one or more inputs came from `examples/`; the individual HTML report should show a fixture warning and scheduled publication should avoid this mode.
+- `fixture`: one or more inputs came from `examples/`; scheduled publication should avoid this mode.
 - `operator_supplied`: inputs did not come from fixture paths. This is the expected mode for scheduled public publication.
 
-`summary.data_quality_warnings` carries source-mode warnings for renderers. Public index, RSS, and Telegram summaries intentionally do not display `source_mode`; it remains an audit field in JSON.
+`summary.data_quality_warnings` carries source-mode warnings for audit tooling. Public HTML, index, RSS, and Telegram summaries intentionally do not display `source_mode`; it remains an audit field in JSON.

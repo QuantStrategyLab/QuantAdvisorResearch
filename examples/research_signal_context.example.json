@@ -45,9 +45,24 @@
     "downstream_use": "Research-only shadow context."
   },
   "theme_bias": {
-    "ai_compute": "watch",
-    "hbm_memory": "watch",
-    "ai_server_infrastructure": "watch",
+    "ai_compute": {
+      "bias": "watch",
+      "confidence": 0.45,
+      "horizon": "1-3 years",
+      "rationale": "AI compute remains long-horizon context only."
+    },
+    "hbm_memory": {
+      "bias": "watch",
+      "confidence": 0.48,
+      "horizon": "1-3 years",
+      "rationale": "HBM context supports research monitoring."
+    },
+    "ai_server_infrastructure": {
+      "bias": "watch",
+      "confidence": 0.44,
+      "horizon": "1-3 years",
+      "rationale": "AI server infrastructure remains watch-only context."
+    },
     "defense_aerospace": "watch",
     "healthcare_policy": "neutral",
     "energy_security": "neutral",
@@ -79,5 +94,15 @@
     "UNH": [
       "healthcare_policy"
     ]
+  },
+  "symbol_bias": {
+    "EVT2": {
+      "bias": "positive",
+      "confidence": 0.58,
+      "linked_themes": [
+        "ai_server_infrastructure"
+      ],
+      "rationale": "Structured fixture for symbol-level AI context."
+    }
   }
 }

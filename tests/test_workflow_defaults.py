@@ -15,3 +15,4 @@ def test_public_workflows_default_to_live_event_inputs() -> None:
         assert "examples/political_watchlist.example.csv" not in text
         assert "QuantStrategyLab/ResearchSignalContextPipelines" in text
         assert "research-signal-context" in text
+        assert "market_confirmation_path" in text
