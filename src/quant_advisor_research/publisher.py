@@ -261,6 +261,7 @@ def render_theme_momentum_html(report: dict[str, Any]) -> str:
 
 def render_report_html(report: dict[str, Any]) -> str:
     title = f"智慧投顾研究{cadence_label(report)}复盘 - {report['as_of']}"
+    display_title = f"智慧投顾研究{cadence_label(report)}复盘"
     final_decisions_html = render_final_decisions_html(report)
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -283,7 +284,9 @@ def render_report_html(report: dict[str, Any]) -> str:
       --gold: #d99b2b;
       --green: #0f8b62;
       --rose: #b54708;
-      font-family: "Avenir Next", "Gill Sans", ui-sans-serif, system-ui, sans-serif;
+      --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", ui-sans-serif, system-ui, sans-serif;
+      --font-display: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "STSong", "SimSun", ui-serif, serif;
+      font-family: var(--font-sans);
     }}
     * {{ box-sizing: border-box; }}
     body {{
@@ -321,8 +324,9 @@ def render_report_html(report: dict[str, Any]) -> str:
       gap: 10px;
       color: var(--ink);
       text-decoration: none;
-      font-weight: 900;
-      letter-spacing: -.02em;
+      font-size: .98rem;
+      font-weight: 800;
+      letter-spacing: -.01em;
     }}
     .brand-link .site-mark {{ width: 38px; height: 38px; margin: 0; }}
     .topbar-actions {{ display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }}
@@ -336,7 +340,8 @@ def render_report_html(report: dict[str, Any]) -> str:
       background: rgba(255,255,255,.72);
       color: var(--ink);
       text-decoration: none;
-      font-weight: 800;
+      font-size: .92rem;
+      font-weight: 750;
       box-shadow: 0 10px 24px rgba(31,45,61,.06);
     }}
     .report-hero {{
@@ -347,7 +352,7 @@ def render_report_html(report: dict[str, Any]) -> str:
       gap: 22px;
       align-items: stretch;
       margin-bottom: 22px;
-      padding: clamp(24px, 4vw, 40px);
+      padding: clamp(22px, 3.2vw, 34px);
       border: 1px solid rgba(30,77,216,.16);
       border-radius: 32px;
       background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(255,250,240,.78));
@@ -371,9 +376,9 @@ def render_report_html(report: dict[str, Any]) -> str:
     .site-mark .mark-line {{ fill: none; stroke: var(--cyan); stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }}
     .site-mark circle {{ fill: var(--paper); }}
     .site-mark .mark-ring {{ fill: none; stroke: var(--paper); stroke-width: 3.2; stroke-linecap: round; opacity: .88; }}
-    .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }}
-    h1 {{ margin: 0 auto; max-width: 860px; font-family: "Iowan Old Style", Georgia, ui-serif, serif; font-size: clamp(2.25rem, 6vw, 4.9rem); line-height: .98; letter-spacing: -.07em; }}
-    .report-lead {{ margin: 18px auto 0; max-width: 720px; color: var(--muted); font-size: 1.05rem; line-height: 1.75; }}
+    .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-size: .72rem; font-weight: 850; letter-spacing: .18em; text-transform: uppercase; }}
+    h1 {{ margin: 0 auto; max-width: 760px; font-family: var(--font-display); font-size: clamp(1.95rem, 4vw, 3.2rem); font-weight: 700; line-height: 1.1; letter-spacing: -.035em; }}
+    .report-lead {{ margin: 16px auto 0; max-width: 720px; color: var(--muted); font-size: .98rem; line-height: 1.75; }}
     .date-card {{
       position: relative;
       z-index: 1;
@@ -387,9 +392,9 @@ def render_report_html(report: dict[str, Any]) -> str:
       backdrop-filter: blur(10px);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
     }}
-    .date-card .date-label {{ margin: 0; color: var(--muted); font-size: .86rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }}
-    .date-card .date-value {{ margin: 8px 0 16px; font-size: clamp(1.85rem, 2.7vw, 2.35rem); line-height: .95; font-weight: 900; letter-spacing: -.06em; white-space: nowrap; }}
-    .date-card .cadence-value {{ margin: 0; display: inline-flex; width: fit-content; padding: 7px 11px; border-radius: 999px; border: 1px solid rgba(30,77,216,.22); background: #fff; font-weight: 900; }}
+    .date-card .date-label {{ margin: 0; color: var(--muted); font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }}
+    .date-card .date-value {{ margin: 8px 0 16px; font-size: clamp(1.55rem, 2.2vw, 2rem); line-height: 1; font-weight: 850; letter-spacing: -.04em; white-space: nowrap; }}
+    .date-card .cadence-value {{ margin: 0; display: inline-flex; width: fit-content; padding: 7px 11px; border-radius: 999px; border: 1px solid rgba(30,77,216,.22); background: #fff; font-size: .92rem; font-weight: 800; }}
     .final-decisions {{ margin-top: 22px; }}
     .horizon-columns {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }}
     .horizon-column {{
@@ -407,8 +412,8 @@ def render_report_html(report: dict[str, Any]) -> str:
     .horizon-medium::before {{ background: var(--blue); }}
     .horizon-short::before {{ background: var(--gold); }}
     .horizon-column-header {{ text-align: center; padding: 12px 8px 16px; }}
-    .horizon-column-header h2 {{ margin: 0; font-size: 1.55rem; letter-spacing: -.04em; }}
-    .horizon-column-header p {{ margin: 5px 0 0; color: var(--muted); font-size: .94rem; }}
+    .horizon-column-header h2 {{ margin: 0; font-size: 1.34rem; font-weight: 850; letter-spacing: -.03em; }}
+    .horizon-column-header p {{ margin: 5px 0 0; color: var(--muted); font-size: .88rem; }}
     .horizon-cards {{ display: grid; gap: 13px; }}
     .empty-column {{ margin: 24px 0; color: var(--muted); text-align: center; }}
     .final-card {{
@@ -419,16 +424,16 @@ def render_report_html(report: dict[str, Any]) -> str:
       box-shadow: 0 10px 28px rgba(31,45,61,.075);
     }}
     .final-card header {{ display: flex; align-items: baseline; justify-content: space-between; gap: 10px; border-bottom: 1px solid #edf2f7; padding-bottom: 12px; margin-bottom: 12px; }}
-    .final-card h3 {{ margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.36rem; letter-spacing: -.04em; }}
-    .final-card header p {{ margin: 0; color: var(--muted); text-align: right; font-size: .92rem; }}
+    .final-card h3 {{ margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.18rem; font-weight: 850; letter-spacing: -.03em; }}
+    .final-card header p {{ margin: 0; color: var(--muted); text-align: right; font-size: .86rem; }}
     .final-card .rank {{ display: inline-flex; align-items: center; justify-content: center; min-width: 38px; min-height: 26px; padding: 0 8px; border-radius: 999px; background: #eef4ff; color: var(--blue); font-weight: 900; font-size: .86rem; }}
-    .final-card p {{ margin: 12px 0 0; line-height: 1.65; color: #334155; }}
+    .final-card p {{ margin: 12px 0 0; font-size: .95rem; line-height: 1.68; color: #334155; }}
     .final-card strong {{ color: var(--ink); }}
     dl {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 9px; margin: 0 0 12px; }}
     dl div {{ border: 1px solid #e5edf6; border-radius: 15px; padding: 10px; background: #fbfdff; }}
-    dt {{ color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; }}
-    dd {{ margin: 4px 0 0; font-weight: 900; }}
-    ul {{ margin: 8px 0 0; padding-left: 1.15rem; color: #334155; line-height: 1.58; }}
+    dt {{ color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; }}
+    dd {{ margin: 4px 0 0; font-size: .95rem; font-weight: 800; }}
+    ul {{ margin: 8px 0 0; padding-left: 1.15rem; color: #334155; font-size: .95rem; line-height: 1.6; }}
     li {{ margin: 5px 0; }}
     table {{ width: 100%; border-collapse: collapse; background: #fff; }}
     th, td {{ text-align: left; border-bottom: 1px solid #eaeef2; padding: 8px; vertical-align: top; }}
@@ -465,7 +470,7 @@ def render_report_html(report: dict[str, Any]) -> str:
       <div class="report-hero-copy">
         {render_site_mark()}
         <p class="eyebrow">Advisory briefing</p>
-        <h1>{html.escape(title)}</h1>
+        <h1>{html.escape(display_title)}</h1>
         <p class="report-lead">按长线、中线、短线分栏展示系统结论；每张卡片保留股票背景、推荐理由、多源依据和主要风险。</p>
       </div>
       <aside class="date-card" aria-label="报告日期">
@@ -571,7 +576,9 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
       --cyan: #00a6c8;
       --gold: #d99b2b;
       --green: #0f8b62;
-      font-family: "Avenir Next", "Gill Sans", ui-sans-serif, system-ui, sans-serif;
+      --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", ui-sans-serif, system-ui, sans-serif;
+      --font-display: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "STSong", "SimSun", ui-serif, serif;
+      font-family: var(--font-sans);
     }}
     * {{ box-sizing: border-box; }}
     body {{
@@ -603,39 +610,39 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     .site-mark .mark-line {{ fill: none; stroke: var(--cyan); stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }}
     .site-mark circle {{ fill: var(--paper); }}
     .site-mark .mark-ring {{ fill: none; stroke: var(--paper); stroke-width: 3.2; stroke-linecap: round; opacity: .88; }}
-    .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }}
-    h1 {{ margin: 0; max-width: 780px; font-family: "Iowan Old Style", Georgia, ui-serif, serif; font-size: clamp(2.55rem, 7vw, 5.7rem); line-height: .92; letter-spacing: -.07em; }}
-    .hero p {{ margin: 18px 0 0; max-width: 680px; color: var(--muted); font-size: 1.06rem; line-height: 1.7; }}
+    .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-size: .72rem; font-weight: 850; letter-spacing: .18em; text-transform: uppercase; }}
+    h1 {{ margin: 0; max-width: 780px; font-family: var(--font-display); font-size: clamp(2.15rem, 5vw, 4.05rem); font-weight: 700; line-height: 1.06; letter-spacing: -.045em; }}
+    .hero p {{ margin: 16px 0 0; max-width: 680px; color: var(--muted); font-size: 1rem; line-height: 1.7; }}
     .rss-card {{ justify-self: end; min-width: 170px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.66); box-shadow: 0 18px 45px rgba(31,45,61,.08); }}
     .rss-card a {{ color: var(--ink); text-decoration: none; font-weight: 800; }}
     .rss-card span {{ display: block; color: var(--muted); margin-top: 5px; font-size: .88rem; }}
     .latest-panel {{ position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr); gap: 22px; border: 1px solid rgba(30,77,216,.16); border-radius: 30px; padding: 26px; background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(255,250,240,.76)); box-shadow: 0 26px 70px rgba(31,45,61,.13); }}
     .latest-panel::after {{ content: ""; position: absolute; right: -80px; top: -110px; width: 260px; height: 260px; border-radius: 999px; background: rgba(0,166,200,.16); filter: blur(2px); }}
     .latest-copy {{ position: relative; z-index: 1; }}
-    h2 {{ margin: 0; font-size: clamp(1.7rem, 3vw, 2.55rem); letter-spacing: -.04em; }}
+    h2 {{ margin: 0; font-size: clamp(1.5rem, 2.45vw, 2.12rem); font-weight: 850; letter-spacing: -.035em; }}
     .lead {{ color: var(--muted); line-height: 1.7; max-width: 620px; }}
     .theme-line {{ display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 14px; color: var(--ink); }}
     .theme-line span {{ color: var(--blue); font-weight: 800; }}
     .symbol-strip {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
     .hero-symbols {{ margin-bottom: 20px; }}
-    .symbol-tag {{ display: inline-flex; align-items: center; min-height: 30px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(30,77,216,.22); background: #fff; color: var(--ink); font-weight: 800; box-shadow: 0 6px 16px rgba(31,45,61,.06); }}
+    .symbol-tag {{ display: inline-flex; align-items: center; min-height: 30px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(30,77,216,.22); background: #fff; color: var(--ink); font-size: .94rem; font-weight: 800; box-shadow: 0 6px 16px rgba(31,45,61,.06); }}
     .symbol-tag.empty {{ color: var(--muted); font-weight: 700; }}
     .primary-action {{ display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--ink); color: #fff; text-decoration: none; font-weight: 900; box-shadow: 0 12px 24px rgba(23,32,51,.22); }}
     .primary-action:hover {{ transform: translateY(-1px); }}
     .snapshot-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-self: stretch; position: relative; z-index: 1; }}
     .snapshot-column {{ padding: 16px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.72); backdrop-filter: blur(10px); min-height: 168px; }}
-    .snapshot-label {{ margin: 0; font-size: 1.28rem; font-weight: 900; letter-spacing: -.03em; }}
+    .snapshot-label {{ margin: 0; font-size: 1.12rem; font-weight: 850; letter-spacing: -.025em; }}
     .snapshot-window {{ margin: 4px 0 14px; color: var(--muted); font-size: .9rem; }}
     .snapshot-long {{ border-top: 4px solid var(--green); }}
     .snapshot-medium {{ border-top: 4px solid var(--blue); }}
     .snapshot-short {{ border-top: 4px solid var(--gold); }}
     .horizon-link {{ color: inherit; text-decoration: none; }}
     .section-title {{ display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 34px 0 14px; }}
-    .section-title h2 {{ font-size: 1.45rem; }}
+    .section-title h2 {{ font-size: 1.28rem; }}
     .section-title p {{ margin: 0; color: var(--muted); }}
     .archive-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }}
     .archive-card {{ border: 1px solid var(--line); border-radius: 24px; padding: 18px; background: var(--panel); box-shadow: 0 12px 34px rgba(31,45,61,.08); }}
-    .archive-title {{ color: var(--ink); font-size: 1.08rem; font-weight: 900; text-decoration: none; }}
+    .archive-title {{ color: var(--ink); font-size: 1rem; font-weight: 850; text-decoration: none; }}
     .archive-card p {{ margin: 10px 0; color: var(--muted); line-height: 1.55; }}
     .archive-symbols {{ margin: 0 0 14px; }}
     .archive-card .snapshot-grid {{ grid-template-columns: 1fr; gap: 8px; }}

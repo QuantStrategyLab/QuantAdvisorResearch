@@ -28,6 +28,10 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     assert "report-shell" in html
     assert "report-hero" in html
     assert "topbar" in html
+    assert "--font-sans" in html
+    assert "--font-display" in html
+    assert "PingFang SC" in html
+    assert "Songti SC" in html
     assert "返回首页" in html
     assert "RSS 订阅" in html
     assert "Report date" in html
@@ -87,6 +91,8 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "<svg" in favicon
     assert "#172033" in favicon
     assert "Latest advisory" in index_html
+    assert "--font-sans" in index_html
+    assert "--font-display" in index_html
     assert "latest-panel" in index_html
     assert "snapshot-grid" in index_html
     assert "<p class=\"snapshot-label\">长线</p>" in index_html
