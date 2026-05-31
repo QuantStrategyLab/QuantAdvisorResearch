@@ -100,7 +100,7 @@ def render_final_decisions_html(report: dict[str, Any]) -> str:
                 <div><dt>综合分</dt><dd>{html.escape(display_number(pick.get('combined_score')))}</dd></div>
                 <div><dt>政策/新闻</dt><dd>{html.escape(display_number(pick.get('source_score')))}</dd></div>
                 <div><dt>动量</dt><dd>{html.escape(display_number(pick.get('momentum_score')))}</dd></div>
-                <div><dt>中线主题</dt><dd>{html.escape(display_number(pick.get('medium_context_score', pick.get('ai_signal_score'))))}</dd></div>
+                <div><dt>主题/背景</dt><dd>{html.escape(display_number(pick.get('medium_context_score', pick.get('ai_signal_score'))))}</dd></div>
               </dl>
               <p><strong>股票背景：</strong>{html.escape(str(pick.get('business_summary', '')))}</p>
               <p><strong>推荐理由：</strong>{html.escape(str(pick.get('prospect_summary', '')))}</p>

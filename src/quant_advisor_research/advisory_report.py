@@ -1253,6 +1253,8 @@ def build_final_decisions(
         if medium_context_score >= 0.35:
             labels = ", ".join(theme.get("theme_labels", [])[:3]) or str(theme.get("primary_theme_label", ""))
             reasons.append(f"中线主题上下文：{labels}。")
+        if market_score is not None and as_float(market_score) >= 0.35:
+            reasons.append(f"市场确认：相对强度、近期走势和成交量确认分数={display_number(market_score)}。")
         if long_context_score >= 0.35 and rec:
             bias = rec.get("ai_context", {}).get("bias", "")
             reasons.append(f"长线AI背景：{bias or '已读取'}。")
