@@ -62,10 +62,10 @@ def return_between(start: PriceBar, end: PriceBar) -> float:
 
 
 def outcome_label(relative_return: float | None, *, elapsed_days: int, has_price_data: bool) -> str:
-    if not has_price_data:
-        return "insufficient_price_data"
     if elapsed_days <= 0:
         return "pending"
+    if not has_price_data:
+        return "insufficient_price_data"
     if relative_return is None:
         return "insufficient_price_data"
     if relative_return >= 0.02:

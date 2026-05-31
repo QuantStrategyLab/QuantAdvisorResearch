@@ -68,3 +68,21 @@ def test_recommendation_review_calculates_forward_relative_return_from_cache(tmp
     assert review["summary"]["evaluated_count"] == 1
     assert review["summary"]["top_outperformers"] == ["MU"]
     assert "MU" in render_recommendation_review_markdown(review)
+
+
+def test_recommendation_review_marks_same_day_report_as_pending(tmp_path: Path) -> None:
+    report_path = tmp_path / "advisory_report_2026-01-05.json"
+    write_report(report_path)
+
+    review = build_recommendation_review(
+        report_paths=[report_path],
+        as_of=dt.date(2026, 1, 5),
+        benchmark="SPY",
+        cache_dir=tmp_path / "missing-cache",
+        cache_max_age_days=14,
+        use_network=False,
+    )
+
+    assert review["review_items"][0]["outcome"] == "pending"
+    assert review["summary"]["pending_count"] == 1
+    assert review["summary"]["insufficient_price_data_count"] == 0
