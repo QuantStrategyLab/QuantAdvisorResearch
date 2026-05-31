@@ -31,6 +31,8 @@ DEFAULT_OUTPUT_FIELDS = [
     "market_score",
     "data_source",
     "price_observation_count",
+    "price_age_days",
+    "confirmation_quality",
     "warnings",
 ]
 
@@ -72,6 +74,8 @@ class MarketConfirmationRow:
     market_score: float
     data_source: str
     price_observation_count: int
+    price_age_days: int = 0
+    confirmation_quality: str = "price_observed"
     warnings: str = ""
 
     def as_csv_row(self) -> dict[str, str]:
@@ -89,6 +93,8 @@ class MarketConfirmationRow:
             "market_score": format_float(self.market_score),
             "data_source": self.data_source,
             "price_observation_count": str(self.price_observation_count),
+            "price_age_days": str(self.price_age_days),
+            "confirmation_quality": self.confirmation_quality,
             "warnings": self.warnings,
         }
 
@@ -190,6 +196,7 @@ def compute_market_confirmation(
     benchmark_bars: list[PriceBar],
     *,
     data_source: str,
+    requested_as_of: dt.date | None = None,
     warning: str = "",
 ) -> MarketConfirmationRow | None:
     bars = sorted((bar for bar in bars if bar.close > 0), key=lambda bar: bar.date)
@@ -215,6 +222,8 @@ def compute_market_confirmation(
         drawdown_63d=drawdown_63d,
         volatility_21d=volatility_21d,
     )
+    price_age_days = max(((requested_as_of or bars[-1].date) - bars[-1].date).days, 0)
+    confirmation_quality = "price_observed" if price_age_days <= 7 else "stale_price"
     return MarketConfirmationRow(
         symbol=symbol.upper(),
         as_of=bars[-1].date,
@@ -229,6 +238,8 @@ def compute_market_confirmation(
         market_score=market_score,
         data_source=data_source,
         price_observation_count=len(bars),
+        price_age_days=price_age_days,
+        confirmation_quality=confirmation_quality,
         warnings=warning,
     )
 
@@ -446,6 +457,8 @@ def fallback_rows_from_theme_momentum(
             market_score=market_score,
             data_source="theme_momentum_fallback",
             price_observation_count=0,
+            price_age_days=max((as_of - fallback_as_of).days, 0),
+            confirmation_quality="fallback_only",
             warnings="price_api_unavailable_or_not_requested",
         )
     return rows
@@ -516,6 +529,7 @@ def build_market_confirmation_rows(
                     bars,
                     benchmark_bars,
                     data_source=data_source,
+                    requested_as_of=as_of,
                     warning="" if len(benchmark_bars) >= 22 else "benchmark_unavailable",
                 )
                 if row:

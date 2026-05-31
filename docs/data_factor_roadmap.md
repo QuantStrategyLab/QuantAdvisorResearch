@@ -90,17 +90,21 @@ Priority order:
    source registry coverage.
 3. Add optional market confirmation CSVs while keeping report generation working
    when the data is absent. The CSV now carries point-in-time returns, relative
-   returns, abnormal volume, drawdown, volatility, `market_score`, source, row
-   count, and warnings. `scripts/build_market_confirmation.py` generates it from
-   watchlists, saved signal context, and theme momentum snapshots; if the free
-   price endpoint is unavailable, it can retry through `--proxy-urls`,
+   returns, abnormal volume, drawdown, volatility, `market_score`,
+   `price_age_days`, `confirmation_quality`, source, row count, and warnings.
+   `scripts/build_market_confirmation.py` generates it from watchlists, saved
+   signal context, and theme momentum snapshots; if the free price endpoint is
+   unavailable, it can retry through `--proxy-urls`,
    `--proxy-list`, `--proxy-pool-url`, or the workflow variables
    `MARKET_DATA_PROXY_URLS` / `MARKET_DATA_PROXY_POOL_URL` before falling back to
    saved theme momentum fields.
    It must not contain target weights or trade instructions.
-4. Add event review inputs for 1/5/20/60 trading-day follow-up.
-5. Add fundamentals/valuation snapshots for risk explanation, not execution.
-6. Only then consider read-only references from existing snapshot repositories.
+4. Keep the cross-repository contract tested with a no-network smoke run before
+   treating workflow success as healthy. The smoke should build report/site
+   artifacts from the three live repositories and upload artifacts for inspection.
+5. Add event review inputs for 1/5/20/60 trading-day follow-up.
+6. Add fundamentals/valuation snapshots for risk explanation, not execution.
+7. Only then consider read-only references from existing snapshot repositories.
 
 ## Anti-Overfitting Rules
 

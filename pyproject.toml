@@ -16,7 +16,10 @@ test = ["pytest>=8"]
 
 [project.scripts]
 qar-build-advisory-report = "quant_advisor_research.advisory_report:main"
+qar-build-advisory-artifacts = "quant_advisor_research.build_pipeline:main"
 qar-build-market-confirmation = "quant_advisor_research.market_confirmation:main"
+qar-backfill-site-archive = "quant_advisor_research.archive_backfill:main"
+qar-run-cross-repo-smoke = "quant_advisor_research.cross_repo_smoke:main"
 qar-publish-advisory-site = "quant_advisor_research.publisher:main"
 
 [tool.setuptools]

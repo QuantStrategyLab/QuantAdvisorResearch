@@ -76,6 +76,28 @@ there, not in this repository.
 
 ## Local Example
 
+Build the full artifact set the same way GitHub Actions does:
+
+```bash
+python scripts/build_advisory_artifacts.py \
+  --as-of 2026-05-30 \
+  --cadence weekly \
+  --political-events examples/political_events.example.csv \
+  --political-watchlist examples/political_watchlist.example.csv \
+  --ai-signal examples/research_signal_context.example.json \
+  --theme-momentum examples/theme_momentum_snapshot.example.json \
+  --market-no-network \
+  --output-dir data/output/weekly_advisory_review \
+  --site-output-dir site
+```
+
+This single command can generate market confirmation, the advisory JSON/Markdown,
+manifest, optional monthly review, and optional static site output. The weekly,
+monthly, and Pages workflows all use this shared build path so report generation
+does not drift between publication modes.
+
+The lower-level report builder is still available for focused debugging:
+
 ```bash
 python scripts/build_advisory_report.py \
   --as-of 2026-05-30 \
@@ -170,6 +192,30 @@ Notification channel rules are documented in
 [`docs/notification_format.md`](docs/notification_format.md) and
 [`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md).
 
+Backfill a local static archive from downloaded workflow artifacts:
+
+```bash
+python scripts/backfill_site_archive.py \
+  --artifact-root path/to/downloaded/actions/artifacts \
+  --output-dir site \
+  --site-url https://quantstrategylab.github.io/QuantAdvisorResearch
+```
+
+Run a deterministic cross-repository smoke test without live price downloads:
+
+```bash
+python scripts/run_cross_repo_smoke.py \
+  --as-of 2026-05-30 \
+  --political-events ../PoliticalEventTrackingResearch/data/live/political_events.csv \
+  --political-watchlist ../PoliticalEventTrackingResearch/data/live/political_watchlist.csv \
+  --ai-signal ../ResearchSignalContextPipelines/data/output/latest_signal.json \
+  --theme-momentum ../ResearchSignalContextPipelines/data/output/theme_momentum_snapshot.json \
+  --work-dir data/output/cross_repo_smoke
+```
+
+`.github/workflows/cross_repo_smoke.yml` runs the same no-network smoke on a
+weekly schedule and uploads the generated report/site artifacts for inspection.
+
 ## Market Confirmation
 
 `scripts/build_market_confirmation.py` collects symbols from the watchlist,
@@ -187,7 +233,8 @@ python scripts/build_market_confirmation.py \
 
 The generated columns include `return_5d`, `return_20d`, `return_63d`,
 relative returns versus SPY, volume z-score, 63-day drawdown, 21-day annualized
-volatility, and `market_score`. The weekly/monthly/publish workflows generate
+volatility, `market_score`, `price_age_days`, `confirmation_quality`, data
+source, row count, and warnings. The weekly/monthly/publish workflows generate
 this file automatically before building advisory reports.
 
 Optional proxy inputs:

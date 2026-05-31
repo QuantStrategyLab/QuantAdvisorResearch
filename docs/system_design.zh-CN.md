@@ -93,6 +93,29 @@ broker platform repositories
 - `QuantAdvisorResearch`：公开 HTML/JSON/RSS 智慧投顾研究继续周更；
 - 月度复盘单独生成 artifact，用来回顾本月最终推荐和相对上次变化，不替代周度公开推荐。
 
+## 构建与验证链路
+
+Advisor 现在使用一个统一构建入口：
+
+```text
+scripts/build_advisory_artifacts.py
+```
+
+这个命令负责市场确认生成、报告生成、manifest 写入、可选月度复盘、可选静态站点渲染，以及可选的已发布历史报告恢复。weekly、monthly 和 Pages 发布 workflow 都应该调用这个入口，避免在多个 YAML 里复制同一段市场确认和报告构建逻辑。
+
+跨仓库契约用 no-network smoke 命令验证：
+
+```text
+scripts/run_cross_repo_smoke.py
+```
+
+它读取事件仓库的 live event/watchlist，读取信号上下文仓库的 live signal/theme momentum，用主题动量 fallback 生成市场确认，再生成报告和静态页面，并检查长线 / 中线 / 短线输出是否存在。这样可以发现三仓库接口漂移，但不会把投顾研究链路和可回测/可执行策略链路混在一起。
+
+历史报告恢复有两种方式：
+
+- Pages 发布 workflow 会在已有 `reports_index.json` 时恢复已发布报告 JSON；
+- `scripts/backfill_site_archive.py` 可以从本地下载的 GitHub Actions artifact 重新生成静态归档。
+
 ## 跨板块长期主题层
 
 `ResearchSignalContextPipelines` 的主题上下文不应只覆盖 AI。当前设计使用静态、版本化 taxonomy，把 AI、半导体、数据中心电力、网络安全、国防、能源、金融、医疗、消费平台、工业自动化、crypto 和 EV/汽车等板块统一成主题暴露。

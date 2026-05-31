@@ -36,7 +36,13 @@ def test_compute_market_confirmation_uses_relative_strength_volume_drawdown_and_
     ]
     benchmark_bars = make_bars(start, benchmark_prices, base_volume=1000)
 
-    row = compute_market_confirmation("MU", symbol_bars, benchmark_bars, data_source="unit_test")
+    row = compute_market_confirmation(
+        "MU",
+        symbol_bars,
+        benchmark_bars,
+        data_source="unit_test",
+        requested_as_of=dt.date(2026, 3, 15),
+    )
 
     assert row is not None
     assert row.symbol == "MU"
@@ -47,6 +53,8 @@ def test_compute_market_confirmation_uses_relative_strength_volume_drawdown_and_
     assert row.drawdown_63d == 0
     assert 0 <= row.market_score <= 1
     assert row.market_score > 0.5
+    assert row.price_age_days == 4
+    assert row.confirmation_quality == "price_observed"
 
 
 def test_market_confirmation_falls_back_to_theme_momentum_without_network(tmp_path: Path) -> None:
@@ -73,11 +81,14 @@ def test_market_confirmation_falls_back_to_theme_momentum_without_network(tmp_pa
     assert rows[0].data_source == "theme_momentum_fallback"
     assert rows[0].return_63d == 0.42
     assert rows[0].market_score == 0.8
+    assert rows[0].price_age_days == 2
+    assert rows[0].confirmation_quality == "fallback_only"
 
     output = tmp_path / "market_confirmation.csv"
     write_market_confirmation_csv(output, rows)
     text = output.read_text(encoding="utf-8")
     assert "market_score" in text
+    assert "confirmation_quality" in text
     assert "theme_momentum_fallback" in text
 
 

@@ -37,7 +37,24 @@ QuantStrategyLab 的“智慧投顾研究系统”协调仓库。它把事件证
 
 ## 当前 MVP
 
-当前实现一个确定性的智慧投顾研究报告生成器：
+当前实现一个确定性的智慧投顾研究报告生成器。推荐先使用和 GitHub Actions 相同的统一构建入口：
+
+```bash
+python scripts/build_advisory_artifacts.py \
+  --as-of 2026-05-30 \
+  --cadence weekly \
+  --political-events examples/political_events.example.csv \
+  --political-watchlist examples/political_watchlist.example.csv \
+  --ai-signal examples/research_signal_context.example.json \
+  --theme-momentum examples/theme_momentum_snapshot.example.json \
+  --market-no-network \
+  --output-dir data/output/weekly_advisory_review \
+  --site-output-dir site
+```
+
+这个入口可以一次生成市场确认、投顾研究 JSON/Markdown、manifest、可选月度复盘和可选静态站点。weekly、monthly 和 Pages 发布 workflow 都走同一条构建路径，避免不同发布方式里复制逻辑后发生偏移。
+
+底层报告生成器仍保留，适合排查单个报告：
 
 ```bash
 python scripts/build_advisory_report.py \
@@ -178,6 +195,29 @@ gh workflow run "Publish Intelligent Advisory Site" \
 通知格式设计见 [docs/notification_format.zh-CN.md](docs/notification_format.zh-CN.md)。
 数据源和因子完善路线见 [docs/data_factor_roadmap.zh-CN.md](docs/data_factor_roadmap.zh-CN.md)。
 
+如果本地下载了历史 GitHub Actions artifact，可以回填静态归档：
+
+```bash
+python scripts/backfill_site_archive.py \
+  --artifact-root path/to/downloaded/actions/artifacts \
+  --output-dir site \
+  --site-url https://quantstrategylab.github.io/QuantAdvisorResearch
+```
+
+跨仓库 smoke 测试可以在不下载实时行情的情况下验证三仓库 artifact 是否能合成报告和页面：
+
+```bash
+python scripts/run_cross_repo_smoke.py \
+  --as-of 2026-05-30 \
+  --political-events ../PoliticalEventTrackingResearch/data/live/political_events.csv \
+  --political-watchlist ../PoliticalEventTrackingResearch/data/live/political_watchlist.csv \
+  --ai-signal ../ResearchSignalContextPipelines/data/output/latest_signal.json \
+  --theme-momentum ../ResearchSignalContextPipelines/data/output/theme_momentum_snapshot.json \
+  --work-dir data/output/cross_repo_smoke
+```
+
+`.github/workflows/cross_repo_smoke.yml` 会每周运行同样的 no-network smoke，并上传生成的报告和页面 artifact，方便检查三仓库接口有没有变坏。
+
 ## 主题动量展示
 
 `build_advisory_report.py` 支持可选的主题动量快照输入：
@@ -213,7 +253,7 @@ python scripts/build_market_confirmation.py \
   --output data/output/market_confirmation_2026-05-30.csv
 ```
 
-字段包括 `return_5d`、`return_20d`、`return_63d`、相对 SPY 收益、成交量 z-score、63 日回撤、21 日年化波动和 `market_score`。线上 weekly/monthly/publish workflow 会自动生成该文件，再传给报告生成器。
+字段包括 `return_5d`、`return_20d`、`return_63d`、相对 SPY 收益、成交量 z-score、63 日回撤、21 日年化波动、`market_score`、`price_age_days`、`confirmation_quality`、数据源、观测数量和 warnings。线上 weekly/monthly/publish workflow 会自动生成该文件，再传给报告生成器。
 
 可选代理参数：
 

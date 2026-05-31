@@ -1,0 +1,56 @@
+name: Cross-Repository Advisory Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "Smoke date. Defaults to current UTC date when empty."
+        required: false
+        type: string
+  schedule:
+    - cron: "45 11 * * 6"
+
+jobs:
+  cross-repo-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout advisor repository
+        uses: actions/checkout@v6
+        with:
+          path: advisor
+      - name: Checkout political event repository
+        uses: actions/checkout@v6
+        with:
+          repository: QuantStrategyLab/PoliticalEventTrackingResearch
+          path: political-events
+      - name: Checkout signal context repository
+        uses: actions/checkout@v6
+        with:
+          repository: QuantStrategyLab/ResearchSignalContextPipelines
+          path: research-signal-context
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install advisor package
+        working-directory: advisor
+        run: python -m pip install -e .
+      - name: Run deterministic cross-repo smoke
+        working-directory: advisor
+        env:
+          INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
+        run: |
+          set -euo pipefail
+          AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
+          python scripts/run_cross_repo_smoke.py \
+            --as-of "${AS_OF}" \
+            --political-events ../political-events/data/live/political_events.csv \
+            --political-watchlist ../political-events/data/live/political_watchlist.csv \
+            --ai-signal ../research-signal-context/data/output/latest_signal.json \
+            --theme-momentum ../research-signal-context/data/output/theme_momentum_snapshot.json \
+            --work-dir data/output/cross_repo_smoke
+      - name: Upload smoke artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: cross-repo-advisory-smoke
+          path: advisor/data/output/cross_repo_smoke/
+          if-no-files-found: error

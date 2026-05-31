@@ -90,6 +90,39 @@ Recommended cadence:
 - Monthly advisory review: separate artifact for month-end change review; it does
   not replace weekly publication.
 
+## Build and Verification Pipeline
+
+The Advisor repository now uses one shared build command for weekly artifacts,
+monthly artifacts, and Pages publication:
+
+```text
+scripts/build_advisory_artifacts.py
+```
+
+This command owns market-confirmation generation, report generation, manifest
+writing, optional monthly review, optional static-site rendering, and optional
+published-site archive recovery. Workflows should call this command instead of
+duplicating shell logic for each publication mode.
+
+A separate no-network smoke command validates the three-repository contract:
+
+```text
+scripts/run_cross_repo_smoke.py
+```
+
+It reads live event/watchlist artifacts, live signal-context artifacts, builds a
+report with theme-momentum fallback market confirmation, renders the static
+site, and checks that the long/medium/short horizon outputs are present. This
+keeps the advisory pipeline distinct from the backtestable/execution pipeline
+while still catching interface drift across repositories.
+
+Historical report recovery has two modes:
+
+- the publish workflow recovers previously published report JSONs from
+  `reports_index.json` when available;
+- `scripts/backfill_site_archive.py` can rebuild a static archive from downloaded
+  GitHub Actions artifacts.
+
 ## Public Output Boundary
 
 The public HTML/RSS/Telegram outputs should stay direct:

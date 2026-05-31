@@ -98,109 +98,31 @@ jobs:
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
-          mkdir -p data/output/published site
-          THEME_ARGS=()
-          RESOLVED_THEME_MOMENTUM=""
-          if [ -n "${THEME_MOMENTUM_PATH}" ] && [ -f "../research-signal-context/${THEME_MOMENTUM_PATH}" ]; then
-            RESOLVED_THEME_MOMENTUM="../research-signal-context/${THEME_MOMENTUM_PATH}"
-            THEME_ARGS=(--theme-momentum "${RESOLVED_THEME_MOMENTUM}")
-          fi
-          MARKET_ARGS=()
-          if [ -n "${MARKET_CONFIRMATION_PATH}" ] && [ -f "${MARKET_CONFIRMATION_PATH}" ]; then
-            MARKET_ARGS=(--market-confirmation "${MARKET_CONFIRMATION_PATH}")
-          else
-            GENERATED_MARKET_CONFIRMATION="data/output/published/market_confirmation_${AS_OF}.csv"
-            MARKET_BUILD_ARGS=(
-              --as-of "${AS_OF}"
-              --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}"
-              --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}"
-              --output "${GENERATED_MARKET_CONFIRMATION}"
-            )
-            if [ -n "${RESOLVED_THEME_MOMENTUM}" ]; then
-              MARKET_BUILD_ARGS+=(--theme-momentum "${RESOLVED_THEME_MOMENTUM}")
-            fi
-            if [ -n "${MARKET_DATA_PROXY_URLS}" ]; then
-              MARKET_BUILD_ARGS+=(--proxy-urls "${MARKET_DATA_PROXY_URLS}")
-            fi
-            if [ -n "${MARKET_DATA_PROXY_POOL_URL}" ]; then
-              MARKET_BUILD_ARGS+=(--proxy-pool-url "${MARKET_DATA_PROXY_POOL_URL}")
-            fi
-            python scripts/build_market_confirmation.py "${MARKET_BUILD_ARGS[@]}"
-            MARKET_ARGS=(--market-confirmation "${GENERATED_MARKET_CONFIRMATION}")
-          fi
-          python scripts/build_advisory_report.py \
-            --as-of "${AS_OF}" \
-            --cadence weekly \
-            --political-events "../political-events/${POLITICAL_EVENTS_PATH}" \
-            --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}" \
-            --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}" \
-            "${THEME_ARGS[@]}" \
-            "${MARKET_ARGS[@]}" \
-            --output-json "data/output/published/advisory_report_${AS_OF}.json" \
-            --output-md "data/output/published/advisory_report_${AS_OF}.md"
-
-          REPORT_ARGS=("data/output/published/advisory_report_${AS_OF}.json")
-          HISTORY_DIR="data/output/published/history"
-          mkdir -p "${HISTORY_DIR}"
-          HISTORY_INDEX="${HISTORY_DIR}/reports_index.json"
-          if curl -fsL "${SITE_URL%/}/reports_index.json" -o "${HISTORY_INDEX}"; then
-            python - "${SITE_URL}" "${HISTORY_INDEX}" "${HISTORY_DIR}" "${AS_OF}" <<'PY'
-          import json
-          import re
-          import sys
-          import urllib.parse
-          import urllib.request
-          from pathlib import Path
-
-          site_url, index_path, history_dir, current_as_of = sys.argv[1:]
-          history_dir_path = Path(history_dir)
-          index = json.loads(Path(index_path).read_text(encoding="utf-8"))
-          paths = []
-          seen_as_of = {current_as_of}
-          for item in index.get("reports", []):
-              as_of = str(item.get("as_of", "")).strip()
-              json_name = Path(str(item.get("json", ""))).name
-              if not as_of or as_of in seen_as_of:
-                  continue
-              if not re.fullmatch(r"advisory_report_\d{4}-\d{2}-\d{2}\.json", json_name):
-                  continue
-              seen_as_of.add(as_of)
-              url = f"{site_url.rstrip('/')}/{urllib.parse.quote(json_name)}"
-              destination = history_dir_path / json_name
-              try:
-                  urllib.request.urlretrieve(url, destination)
-                  payload = json.loads(destination.read_text(encoding="utf-8"))
-              except Exception as exc:  # noqa: BLE001 - best-effort public archive recovery
-                  print(f"Skipped historical report {json_name}: {exc}")
-                  continue
-              if str(payload.get("as_of", "")) != as_of:
-                  print(f"Skipped historical report {json_name}: as_of mismatch")
-                  continue
-              paths.append(str(destination))
-
-          (history_dir_path / "report_paths.txt").write_text("\n".join(paths), encoding="utf-8")
-          print(f"Recovered {len(paths)} historical reports from published site.")
-          PY
-            if [ -s "${HISTORY_DIR}/report_paths.txt" ]; then
-              mapfile -t HISTORY_REPORTS < "${HISTORY_DIR}/report_paths.txt"
-              REPORT_ARGS+=("${HISTORY_REPORTS[@]}")
-            fi
-          else
-            echo "No existing reports_index.json found on published site; starting archive with current report."
-          fi
-
-          python scripts/publish_advisory_site.py \
-            --reports "${REPORT_ARGS[@]}" \
-            --output-dir site \
-            --site-url "${SITE_URL}" \
+          ARGS=(
+            --as-of "${AS_OF}"
+            --cadence weekly
+            --political-events "../political-events/${POLITICAL_EVENTS_PATH}"
+            --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}"
+            --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}"
+            --output-dir data/output/published
+            --site-output-dir site
+            --site-url "${SITE_URL}"
             --feed-title "智慧投顾研究系统"
-          for REPORT_JSON in "${REPORT_ARGS[@]}"; do
-            cp "${REPORT_JSON}" site/
-          done
-          cp "data/output/published/advisory_report_${AS_OF}.md" site/
-          cp "data/output/published/advisory_report_${AS_OF}.json.manifest.json" site/
-          echo "as_of=${AS_OF}" >> "$GITHUB_OUTPUT"
-          echo "report_path=data/output/published/advisory_report_${AS_OF}.json" >> "$GITHUB_OUTPUT"
+            --recover-site-archive
+          )
+          if [ -n "${THEME_MOMENTUM_PATH}" ]; then
+            ARGS+=(--theme-momentum "../research-signal-context/${THEME_MOMENTUM_PATH}")
+          fi
+          if [ -n "${MARKET_CONFIRMATION_PATH}" ]; then
+            ARGS+=(--market-confirmation "${MARKET_CONFIRMATION_PATH}")
+          fi
+          if [ -n "${MARKET_DATA_PROXY_URLS}" ]; then
+            ARGS+=(--market-proxy-urls "${MARKET_DATA_PROXY_URLS}")
+          fi
+          if [ -n "${MARKET_DATA_PROXY_POOL_URL}" ]; then
+            ARGS+=(--market-proxy-pool-url "${MARKET_DATA_PROXY_POOL_URL}")
+          fi
+          python scripts/build_advisory_artifacts.py "${ARGS[@]}"
       - name: Upload site artifact
         uses: actions/upload-artifact@v7
         with:

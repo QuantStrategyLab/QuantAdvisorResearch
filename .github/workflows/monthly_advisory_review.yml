@@ -89,55 +89,31 @@ jobs:
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
-          mkdir -p data/output/monthly_advisory_review
-          THEME_ARGS=()
-          RESOLVED_THEME_MOMENTUM=""
-          if [ -n "${THEME_MOMENTUM_PATH}" ] && [ -f "../research-signal-context/${THEME_MOMENTUM_PATH}" ]; then
-            RESOLVED_THEME_MOMENTUM="../research-signal-context/${THEME_MOMENTUM_PATH}"
-            THEME_ARGS=(--theme-momentum "${RESOLVED_THEME_MOMENTUM}")
-          fi
-          MARKET_ARGS=()
-          if [ -n "${MARKET_CONFIRMATION_PATH}" ] && [ -f "${MARKET_CONFIRMATION_PATH}" ]; then
-            MARKET_ARGS=(--market-confirmation "${MARKET_CONFIRMATION_PATH}")
-          else
-            GENERATED_MARKET_CONFIRMATION="data/output/monthly_advisory_review/market_confirmation_${AS_OF}.csv"
-            MARKET_BUILD_ARGS=(
-              --as-of "${AS_OF}"
-              --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}"
-              --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}"
-              --output "${GENERATED_MARKET_CONFIRMATION}"
-            )
-            if [ -n "${RESOLVED_THEME_MOMENTUM}" ]; then
-              MARKET_BUILD_ARGS+=(--theme-momentum "${RESOLVED_THEME_MOMENTUM}")
-            fi
-            if [ -n "${MARKET_DATA_PROXY_URLS}" ]; then
-              MARKET_BUILD_ARGS+=(--proxy-urls "${MARKET_DATA_PROXY_URLS}")
-            fi
-            if [ -n "${MARKET_DATA_PROXY_POOL_URL}" ]; then
-              MARKET_BUILD_ARGS+=(--proxy-pool-url "${MARKET_DATA_PROXY_POOL_URL}")
-            fi
-            python scripts/build_market_confirmation.py "${MARKET_BUILD_ARGS[@]}"
-            MARKET_ARGS=(--market-confirmation "${GENERATED_MARKET_CONFIRMATION}")
-          fi
-          python scripts/build_advisory_report.py \
-            --as-of "${AS_OF}" \
-            --cadence monthly \
-            --political-events "../political-events/${POLITICAL_EVENTS_PATH}" \
-            --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}" \
-            --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}" \
-            "${THEME_ARGS[@]}" \
-            "${MARKET_ARGS[@]}" \
-            --output-json "data/output/monthly_advisory_review/advisory_report_${AS_OF}.json" \
-            --output-md "data/output/monthly_advisory_review/advisory_report_${AS_OF}.md"
-          REVIEW_ARGS=(
-            --current-report "data/output/monthly_advisory_review/advisory_report_${AS_OF}.json"
-            --output-json "data/output/monthly_advisory_review/monthly_review_${AS_OF}.json"
-            --output-md "data/output/monthly_advisory_review/monthly_review_${AS_OF}.md"
+          ARGS=(
+            --as-of "${AS_OF}"
+            --cadence monthly
+            --political-events "../political-events/${POLITICAL_EVENTS_PATH}"
+            --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}"
+            --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}"
+            --output-dir data/output/monthly_advisory_review
+            --monthly-review
           )
-          if [ -n "${PREVIOUS_REPORT_PATH}" ] && [ -f "${PREVIOUS_REPORT_PATH}" ]; then
-            REVIEW_ARGS+=(--previous-report "${PREVIOUS_REPORT_PATH}")
+          if [ -n "${THEME_MOMENTUM_PATH}" ]; then
+            ARGS+=(--theme-momentum "../research-signal-context/${THEME_MOMENTUM_PATH}")
           fi
-          python scripts/build_monthly_review.py "${REVIEW_ARGS[@]}"
+          if [ -n "${MARKET_CONFIRMATION_PATH}" ]; then
+            ARGS+=(--market-confirmation "${MARKET_CONFIRMATION_PATH}")
+          fi
+          if [ -n "${PREVIOUS_REPORT_PATH}" ]; then
+            ARGS+=(--previous-report "${PREVIOUS_REPORT_PATH}")
+          fi
+          if [ -n "${MARKET_DATA_PROXY_URLS}" ]; then
+            ARGS+=(--market-proxy-urls "${MARKET_DATA_PROXY_URLS}")
+          fi
+          if [ -n "${MARKET_DATA_PROXY_POOL_URL}" ]; then
+            ARGS+=(--market-proxy-pool-url "${MARKET_DATA_PROXY_POOL_URL}")
+          fi
+          python scripts/build_advisory_artifacts.py "${ARGS[@]}"
       - name: Upload monthly review artifact
         uses: actions/upload-artifact@v7
         with:
