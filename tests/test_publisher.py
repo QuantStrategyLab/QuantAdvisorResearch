@@ -42,6 +42,12 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     assert "股票背景" in html
     assert "推荐理由" in html
     assert "主要风险" in html
+    assert "按长线、中线、短线分栏展示系统结论" not in html
+    assert "本期结论：" in html
+    assert "长线：暂无稳定结论" in html
+    assert "中线：MU、NVDA" in html
+    assert "短线：暂无稳定结论" in html
+    assert "动量因子主要集中在科技板块" in html
     assert "<span class=\"pill\">模式：" not in html
     assert "受众：" not in html
     assert "AI 状态：" not in html
@@ -219,6 +225,7 @@ def test_render_report_html_renders_long_context_as_full_card_when_primary_bucke
     assert "长线 / 1-3年" in html
     assert "MU background" in html
     assert "MU reason" in html
+    assert "本期结论：长线：MU；中线：MU；短线：暂无稳定结论。" in html
     assert "最终推荐" not in html
 
 
@@ -285,6 +292,12 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "股票背景" in html
     assert "推荐理由" in html
     assert "主要风险" in html
+    assert "按长线、中线、短线分栏展示系统结论" not in html
+    assert "本期结论：" in html
+    assert "长线：暂无稳定结论" in html
+    assert "中线：MU、NVDA" in html
+    assert "短线：暂无稳定结论" in html
+    assert "动量因子主要集中在科技板块" in html
     assert "存储周期" in html
     assert "需复核估值、财报、回撤和流动性" not in html
     assert "做什么" not in html

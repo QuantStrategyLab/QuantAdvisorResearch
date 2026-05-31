@@ -173,6 +173,85 @@ def render_final_card(pick: dict[str, Any], *, rank: int, horizon: str) -> str:
     """
 
 
+def join_zh_items(items: list[str], *, limit: int = 5, empty: str = "暂无") -> str:
+    cleaned = []
+    seen = set()
+    for item in items:
+        text = str(item or "").strip()
+        if not text or text in seen:
+            continue
+        cleaned.append(text)
+        seen.add(text)
+    if not cleaned:
+        return empty
+    visible = cleaned[:limit]
+    suffix = "等" if len(cleaned) > limit else ""
+    return "、".join(visible) + suffix
+
+
+def displayed_horizon_symbols(report: dict[str, Any], horizon: str) -> list[str]:
+    decisions = report.get("final_decisions", {})
+    if not isinstance(decisions, dict):
+        return []
+    final_picks = [pick for pick in decisions.get("recommendations", []) if isinstance(pick, dict)]
+    return [
+        str(pick.get("symbol", "")).strip()
+        for pick in ranked_horizon_picks(final_picks, horizon)
+        if str(pick.get("symbol", "")).strip()
+    ]
+
+
+def format_horizon_conclusion(report: dict[str, Any]) -> str:
+    parts = []
+    for horizon, label, _window in HORIZON_COLUMNS:
+        symbols = displayed_horizon_symbols(report, horizon)
+        value = join_zh_items(symbols, empty="暂无稳定结论")
+        parts.append(f"{label}：{value}")
+    return "；".join(parts)
+
+
+def format_momentum_factor_summary(report: dict[str, Any]) -> str:
+    theme_momentum = report.get("theme_momentum", {})
+    if not isinstance(theme_momentum, dict) or not theme_momentum.get("available"):
+        return "动量因子暂无可用主题排序。"
+
+    themes = [theme for theme in theme_momentum.get("top_themes", []) if isinstance(theme, dict)]
+    theme_names = [theme_label(theme.get("theme_id"), theme.get("theme_name")) for theme in themes[:4]]
+    sectors = [sector_label(theme.get("sector")) for theme in themes[:4]]
+    sector_text = join_zh_items(sectors, limit=3, empty="暂无明确板块")
+    theme_text = join_zh_items(theme_names, limit=4, empty="暂无明确主题")
+    if sector_text == "暂无明确板块":
+        return f"动量因子领先主题包括 {theme_text}。"
+    return f"动量因子主要集中在{sector_text}板块，领先主题包括 {theme_text}。"
+
+
+def format_report_takeaway(report: dict[str, Any]) -> str:
+    has_long = bool(displayed_horizon_symbols(report, "long"))
+    has_medium = bool(displayed_horizon_symbols(report, "medium"))
+    has_short = bool(displayed_horizon_symbols(report, "short"))
+    if has_long and has_medium and has_short:
+        return "整体看，当前信号存在跨周期共振，后续重点观察动量延续和风险事件变化。"
+    if has_long and has_medium:
+        return "整体看，当前信号更偏中长线，短线暂不强调，后续重点观察动量延续和基本面兑现。"
+    if has_medium:
+        return "整体看，当前信号更偏中线，短线暂不强调，后续重点观察动量延续和基本面兑现。"
+    if has_long:
+        return "整体看，当前信号更偏长线观察，短线和中线暂未形成稳定排序。"
+    if has_short:
+        return "整体看，当前只出现短线机会，持续性仍需要后续数据确认。"
+    return "整体看，当前暂未形成稳定系统结论，继续等待更清晰的主题和价格确认。"
+
+
+def render_report_lead(report: dict[str, Any]) -> str:
+    return " ".join(
+        [
+            f"本期结论：{format_horizon_conclusion(report)}。",
+            format_momentum_factor_summary(report),
+            format_report_takeaway(report),
+        ]
+    )
+
+
 def render_final_decisions_html(report: dict[str, Any]) -> str:
     decisions = report.get("final_decisions", {})
     if not decisions:
@@ -491,7 +570,7 @@ def render_report_html(report: dict[str, Any]) -> str:
         {render_site_mark()}
         <p class="eyebrow">Advisory briefing</p>
         <h1>{html.escape(display_title)}</h1>
-        <p class="report-lead">按长线、中线、短线分栏展示系统结论；每张卡片保留股票背景、推荐理由、多源依据和主要风险。</p>
+        <p class="report-lead">{html.escape(render_report_lead(report))}</p>
       </div>
       <aside class="date-card" aria-label="报告日期">
         <p class="date-label">Report date</p>
