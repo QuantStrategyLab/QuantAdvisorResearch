@@ -6,6 +6,8 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 
 线上站点：<https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
+当前运行节奏是：**周度公开推荐 + 周度事件/主题刷新 + 月度 AI shadow 背景**。后续可以新增月度复盘，用来回顾上月推荐表现，但只要报告里仍保留短线 `1-10个交易日` 和中线 `2-12周` 窗口，公开推荐就不应改成月更。
+
 ## 仓库定位
 
 这个仓库把事件研究和 AI shadow 产物组合成 model recommendation artifact：
@@ -109,6 +111,8 @@ python -m pytest -q
 它不会提交文件、不会通知投资者、不会创建订单。
 
 `.github/workflows/publish_advisory_site.yml` 会每周发布 HTML/JSON/RSS 站点。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，Pages 部署成功后会发送一条非个性化 Telegram 摘要；如果没配置，通知步骤会跳过；Telegram 发送异常会记录在日志里，但不阻断网页/RSS 发布。
+
+周度发布是有意保留的：短线结论如果只月更会过期；月度 AI shadow 只提供长周期背景，不作为每周追热点的模型输入。
 
 ## RSS / 静态页面
 

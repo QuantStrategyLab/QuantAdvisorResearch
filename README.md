@@ -19,8 +19,11 @@ system:
 - keep other strategy and snapshot repositories independent from this pipeline
 - leave broker execution in platform repositories
 
-The output is a non-personalized model recommendation artifact and a readable daily, weekly,
-or monthly report.
+The current operating cadence is a weekly public recommendation snapshot,
+supported by weekly event/theme refreshes and monthly long-horizon AI shadow
+context. Monthly review reports can be added later for performance review, but
+they should not replace the weekly publication while short-horizon windows are
+part of the contract.
 
 Live site:
 
@@ -97,6 +100,12 @@ as repository secrets, the workflow sends a short non-personalized Telegram
 summary after a successful Pages deployment. If either secret is missing, the
 notification step is skipped without failing the publication. Telegram delivery
 errors are logged and do not block Pages/RSS output.
+
+The weekly publication cadence is intentional: the report contract still
+contains short-horizon (`1-10 trading days`) and medium-horizon (`2-12 weeks`)
+windows, so a monthly-only public report would make short-horizon conclusions
+stale. The AI shadow input remains monthly because it is long-horizon context,
+not a weekly trading signal.
 
 Publish a static HTML + RSS preview:
 

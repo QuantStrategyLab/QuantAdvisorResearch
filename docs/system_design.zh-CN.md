@@ -73,12 +73,23 @@ broker platform repositories
 - 能读取政治事件 CSV 和 AI shadow JSON。
 - 能生成 `model_recommendations` JSON artifact。
 - 能生成 `<output-json>.manifest.json`，记录 contract version、hash、Git SHA 和来源。
-- 能生成日/周/月 Markdown 复盘。
+- 能生成周度公开推荐报告，并保留日/月 cadence 的手工生成能力。
 - 能生成静态 HTML 和 RSS feed 供非个性化订阅。
 - 所有 artifact 明确允许非个性化模型推荐，但禁止下单、调仓、账户级仓位和个性化建议。
 - 后续可以 replay 历史模型推荐，而不是重写过去判断。
 
 数据源和因子完善路线见 [data_factor_roadmap.zh-CN.md](data_factor_roadmap.zh-CN.md)。
+
+## 发布频率
+
+当前不把公开推荐改成月更。原因是模型合同仍包含短线 `1-10个交易日` 和中线 `2-12周`，月更会让短线结论失效。
+
+推荐节奏是：
+
+- `PoliticalEventTrackingResearch`：事件/RSS 事实层周更，必要时手工触发；
+- `AiLongHorizonSignalPipelines`：主题动量周更，长周期 AI shadow signal 月更；
+- `QuantAdvisorResearch`：公开 HTML/JSON/RSS 推荐继续周更；
+- 月度复盘后续可以新增，用来回顾上月推荐表现，不替代周度公开推荐。
 
 ## 跨板块长期主题层
 
