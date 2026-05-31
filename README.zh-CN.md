@@ -1,5 +1,7 @@
 # QuantAdvisorResearch
 
+> ⚠️ 投资有风险，不构成投资建议，仅供学习交流用途。
+
 [English](README.md) | [简体中文](README.zh-CN.md)
 
 QuantStrategyLab 的“智慧投顾研究系统”协调仓库。它把事件证据、主题动量、市场确认和 AI shadow 背景整理成普通投资者能读懂的研究结论；不下单、不管理仓位、不接券商凭证，也不做账户级个性化建议。
