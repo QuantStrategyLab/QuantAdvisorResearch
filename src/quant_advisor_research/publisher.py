@@ -271,67 +271,208 @@ def render_report_html(report: dict[str, Any]) -> str:
   <link rel="icon" type="image/svg+xml" href="{SITE_ICON_FILENAME}">
   <link rel="alternate" type="application/rss+xml" title="量化模型推荐 RSS" href="feed.xml">
   <style>
-    :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-    body {{ margin: 0; background: #f6f7f9; color: #1b1f24; }}
-    main {{ max-width: 1080px; margin: 0 auto; padding: 32px 20px 56px; }}
-    .hero {{ text-align: center; padding: 8px 0 22px; margin-bottom: 10px; }}
-    .site-mark {{ display: inline-flex; width: 58px; height: 58px; margin: 0 auto 14px; filter: drop-shadow(0 12px 22px rgb(9 105 218 / 18%)); }}
+    :root {{
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9e2ef;
+      --paper: #fffaf0;
+      --panel: rgba(255,255,255,.78);
+      --blue: #1e4dd8;
+      --cyan: #00a6c8;
+      --gold: #d99b2b;
+      --green: #0f8b62;
+      --rose: #b54708;
+      font-family: "Avenir Next", "Gill Sans", ui-sans-serif, system-ui, sans-serif;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 11% 7%, rgba(0,166,200,.18), transparent 27rem),
+        radial-gradient(circle at 88% 2%, rgba(217,155,43,.18), transparent 25rem),
+        linear-gradient(135deg, #f8fafc 0%, #eef4fb 52%, #fff7e6 100%);
+      min-height: 100vh;
+    }}
+    body::before {{
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(23,32,51,.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23,32,51,.045) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.75), transparent 78%);
+    }}
+    a {{ color: var(--blue); word-break: break-word; }}
+    .report-shell {{ max-width: 1180px; margin: 0 auto; padding: 28px 20px 68px; position: relative; }}
+    .topbar {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 20px;
+    }}
+    .brand-link {{
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 900;
+      letter-spacing: -.02em;
+    }}
+    .brand-link .site-mark {{ width: 38px; height: 38px; margin: 0; }}
+    .topbar-actions {{ display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }}
+    .topbar-actions a {{
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.72);
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 800;
+      box-shadow: 0 10px 24px rgba(31,45,61,.06);
+    }}
+    .report-hero {{
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(230px, .28fr);
+      gap: 22px;
+      align-items: stretch;
+      margin-bottom: 22px;
+      padding: clamp(24px, 4vw, 40px);
+      border: 1px solid rgba(30,77,216,.16);
+      border-radius: 32px;
+      background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(255,250,240,.78));
+      box-shadow: 0 26px 70px rgba(31,45,61,.13);
+    }}
+    .report-hero::after {{
+      content: "";
+      position: absolute;
+      right: -86px;
+      top: -120px;
+      width: 286px;
+      height: 286px;
+      border-radius: 999px;
+      background: rgba(0,166,200,.16);
+      filter: blur(2px);
+    }}
+    .report-hero-copy {{ position: relative; z-index: 1; text-align: center; }}
+    .site-mark {{ display: inline-flex; width: 64px; height: 64px; margin: 0 auto 16px; filter: drop-shadow(0 18px 28px rgba(30,77,216,.22)); }}
     .site-mark svg {{ width: 100%; height: 100%; }}
     .site-mark rect {{ fill: #172033; }}
-    .site-mark .mark-line {{ fill: none; stroke: #00a6c8; stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }}
-    .site-mark circle {{ fill: #fffaf0; }}
-    .site-mark .mark-ring {{ fill: none; stroke: #fffaf0; stroke-width: 3.2; stroke-linecap: round; opacity: .88; }}
-    h1 {{ margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.15; letter-spacing: -0.04em; }}
-    .warning {{ background: #fff1f2; border: 1px solid #fecdd3; padding: 14px 16px; margin-bottom: 20px; }}
-    .final-decisions {{ margin-bottom: 20px; }}
+    .site-mark .mark-line {{ fill: none; stroke: var(--cyan); stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }}
+    .site-mark circle {{ fill: var(--paper); }}
+    .site-mark .mark-ring {{ fill: none; stroke: var(--paper); stroke-width: 3.2; stroke-linecap: round; opacity: .88; }}
+    .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }}
+    h1 {{ margin: 0 auto; max-width: 860px; font-family: "Iowan Old Style", Georgia, ui-serif, serif; font-size: clamp(2.25rem, 6vw, 4.9rem); line-height: .98; letter-spacing: -.07em; }}
+    .report-lead {{ margin: 18px auto 0; max-width: 720px; color: var(--muted); font-size: 1.05rem; line-height: 1.75; }}
+    .date-card {{
+      position: relative;
+      z-index: 1;
+      display: grid;
+      align-content: end;
+      min-height: 220px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: rgba(255,255,255,.72);
+      backdrop-filter: blur(10px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+    }}
+    .date-card .date-label {{ margin: 0; color: var(--muted); font-size: .86rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }}
+    .date-card .date-value {{ margin: 8px 0 16px; font-size: clamp(1.85rem, 2.7vw, 2.35rem); line-height: .95; font-weight: 900; letter-spacing: -.06em; white-space: nowrap; }}
+    .date-card .cadence-value {{ margin: 0; display: inline-flex; width: fit-content; padding: 7px 11px; border-radius: 999px; border: 1px solid rgba(30,77,216,.22); background: #fff; font-weight: 900; }}
+    .final-decisions {{ margin-top: 22px; }}
     .horizon-columns {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }}
-    .horizon-column {{ background: #eef6ff; border: 1px solid #bfdbfe; border-radius: 14px; padding: 14px; min-height: 160px; }}
-    .horizon-column-header {{ text-align: center; margin-bottom: 12px; }}
-    .horizon-column-header h2 {{ margin: 0; font-size: 1.35rem; }}
-    .horizon-column-header p {{ margin: 4px 0 0; color: #57606a; }}
-    .horizon-cards {{ display: grid; gap: 12px; }}
-    .empty-column {{ margin: 22px 0; color: #57606a; text-align: center; }}
-    .final-card {{ background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; box-shadow: 0 1px 2px rgb(27 31 36 / 4%); }}
-    .final-card h3 {{ margin: 0; font-size: 1.35rem; }}
-    .final-card header p {{ margin: 4px 0 12px; color: #57606a; }}
-    .final-card p {{ line-height: 1.55; color: #334155; }}
-    .final-card .rank {{ min-width: 34px; color: #0969da; }}
-    .theme-candidates {{ background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
-    .candidate-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }}
-    .candidate-card {{ background: #fff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; }}
-    .candidate-card header {{ display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }}
-    .candidate-card h3 {{ margin: 0; font-size: 1.15rem; }}
-    .candidate-card header p {{ margin: 2px 0 0; color: #57606a; }}
-    .candidate-card p {{ margin: 8px 0 0; color: #57606a; line-height: 1.5; }}
-    .rank {{ display: inline-block; min-width: 40px; color: #166534; font-weight: 800; }}
-    .theme-momentum {{ background: #eef6ff; border: 1px solid #bfdbfe; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
-    .recommendation-section {{ margin: 22px 0 8px; }}
-    .recommendation-section p {{ color: #57606a; line-height: 1.55; }}
-    .monitor-note {{ color: #57606a; background: #fff; border: 1px dashed #d0d7de; border-radius: 8px; padding: 12px 14px; }}
+    .horizon-column {{
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 16px;
+      min-height: 220px;
+      background: var(--panel);
+      box-shadow: 0 18px 44px rgba(31,45,61,.09);
+    }}
+    .horizon-column::before {{ content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; }}
+    .horizon-long::before {{ background: var(--green); }}
+    .horizon-medium::before {{ background: var(--blue); }}
+    .horizon-short::before {{ background: var(--gold); }}
+    .horizon-column-header {{ text-align: center; padding: 12px 8px 16px; }}
+    .horizon-column-header h2 {{ margin: 0; font-size: 1.55rem; letter-spacing: -.04em; }}
+    .horizon-column-header p {{ margin: 5px 0 0; color: var(--muted); font-size: .94rem; }}
+    .horizon-cards {{ display: grid; gap: 13px; }}
+    .empty-column {{ margin: 24px 0; color: var(--muted); text-align: center; }}
+    .final-card {{
+      background: rgba(255,255,255,.9);
+      border: 1px solid rgba(217,226,239,.95);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: 0 10px 28px rgba(31,45,61,.075);
+    }}
+    .final-card header {{ display: flex; align-items: baseline; justify-content: space-between; gap: 10px; border-bottom: 1px solid #edf2f7; padding-bottom: 12px; margin-bottom: 12px; }}
+    .final-card h3 {{ margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.36rem; letter-spacing: -.04em; }}
+    .final-card header p {{ margin: 0; color: var(--muted); text-align: right; font-size: .92rem; }}
+    .final-card .rank {{ display: inline-flex; align-items: center; justify-content: center; min-width: 38px; min-height: 26px; padding: 0 8px; border-radius: 999px; background: #eef4ff; color: var(--blue); font-weight: 900; font-size: .86rem; }}
+    .final-card p {{ margin: 12px 0 0; line-height: 1.65; color: #334155; }}
+    .final-card strong {{ color: var(--ink); }}
+    dl {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 9px; margin: 0 0 12px; }}
+    dl div {{ border: 1px solid #e5edf6; border-radius: 15px; padding: 10px; background: #fbfdff; }}
+    dt {{ color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; }}
+    dd {{ margin: 4px 0 0; font-weight: 900; }}
+    ul {{ margin: 8px 0 0; padding-left: 1.15rem; color: #334155; line-height: 1.58; }}
+    li {{ margin: 5px 0; }}
     table {{ width: 100%; border-collapse: collapse; background: #fff; }}
     th, td {{ text-align: left; border-bottom: 1px solid #eaeef2; padding: 8px; vertical-align: top; }}
-    .recommendation {{ background: #fff; border: 1px solid #d8dee4; border-radius: 8px; padding: 18px; margin: 16px 0; }}
-    .recommendation h2 {{ margin: 0; font-size: 1.25rem; }}
-    .recommendation h2 span {{ font-size: .85rem; color: #57606a; font-weight: 700; margin-left: 8px; }}
-    .recommendation header p {{ margin: 4px 0 14px; color: #57606a; }}
-    dl {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 0 0 14px; }}
-    dl div {{ border: 1px solid #eaeef2; border-radius: 6px; padding: 10px; }}
-    dt {{ color: #57606a; font-size: .78rem; text-transform: uppercase; }}
-    dd {{ margin: 4px 0 0; font-weight: 600; }}
-    .horizon-note {{ line-height: 1.55; color: #57606a; }}
-    h3 {{ margin: 18px 0 8px; font-size: 1rem; }}
-    li {{ margin: 5px 0; }}
-    a {{ color: #0969da; word-break: break-word; }}
-    @media (max-width: 920px) {{
+    .theme-candidates, .theme-momentum, .recommendation-section, .recommendation, .monitor-note, .horizon-note {{ display: none; }}
+    @media (max-width: 980px) {{
+      .report-hero {{ grid-template-columns: 1fr; }}
+      .date-card {{ min-height: auto; }}
       .horizon-columns {{ grid-template-columns: 1fr; }}
+      .final-card header {{ display: block; }}
+      .final-card header p {{ margin-top: 5px; text-align: left; }}
+    }}
+    @media (max-width: 640px) {{
+      .report-shell {{ padding: 20px 14px 48px; }}
+      .topbar {{ align-items: flex-start; flex-direction: column; }}
+      .topbar-actions {{ justify-content: flex-start; }}
+      .report-hero {{ border-radius: 24px; padding: 22px 18px; }}
+      .horizon-column {{ border-radius: 22px; }}
     }}
   </style>
 </head>
 <body>
-  <main>
-    <section class="hero">
-      {render_site_mark()}
-      <h1>{html.escape(title)}</h1>
+  <main class="report-shell">
+    <nav class="topbar" aria-label="站点导航">
+      <a class="brand-link" href="index.html">
+        {render_site_mark()}
+        <span>QuantStrategyLab</span>
+      </a>
+      <div class="topbar-actions">
+        <a href="index.html">返回首页</a>
+        <a href="feed.xml">RSS 订阅</a>
+      </div>
+    </nav>
+    <section class="report-hero">
+      <div class="report-hero-copy">
+        {render_site_mark()}
+        <p class="eyebrow">Model briefing</p>
+        <h1>{html.escape(title)}</h1>
+        <p class="report-lead">按长线、中线、短线分栏展示模型结果；每张卡片保留股票背景、推荐理由、多源依据和主要风险。</p>
+      </div>
+      <aside class="date-card" aria-label="报告日期">
+        <p class="date-label">Report date</p>
+        <p class="date-value">{html.escape(str(report['as_of']))}</p>
+        <p class="cadence-value">{html.escape(cadence_label(report))}更新</p>
+      </aside>
     </section>
     {final_decisions_html}
   </main>

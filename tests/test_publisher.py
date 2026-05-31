@@ -25,6 +25,12 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
 
     assert "量化模型推荐周度复盘 - 2026-05-30" in html
     assert "text-align: center" in html
+    assert "report-shell" in html
+    assert "report-hero" in html
+    assert "topbar" in html
+    assert "返回首页" in html
+    assert "RSS 订阅" in html
+    assert "Report date" in html
     assert 'rel="icon" type="image/svg+xml" href="favicon.svg"' in html
     assert "site-mark" in html
     assert "2-12周" in html
@@ -154,6 +160,9 @@ def test_render_report_html_groups_final_cards_by_horizon_and_rank() -> None:
     html = render_report_html(report)
 
     assert "horizon-columns" in html
+    assert "horizon-long" in html
+    assert "horizon-medium" in html
+    assert "horizon-short" in html
     assert html.index("<h2>长线</h2>") < html.index("<h2>中线</h2>") < html.index("<h2>短线</h2>")
     assert html.index("#1</span>MID1") < html.index("#2</span>MID2")
     assert "#1</span>LONG1" in html
