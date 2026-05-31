@@ -208,6 +208,40 @@ If `long_context_available=false`, `long_context_missing_reason` should point to
 the first likely ingestion problem, such as missing AI shadow input, a non-long
 `latest_signal` horizon, or missing symbol/theme coverage.
 
+## Recommendation Follow-up Review
+
+Recommendation follow-up reviews are separate audit artifacts generated from
+past final recommendations and cached point-in-time prices:
+
+```text
+schema_version = 1
+mode = recommendation_review
+as_of
+generated_at
+benchmark
+source_reports[]
+summary
+review_items[]
+data_quality_warnings[]
+policy
+```
+
+Each `review_items[]` row carries the original report date, review date, symbol,
+primary horizon, price interval, absolute return, benchmark return,
+benchmark-relative return, outcome label, market data source, and original
+selection scores when present.
+
+Allowed outcome labels:
+
+- `pending`
+- `insufficient_price_data`
+- `outperforming`
+- `inline`
+- `lagging`
+
+This artifact is for research accountability only. It must not be interpreted as
+a new buy list, target allocation, or execution signal.
+
 ## Artifact Manifest
 
 Every CLI-generated JSON report also writes:

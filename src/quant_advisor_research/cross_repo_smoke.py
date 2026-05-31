@@ -78,6 +78,8 @@ def run_cross_repo_smoke(
         market_proxy_urls="",
         market_proxy_pool_url="",
         market_use_network=False,
+        market_cache_dir=None,
+        market_cache_max_age_days=14,
         site_output_dir=site_dir,
         site_url=site_url,
         feed_title=DEFAULT_FEED_TITLE,

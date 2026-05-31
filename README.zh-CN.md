@@ -48,11 +48,13 @@ python scripts/build_advisory_artifacts.py \
   --ai-signal examples/research_signal_context.example.json \
   --theme-momentum examples/theme_momentum_snapshot.example.json \
   --market-no-network \
+  --market-cache-dir .cache/market-data \
+  --recommendation-review \
   --output-dir data/output/weekly_advisory_review \
   --site-output-dir site
 ```
 
-这个入口可以一次生成市场确认、投顾研究 JSON/Markdown、manifest、可选月度复盘和可选静态站点。weekly、monthly 和 Pages 发布 workflow 都走同一条构建路径，避免不同发布方式里复制逻辑后发生偏移。
+这个入口可以一次生成市场确认、投顾研究 JSON/Markdown、manifest、可选月度复盘、可选推荐跟踪复盘和可选静态站点。weekly、monthly 和 Pages 发布 workflow 都走同一条构建路径，避免不同发布方式里复制逻辑后发生偏移。
 
 底层报告生成器仍保留，适合排查单个报告：
 
@@ -260,7 +262,25 @@ python scripts/build_market_confirmation.py \
 - `--proxy-urls`：逗号或换行分隔的代理列表。
 - `--proxy-list`：本地代理列表文件。
 - `--proxy-pool-url`：公共代理池文本 URL，一行一个代理。
+- `--cache-dir`：保存 Yahoo 日线价格缓存的本地目录。
+- `--cache-max-age-days`：实时下载失败时，允许使用的最大缓存陈旧天数。
 
 线上 workflow 也支持仓库变量 `MARKET_DATA_PROXY_URLS` 和 `MARKET_DATA_PROXY_POOL_URL`。脚本会先直连 Yahoo，失败后再尝试代理；日志只记录代理序号，不输出代理完整地址。
 
-Yahoo chart 下载只是当前无依赖的免费行情入口；如果不可用，脚本会退回到 `theme_momentum_snapshot.json` 里的价格动量信息，报告仍能生成。免费公共代理池可以作为应急补充，但不应当作稳定生产数据源；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。
+Yahoo chart 下载只是当前无依赖的免费行情入口；如果不可用，脚本会退回到 `theme_momentum_snapshot.json` 里的价格动量信息，报告仍能生成。免费公共代理池可以作为应急补充，但不应当作稳定生产数据源；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。线上 weekly/monthly/Pages workflow 会用 GitHub Actions cache 恢复和保存 `.cache/market-data`，让一次成功的价格下载可以继续支撑后续推荐复盘，也能降低 Yahoo 临时不可用的影响。
+
+## 推荐跟踪复盘
+
+`scripts/build_recommendation_review.py` 会用缓存价格复盘历史最终推荐的后续表现。它是研究审计 artifact，不是新的推荐清单。
+
+```bash
+python scripts/build_recommendation_review.py \
+  --as-of 2026-06-30 \
+  --reports data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
+  --benchmark SPY \
+  --cache-dir .cache/market-data \
+  --output-json data/output/recommendation_review_2026-06-30.json \
+  --output-md data/output/recommendation_review_2026-06-30.md
+```
+
+复盘会计算绝对收益、相对 SPY 收益、结果状态、按周期汇总和数据质量提示。统一构建入口可以通过 `--recommendation-review` 生成该 artifact；Pages 发布 workflow 在能恢复已发布历史报告时，也会把历史报告纳入复盘，所以历史越完整，复盘越有用。

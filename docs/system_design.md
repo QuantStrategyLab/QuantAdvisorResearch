@@ -100,9 +100,21 @@ scripts/build_advisory_artifacts.py
 ```
 
 This command owns market-confirmation generation, report generation, manifest
-writing, optional monthly review, optional static-site rendering, and optional
-published-site archive recovery. Workflows should call this command instead of
-duplicating shell logic for each publication mode.
+writing, optional monthly review, optional recommendation follow-up review,
+optional static-site rendering, and optional published-site archive recovery.
+Workflows should call this command instead of duplicating shell logic for each
+publication mode.
+
+Market confirmation has a small price-cache adapter around the free Yahoo chart
+endpoint. Scheduled workflows restore and save `.cache/market-data` with GitHub
+Actions cache. This keeps the public report deterministic enough to publish when
+Yahoo has a temporary outage, and it gives recommendation reviews a point-in-time
+price source without turning the repository into a paid market-data store.
+
+Recommendation follow-up review is a separate artifact. It reads past final
+recommendations, cached prices, and a benchmark, then reports absolute and
+relative returns by horizon. It is used for research accountability and data
+quality checks; it does not create new recommendations or execution targets.
 
 A separate no-network smoke command validates the three-repository contract:
 

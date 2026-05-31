@@ -13,6 +13,7 @@ from quant_advisor_research.market_confirmation import (
     collect_symbols,
     compute_market_confirmation,
     load_proxy_urls,
+    write_cached_bars,
     write_market_confirmation_csv,
 )
 
@@ -175,3 +176,34 @@ def test_market_confirmation_retries_with_proxy_when_direct_fetch_fails(monkeypa
     assert rows[0].data_source == "yahoo_chart_proxy"
     assert ("MU", None) in calls
     assert ("MU", "http://127.0.0.1:8080") in calls
+
+
+def test_market_confirmation_uses_cached_price_bars_when_fetch_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    start = dt.date(2026, 1, 1)
+    symbol_bars = make_bars(start, [100 + index for index in range(70)], base_volume=100)
+    benchmark_bars = make_bars(start, [100 + index * 0.2 for index in range(70)], base_volume=1000)
+    cache_dir = tmp_path / "market-cache"
+    write_cached_bars("MU", symbol_bars, cache_dir=cache_dir)
+    write_cached_bars("SPY", benchmark_bars, cache_dir=cache_dir)
+
+    def fail_fetch(*args: object, **kwargs: object) -> tuple[list[PriceBar], str]:
+        raise URLError("temporary outage")
+
+    monkeypatch.setattr(market_confirmation_module, "fetch_yahoo_bars_with_fallback", fail_fetch)
+
+    rows = build_market_confirmation_rows(
+        symbols=["MU"],
+        as_of=dt.date(2026, 3, 15),
+        benchmark="SPY",
+        request_pause_seconds=0,
+        cache_dir=cache_dir,
+        cache_max_age_days=14,
+    )
+
+    assert rows[0].symbol == "MU"
+    assert rows[0].data_source == "yahoo_chart_cache"
+    assert rows[0].confirmation_quality == "price_observed"
+    assert rows[0].warnings == "price_cache_used"

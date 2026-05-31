@@ -23,6 +23,7 @@ from .market_confirmation import (
 )
 from .monthly_review import build_monthly_review, render_monthly_review_markdown
 from .publisher import publish_reports
+from .recommendation_review import build_recommendation_review, render_recommendation_review_markdown
 
 
 DEFAULT_SITE_URL = "https://quantstrategylab.github.io/QuantAdvisorResearch"
@@ -40,6 +41,8 @@ class BuildPipelineResult:
     market_confirmation: Path | None
     monthly_review_json: Path | None = None
     monthly_review_md: Path | None = None
+    recommendation_review_json: Path | None = None
+    recommendation_review_md: Path | None = None
     site_output_dir: Path | None = None
     recovered_report_count: int = 0
 
@@ -92,6 +95,8 @@ def build_market_confirmation_artifact(
     proxy_urls_text: str,
     proxy_pool_url: str,
     use_network: bool,
+    cache_dir: str | Path | None,
+    cache_max_age_days: int,
 ) -> Path:
     theme_momentum = load_theme_momentum(theme_momentum_path) if theme_momentum_path else None
     symbols = collect_symbols(
@@ -115,6 +120,8 @@ def build_market_confirmation_artifact(
         use_network=use_network,
         request_pause_seconds=request_pause_seconds,
         proxy_urls=proxy_urls,
+        cache_dir=cache_dir,
+        cache_max_age_days=cache_max_age_days,
     )
     write_market_confirmation_csv(output_path, rows)
     print(f"market_confirmation_rows={len(rows)} symbols_requested={len(symbols)} output={output_path}")
@@ -182,8 +189,11 @@ def build_advisory_artifacts(
     market_proxy_urls: str,
     market_proxy_pool_url: str,
     market_use_network: bool,
+    market_cache_dir: str | Path | None,
+    market_cache_max_age_days: int,
     monthly_review: bool = False,
     previous_report_path: str | Path | None = None,
+    recommendation_review: bool = False,
     site_output_dir: str | Path | None = None,
     site_url: str = DEFAULT_SITE_URL,
     feed_title: str = DEFAULT_FEED_TITLE,
@@ -210,6 +220,8 @@ def build_advisory_artifacts(
             proxy_urls_text=market_proxy_urls,
             proxy_pool_url=market_proxy_pool_url,
             use_network=market_use_network,
+            cache_dir=market_cache_dir,
+            cache_max_age_days=market_cache_max_age_days,
         )
 
     report_json = output / f"advisory_report_{as_of.isoformat()}.json"
@@ -266,11 +278,34 @@ def build_advisory_artifacts(
                 current_as_of=as_of,
             )
         report_paths = [report_json, *recovered_report_paths]
+    else:
+        report_paths = [report_json]
+
+    recommendation_review_json: Path | None = None
+    recommendation_review_md: Path | None = None
+    if recommendation_review:
+        review = build_recommendation_review(
+            report_paths=report_paths,
+            as_of=as_of,
+            benchmark=market_benchmark,
+            cache_dir=market_cache_dir,
+            cache_max_age_days=market_cache_max_age_days,
+            use_network=False,
+        )
+        recommendation_review_json = output / f"recommendation_review_{as_of.isoformat()}.json"
+        recommendation_review_md = output / f"recommendation_review_{as_of.isoformat()}.md"
+        write_json(recommendation_review_json, review)
+        write_text(recommendation_review_md, render_recommendation_review_markdown(review))
+
+    if site_output:
         publish_reports(report_paths, site_output, site_url=site_url, feed_title=feed_title)
         for path in report_paths:
             copy_if_different(Path(path), site_output / Path(path).name)
         copy_if_different(report_md, site_output / report_md.name)
         copy_if_different(report_manifest, site_output / report_manifest.name)
+        if recommendation_review_json and recommendation_review_md:
+            copy_if_different(recommendation_review_json, site_output / recommendation_review_json.name)
+            copy_if_different(recommendation_review_md, site_output / recommendation_review_md.name)
 
     write_github_output({"as_of": as_of.isoformat(), "report_path": str(report_json)})
     return BuildPipelineResult(
@@ -282,6 +317,8 @@ def build_advisory_artifacts(
         market_confirmation=market_path,
         monthly_review_json=monthly_review_json,
         monthly_review_md=monthly_review_md,
+        recommendation_review_json=recommendation_review_json,
+        recommendation_review_md=recommendation_review_md,
         site_output_dir=site_output,
         recovered_report_count=len(recovered_report_paths),
     )
@@ -304,9 +341,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--market-proxy-list")
     parser.add_argument("--market-proxy-urls", default="")
     parser.add_argument("--market-proxy-pool-url", default="")
+    parser.add_argument("--market-cache-dir")
+    parser.add_argument("--market-cache-max-age-days", type=int, default=14)
     parser.add_argument("--market-no-network", action="store_true", help="Use theme momentum fallback only.")
     parser.add_argument("--monthly-review", action="store_true", help="Also write monthly review artifacts.")
     parser.add_argument("--previous-report", help="Optional previous advisory report JSON for monthly review.")
+    parser.add_argument("--recommendation-review", action="store_true", help="Also write recommendation follow-up review artifacts.")
     parser.add_argument("--site-output-dir", help="Optional static site output directory.")
     parser.add_argument("--site-url", default=DEFAULT_SITE_URL)
     parser.add_argument("--feed-title", default=DEFAULT_FEED_TITLE)
@@ -333,8 +373,11 @@ def main(argv: list[str] | None = None) -> None:
         market_proxy_urls=args.market_proxy_urls,
         market_proxy_pool_url=args.market_proxy_pool_url,
         market_use_network=not args.market_no_network,
+        market_cache_dir=args.market_cache_dir,
+        market_cache_max_age_days=args.market_cache_max_age_days,
         monthly_review=args.monthly_review,
         previous_report_path=args.previous_report,
+        recommendation_review=args.recommendation_review,
         site_output_dir=args.site_output_dir,
         site_url=args.site_url,
         feed_title=args.feed_title,

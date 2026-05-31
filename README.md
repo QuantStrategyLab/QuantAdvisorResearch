@@ -87,14 +87,17 @@ python scripts/build_advisory_artifacts.py \
   --ai-signal examples/research_signal_context.example.json \
   --theme-momentum examples/theme_momentum_snapshot.example.json \
   --market-no-network \
+  --market-cache-dir .cache/market-data \
+  --recommendation-review \
   --output-dir data/output/weekly_advisory_review \
   --site-output-dir site
 ```
 
 This single command can generate market confirmation, the advisory JSON/Markdown,
-manifest, optional monthly review, and optional static site output. The weekly,
-monthly, and Pages workflows all use this shared build path so report generation
-does not drift between publication modes.
+manifest, optional monthly review, optional recommendation follow-up review, and
+optional static site output. The weekly, monthly, and Pages workflows all use
+this shared build path so report generation does not drift between publication
+modes.
 
 The lower-level report builder is still available for focused debugging:
 
@@ -242,6 +245,8 @@ Optional proxy inputs:
 - `--proxy-urls`: comma/newline-separated proxy URLs.
 - `--proxy-list`: local text file with one proxy per line.
 - `--proxy-pool-url`: public text URL returning one proxy per line.
+- `--cache-dir`: local directory for saved point-in-time Yahoo daily bars.
+- `--cache-max-age-days`: maximum accepted cache staleness when live fetches fail.
 
 The scheduled workflows also read repository variables `MARKET_DATA_PROXY_URLS`
 and `MARKET_DATA_PROXY_POOL_URL`. The script tries direct Yahoo access first and
@@ -253,7 +258,31 @@ unavailable, the script falls back to price-momentum fields already saved in
 `theme_momentum_snapshot.json`, so report generation continues. Random free
 proxy pools can be used as an emergency supplement, but should not be treated as
 a stable production data source; prefer organization-owned price snapshots,
-caches, or auditable controlled proxies.
+caches, or auditable controlled proxies. The scheduled workflows restore and
+save `.cache/market-data` with GitHub Actions cache, so one successful price run
+can support later recommendation review and temporary Yahoo outages.
+
+## Recommendation Follow-up Review
+
+`scripts/build_recommendation_review.py` reviews past final recommendations
+against cached point-in-time prices. It is a research audit artifact, not a new
+recommendation list.
+
+```bash
+python scripts/build_recommendation_review.py \
+  --as-of 2026-06-30 \
+  --reports data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
+  --benchmark SPY \
+  --cache-dir .cache/market-data \
+  --output-json data/output/recommendation_review_2026-06-30.json \
+  --output-md data/output/recommendation_review_2026-06-30.md
+```
+
+The review calculates absolute return, benchmark-relative return, outcome
+labels, horizon summaries, and data-quality warnings. The unified build command
+can generate it with `--recommendation-review`; the Pages workflow also includes
+recovered published reports when available, so the review improves as history
+accumulates.
 
 ## Output Contract
 

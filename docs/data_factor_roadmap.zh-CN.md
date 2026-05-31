@@ -181,24 +181,30 @@ Crypto 可作为跨资产风险情绪参考，但暂时不应混入 US equity �
    - 当前 CSV 字段为 `symbol,as_of,return_5d,return_20d,return_63d,relative_return_20d,relative_return_63d,volume_zscore,drawdown_63d,volatility_21d,market_score,data_source,price_observation_count,price_age_days,confirmation_quality,warnings`。
    - `scripts/build_market_confirmation.py` 已能自动从 watchlist、信号上下文和主题动量快照收集标的，线上 workflow 默认生成该 CSV。
    - 支持 `--proxy-urls`、`--proxy-list`、`--proxy-pool-url` 和仓库变量 `MARKET_DATA_PROXY_URLS` / `MARKET_DATA_PROXY_POOL_URL` 作为免费公共代理池补充。
+   - 支持 `--cache-dir` 和 `--cache-max-age-days`，线上 workflow 会用 GitHub Actions cache 保存 `.cache/market-data`，让后续复盘和临时行情失败时有近期缓存可用。
    - 如果免费行情接口不可用，脚本会退回到 `theme_momentum_snapshot.json` 中的价格动量字段；报告继续生成，但短线结论会更保守。
    - 该输入只影响 `final_decisions` 的短/中/长线审计评分，不包含目标仓位或交易指令。
 
-4. 增加跨仓库 no-network smoke：
+4. 增加推荐跟踪复盘：
+   - 读取历史最终推荐、缓存日线和基准指数；
+   - 输出绝对收益、相对收益、按周期汇总和数据质量提示；
+   - 只做研究问责，不生成新的推荐，不生成交易目标。
+
+5. 增加跨仓库 no-network smoke：
    - 从三个 live 仓库读取事件、watchlist、signal 和 theme momentum；
    - 用 theme momentum fallback 生成市场确认；
    - 生成报告和静态页面，并上传 artifact 供检查；
    - 目的只是验证三仓库接口没有漂移，不接入交易执行。
 
-5. 增加事件复盘结果输入：
+6. 增加事件复盘结果输入：
    - `event_id,symbol,event_date,window,absolute_return,benchmark_relative_return`。
    - 用于日/周/月回顾，不用于自动交易。
 
-6. 增加基本面/估值快照输入：
+7. 增加基本面/估值快照输入：
    - 独立 CSV artifact，不直接依赖策略仓库。
    - 先只用于风险提示和推荐解释。
 
-7. 最后再考虑跨仓库只读参考：
+8. 最后再考虑跨仓库只读参考：
    - 只读 `UsEquitySnapshotPipelines` 的公开 artifact 摘要。
    - 不读取策略 target、broker runtime、账户持仓或订单。
    - 输出仍然是推荐文本，不是仓位。

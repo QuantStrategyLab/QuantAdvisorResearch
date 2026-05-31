@@ -101,7 +101,11 @@ Advisor 现在使用一个统一构建入口：
 scripts/build_advisory_artifacts.py
 ```
 
-这个命令负责市场确认生成、报告生成、manifest 写入、可选月度复盘、可选静态站点渲染，以及可选的已发布历史报告恢复。weekly、monthly 和 Pages 发布 workflow 都应该调用这个入口，避免在多个 YAML 里复制同一段市场确认和报告构建逻辑。
+这个命令负责市场确认生成、报告生成、manifest 写入、可选月度复盘、可选推荐跟踪复盘、可选静态站点渲染，以及可选的已发布历史报告恢复。weekly、monthly 和 Pages 发布 workflow 都应该调用这个入口，避免在多个 YAML 里复制同一段市场确认和报告构建逻辑。
+
+市场确认现在在 Yahoo chart 免费入口外面加了一层轻量价格缓存。线上 workflow 会用 GitHub Actions cache 恢复和保存 `.cache/market-data`。这样 Yahoo 临时不可用时，公开报告仍可以尽量用近期缓存继续生成；推荐跟踪复盘也可以使用 point-in-time 价格来源，而不把本仓库变成付费行情存储仓库。
+
+推荐跟踪复盘是单独 artifact。它读取历史最终推荐、缓存价格和基准指数，按周期计算绝对收益、相对收益和结果状态。它只用于研究问责和数据质量检查，不生成新的推荐，也不输出执行目标。
 
 跨仓库契约用 no-network smoke 命令验证：
 

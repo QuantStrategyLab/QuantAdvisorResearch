@@ -34,6 +34,8 @@ def build_fixture_report(tmp_path: Path, as_of: dt.date) -> Path:
         market_proxy_urls="",
         market_proxy_pool_url="",
         market_use_network=False,
+        market_cache_dir=None,
+        market_cache_max_age_days=14,
     )
     return result.report_json
 
@@ -56,6 +58,9 @@ def test_build_advisory_artifacts_builds_market_report_and_site(tmp_path: Path) 
         market_proxy_urls="",
         market_proxy_pool_url="",
         market_use_network=False,
+        market_cache_dir=tmp_path / "market-cache",
+        market_cache_max_age_days=14,
+        recommendation_review=True,
         site_output_dir=tmp_path / "site",
         site_url="https://example.invalid/advisor",
         feed_title="智慧投顾研究系统",
@@ -66,9 +71,14 @@ def test_build_advisory_artifacts_builds_market_report_and_site(tmp_path: Path) 
     assert result.report_manifest.exists()
     assert result.market_confirmation is not None
     assert result.market_confirmation.exists()
+    assert result.recommendation_review_json is not None
+    assert result.recommendation_review_json.exists()
+    assert result.recommendation_review_md is not None
+    assert result.recommendation_review_md.exists()
     assert "confirmation_quality" in result.market_confirmation.read_text(encoding="utf-8")
     assert (tmp_path / "site" / "index.html").exists()
     assert (tmp_path / "site" / result.report_json.name).exists()
+    assert (tmp_path / "site" / result.recommendation_review_json.name).exists()
 
     report = json.loads(result.report_json.read_text(encoding="utf-8"))
     assert report["summary"]["top_recommended_symbols"]

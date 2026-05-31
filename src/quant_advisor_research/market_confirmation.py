@@ -103,6 +103,78 @@ def format_float(value: float) -> str:
     return f"{value:.6f}"
 
 
+def safe_cache_symbol(symbol: str) -> str:
+    return "".join(char if char.isalnum() else "-" for char in symbol.upper()).strip("-") or "UNKNOWN"
+
+
+def cache_file_path(cache_dir: str | Path, symbol: str) -> Path:
+    return Path(cache_dir) / f"{safe_cache_symbol(symbol)}.json"
+
+
+def price_bar_to_json(bar: PriceBar) -> dict[str, float | str]:
+    return {"date": bar.date.isoformat(), "close": bar.close, "volume": bar.volume}
+
+
+def price_bar_from_json(payload: dict[str, Any]) -> PriceBar | None:
+    try:
+        close = float(payload["close"])
+        return PriceBar(
+            date=dt.date.fromisoformat(str(payload["date"])),
+            close=close,
+            volume=float(payload.get("volume", 0)),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def load_cached_bars(
+    symbol: str,
+    *,
+    as_of: dt.date,
+    cache_dir: str | Path | None,
+    max_age_days: int = 14,
+) -> list[PriceBar]:
+    if not cache_dir:
+        return []
+    path = cache_file_path(cache_dir, symbol)
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    raw_bars = payload.get("bars", [])
+    if not isinstance(raw_bars, list):
+        return []
+    bars = [bar for item in raw_bars if isinstance(item, dict) for bar in [price_bar_from_json(item)] if bar]
+    bars = sorted((bar for bar in bars if bar.close > 0 and bar.date <= as_of), key=lambda bar: bar.date)
+    if not bars:
+        return []
+    if max_age_days >= 0 and (as_of - bars[-1].date).days > max_age_days:
+        return []
+    return bars
+
+
+def write_cached_bars(symbol: str, bars: list[PriceBar], *, cache_dir: str | Path | None) -> None:
+    if not cache_dir or not bars:
+        return
+    path = cache_file_path(cache_dir, symbol)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    merged: dict[str, PriceBar] = {}
+    for bar in load_cached_bars(symbol, as_of=max(bar.date for bar in bars), cache_dir=cache_dir, max_age_days=-1):
+        merged[bar.date.isoformat()] = bar
+    for bar in bars:
+        if bar.close > 0:
+            merged[bar.date.isoformat()] = bar
+    payload = {
+        "schema_version": 1,
+        "symbol": symbol.upper(),
+        "updated_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "bars": [price_bar_to_json(bar) for bar in sorted(merged.values(), key=lambda item: item.date)],
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def pct_return(bars: list[PriceBar], lookback: int) -> float:
     if len(bars) <= lookback:
         return 0.0
@@ -402,6 +474,34 @@ def fetch_yahoo_bars_with_fallback(
     raise ValueError("price_fetch_unavailable")
 
 
+def fetch_bars_with_cache(
+    symbol: str,
+    *,
+    as_of: dt.date,
+    proxy_urls: list[str],
+    cache_dir: str | Path | None = None,
+    cache_max_age_days: int = 14,
+) -> tuple[list[PriceBar], str, str]:
+    try:
+        bars, data_source = fetch_yahoo_bars_with_fallback(symbol, as_of=as_of, proxy_urls=proxy_urls)
+        write_cached_bars(symbol, bars, cache_dir=cache_dir)
+        return bars, data_source, ""
+    except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError, OSError) as exc:
+        cached_bars = load_cached_bars(
+            symbol,
+            as_of=as_of,
+            cache_dir=cache_dir,
+            max_age_days=cache_max_age_days,
+        )
+        if cached_bars:
+            print(
+                "market_data_notice: cache_used "
+                f"symbol={symbol} latest={cached_bars[-1].date.isoformat()} reason={type(exc).__name__}"
+            )
+            return cached_bars, "yahoo_chart_cache", "price_cache_used"
+        raise
+
+
 def load_theme_momentum(path: str | Path | None) -> dict[str, Any] | None:
     if not path:
         return None
@@ -507,6 +607,8 @@ def build_market_confirmation_rows(
     use_network: bool = True,
     request_pause_seconds: float = 0.2,
     proxy_urls: list[str] | None = None,
+    cache_dir: str | Path | None = None,
+    cache_max_age_days: int = 14,
 ) -> list[MarketConfirmationRow]:
     symbol_set = set(symbols)
     fallback_rows = fallback_rows_from_theme_momentum(theme_momentum, symbols=symbol_set, as_of=as_of)
@@ -515,7 +617,13 @@ def build_market_confirmation_rows(
     if use_network:
         benchmark_bars: list[PriceBar] = []
         try:
-            benchmark_bars, _ = fetch_yahoo_bars_with_fallback(benchmark, as_of=as_of, proxy_urls=proxy_urls)
+            benchmark_bars, _, _ = fetch_bars_with_cache(
+                benchmark,
+                as_of=as_of,
+                proxy_urls=proxy_urls,
+                cache_dir=cache_dir,
+                cache_max_age_days=cache_max_age_days,
+            )
         except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError, OSError) as exc:
             benchmark_bars = []
             print(f"market_data_notice: benchmark_fetch_unavailable benchmark={benchmark} reason={type(exc).__name__}")
@@ -523,14 +631,25 @@ def build_market_confirmation_rows(
             if index and request_pause_seconds > 0:
                 time.sleep(request_pause_seconds)
             try:
-                bars, data_source = fetch_yahoo_bars_with_fallback(symbol, as_of=as_of, proxy_urls=proxy_urls)
+                bars, data_source, cache_warning = fetch_bars_with_cache(
+                    symbol,
+                    as_of=as_of,
+                    proxy_urls=proxy_urls,
+                    cache_dir=cache_dir,
+                    cache_max_age_days=cache_max_age_days,
+                )
+                warnings = []
+                if len(benchmark_bars) < 22:
+                    warnings.append("benchmark_unavailable")
+                if cache_warning:
+                    warnings.append(cache_warning)
                 row = compute_market_confirmation(
                     symbol,
                     bars,
                     benchmark_bars,
                     data_source=data_source,
                     requested_as_of=as_of,
-                    warning="" if len(benchmark_bars) >= 22 else "benchmark_unavailable",
+                    warning=";".join(warnings),
                 )
                 if row:
                     rows[symbol] = row
@@ -568,6 +687,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--proxy-list", help="Optional local text file with one HTTP/HTTPS proxy per line.")
     parser.add_argument("--proxy-urls", default="", help="Optional comma/newline-separated HTTP/HTTPS proxy URLs.")
     parser.add_argument("--proxy-pool-url", default="", help="Optional public text URL returning one proxy per line.")
+    parser.add_argument("--cache-dir", help="Optional directory for point-in-time Yahoo bar cache.")
+    parser.add_argument("--cache-max-age-days", type=int, default=14)
     parser.add_argument("--no-network", action="store_true", help="Skip price API calls and use theme momentum fallback only.")
     parser.add_argument("--output", required=True, help="Output CSV path.")
     return parser
@@ -598,6 +719,8 @@ def main(argv: list[str] | None = None) -> None:
         use_network=not args.no_network,
         request_pause_seconds=args.request_pause_seconds,
         proxy_urls=proxy_urls,
+        cache_dir=args.cache_dir,
+        cache_max_age_days=args.cache_max_age_days,
     )
     write_market_confirmation_csv(args.output, rows)
     print(f"market_confirmation_rows={len(rows)} symbols_requested={len(symbols)} output={args.output}")

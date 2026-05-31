@@ -82,6 +82,14 @@ jobs:
       - name: Install advisor package
         working-directory: advisor
         run: python -m pip install -e .
+      - name: Restore market data cache
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: advisor/.cache/market-data
+          key: ${{ runner.os }}-qar-market-data-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ runner.os }}-qar-market-data-v1-
       - name: Build report and static site
         id: build_report
         working-directory: advisor
@@ -98,6 +106,7 @@ jobs:
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
+          mkdir -p .cache/market-data
           ARGS=(
             --as-of "${AS_OF}"
             --cadence weekly
@@ -109,6 +118,8 @@ jobs:
             --site-url "${SITE_URL}"
             --feed-title "智慧投顾研究系统"
             --recover-site-archive
+            --market-cache-dir .cache/market-data
+            --recommendation-review
           )
           if [ -n "${THEME_MOMENTUM_PATH}" ]; then
             ARGS+=(--theme-momentum "../research-signal-context/${THEME_MOMENTUM_PATH}")
@@ -123,6 +134,13 @@ jobs:
             ARGS+=(--market-proxy-pool-url "${MARKET_DATA_PROXY_POOL_URL}")
           fi
           python scripts/build_advisory_artifacts.py "${ARGS[@]}"
+      - name: Save market data cache
+        if: ${{ success() }}
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: advisor/.cache/market-data
+          key: ${{ runner.os }}-qar-market-data-v1-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Upload site artifact
         uses: actions/upload-artifact@v7
         with:

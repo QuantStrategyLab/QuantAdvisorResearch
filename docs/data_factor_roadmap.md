@@ -99,12 +99,20 @@ Priority order:
    `MARKET_DATA_PROXY_URLS` / `MARKET_DATA_PROXY_POOL_URL` before falling back to
    saved theme momentum fields.
    It must not contain target weights or trade instructions.
-4. Keep the cross-repository contract tested with a no-network smoke run before
+4. Persist a lightweight price cache for market confirmation and recommendation
+   review. Cache files should contain only point-in-time daily bars, source,
+   update time, and no account data. GitHub Actions cache is acceptable for this
+   early stage; a controlled snapshot repository or audited data provider is a
+   better long-term source.
+5. Keep the cross-repository contract tested with a no-network smoke run before
    treating workflow success as healthy. The smoke should build report/site
    artifacts from the three live repositories and upload artifacts for inspection.
-5. Add event review inputs for 1/5/20/60 trading-day follow-up.
-6. Add fundamentals/valuation snapshots for risk explanation, not execution.
-7. Only then consider read-only references from existing snapshot repositories.
+6. Add recommendation follow-up review from cached prices and published reports.
+   It should report absolute/benchmark-relative returns by horizon, not create
+   new recommendations or trading targets.
+7. Add event review inputs for 1/5/20/60 trading-day follow-up.
+8. Add fundamentals/valuation snapshots for risk explanation, not execution.
+9. Only then consider read-only references from existing snapshot repositories.
 
 ## Anti-Overfitting Rules
 
