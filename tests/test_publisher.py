@@ -49,7 +49,9 @@ def test_render_feed_xml_contains_report_item() -> None:
 
     assert "<rss version=\"2.0\">" in feed
     assert "2026-05-30 周度模型推荐" in feed
-    assert "来源=fixture" in feed
+    assert "来源=fixture" not in feed
+    assert "来源=" not in feed
+    assert "主要信号=" in feed
     assert "非个性化模型输出；不包含下单、仓位配置或账户级建议。" in feed
 
 
@@ -64,6 +66,37 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "index.html" in filenames
     assert "feed.xml" in filenames
     assert "2026-05-30-weekly-model-recommendations.html" in filenames
+    index_html = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+    assert "来源：" not in index_html
+    assert "主要信号" in index_html
+
+
+def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_path: Path) -> None:
+    live_dir = tmp_path / "live"
+    live_dir.mkdir()
+    political_events = live_dir / "political_events.csv"
+    political_watchlist = live_dir / "political_watchlist.csv"
+    ai_signal = live_dir / "research_signal_context.json"
+    theme_momentum = live_dir / "theme_momentum_snapshot.json"
+    political_events.write_text((ROOT / "examples/political_events.example.csv").read_text(encoding="utf-8"), encoding="utf-8")
+    political_watchlist.write_text((ROOT / "examples/political_watchlist.example.csv").read_text(encoding="utf-8"), encoding="utf-8")
+    ai_signal.write_text((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"), encoding="utf-8")
+    theme_momentum.write_text((ROOT / "examples/theme_momentum_snapshot.example.json").read_text(encoding="utf-8"), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=political_events,
+        political_watchlist_path=political_watchlist,
+        ai_signal_path=ai_signal,
+        theme_momentum_path=theme_momentum,
+    )
+    html = render_report_html(report)
+
+    assert report["summary"]["source_mode"] == "operator_supplied"
+    assert report["summary"]["data_quality_warnings"] == []
+    assert "来源模式" not in html
+    assert "Input artifacts include example fixture paths" not in html
 
 
 def test_render_report_html_includes_theme_momentum_context() -> None:

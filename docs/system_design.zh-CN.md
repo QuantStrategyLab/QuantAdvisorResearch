@@ -1,5 +1,7 @@
 # 智慧顾投研究系统设计
 
+[English](system_design.md) | [简体中文](system_design.zh-CN.md)
+
 ## 当前架构理解
 
 QuantStrategyLab 现有仓库已经天然分层：

@@ -1,5 +1,7 @@
 # 数据源与因子完善路线
 
+[English](data_factor_roadmap.md) | [简体中文](data_factor_roadmap.zh-CN.md)
+
 ## 当前结论
 
 `QuantAdvisorResearch` 当前应该继续做推荐结论仓库，而不是把所有量化因子仓库接进来。原因是现有组织里已经有两条性质不同的链路：
@@ -163,11 +165,11 @@ Crypto 可作为跨资产风险情绪参考，但暂时不应混入 US equity �
 
 ## 低风险实施顺序
 
-1. 先让 `QuantAdvisorResearch` 把主题动量放到报告前面：
-   - 新增 `theme_first_candidates[]`，公开展示为“本期重点股票池”。
-   - 每期保留 5-10 个股票/公司标的，说明行业/主题背景、入选原因、事件确认和主要风险。
-   - 按主题和个股动量排序，优先展示 AI / 高科技等强主题候选。
-   - 事件证据只作为确认项，不再让事件股默认压过强主题候选。
+1. 先让 `QuantAdvisorResearch` 稳定输出最终推荐：
+   - 保留 `theme_first_candidates[]` 作为 JSON/Markdown 审计材料，不在公开页面默认展示。
+   - 公开 HTML/RSS/Telegram 默认只显示最终推荐、股票背景、推荐理由、周期和风险。
+   - 中线主题动量用于解释和排序候选，事件证据作为置信度与风险提示输入。
+   - 避免让“主题候选池”被误读为买入清单。
 
 2. 继续补 `PoliticalEventTrackingResearch` 的稳定真实源：
    - RSS feed 配置。
@@ -234,6 +236,6 @@ config/symbol_theme_exposure.csv
 
 1. theme membership 先固定，再观察后续表现。
 2. AI 只能输出 `theme_bias` 和 shadow context，不能输出目标仓位。
-3. Advisor 可以把主题 bias 和主题动量作为“本期重点股票池”展示入口；一级事件确认推荐仍需要事件证据和来源质量支撑。
+3. Advisor 可以把主题 bias 和主题动量作为最终推荐的解释输入；主题候选池只作为审计材料，公开输出默认只展示最终推荐。
 4. 每次规则、taxonomy、universe 变更都要记录版本，后续 walk-forward 只能 replay 已保存 artifact。
 5. 不因为 MU、INTC、DELL 或任何短期热门标的临时调权重；如果它们长期有 SEC/IR/政策/需求证据，会通过固定规则自然上升。

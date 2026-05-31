@@ -57,7 +57,7 @@ RSS 只放最短摘要，适合订阅器扫一眼：
 
 ```text
 标题：2026-05-30 周度模型推荐
-摘要：模式=model_recommendations；来源=operator_supplied；主题=...；推荐=EVT1, EVT2。
+摘要：主要信号=HBM / 存储, AI 算力平台；最终推荐=MU, INTC, AMD, VRT, DELL。
      非个性化模型输出；不包含下单、仓位配置或账户级建议。
 链接：完整 HTML 报告
 ```
@@ -69,22 +69,13 @@ Telegram 适合中等长度，最多展示前 3-5 个推荐：
 ```text
 量化模型推荐 | 周度 | 2026-05-30
 
-模式：model_recommendations
-来源：operator_supplied
-来源事件：8
+本期最终推荐：
+- MU | 中线 | 综合分=0.85 | 股票背景：Micron 主要做 DRAM、NAND 和 HBM 等存储芯片。
+  推荐理由：前景主要来自 AI 服务器对 HBM 和高端 DRAM 的需求，以及存储周期修复。
+- INTC | 中线 | 综合分=0.77 | 股票背景：Intel 主要做 CPU、数据中心芯片、制造工艺和晶圆代工。
+  推荐理由：前景主要来自美国本土半导体制造、CHIPS Act、代工恢复和 AI PC / 数据中心需求。
 
-主题动量：
-- #1 hbm_memory 分数=2.16 标的=MU
-
-本期重点股票池（5-10只，非个性化，不等于买入）：
-- #1 MU | 科技 / HBM and memory cycle | 近3月 +135.6% | 事件：待事件确认 | 结论：主题候选
-  为什么：属于科技 / HBM and memory cycle，主主题排名 #1；个股动量 2.93，近3个月 +135.6%。
-
-推荐/观察摘要：
-- EVT1 | 一级推荐 | 重点推荐 | 中线 | 分数=0.85
-- EVT2 | 一级推荐 | 重点推荐 | 中线 | 分数=0.83
-
-说明：非个性化模型输出；不包含下单、仓位配置或账户级建议。
+周期：短线=暂无；中线=MU, INTC, AMD, VRT, DELL；长线=暂无
 完整报告：<HTML link>
 ```
 
@@ -155,4 +146,4 @@ Subject: 量化模型推荐周度复盘 - 2026-05-30
 - RSS：`scripts/publish_advisory_site.py` 生成 `feed.xml`。
 - Telegram：可选。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，`scripts/notify_advisory_telegram.py` 会在 Pages 部署成功后发送短摘要；如果缺少任一 secret，会跳过通知但不让发布失败。
 
-通知仍然只能包含标的、重点股票池、行业/主题背景、推荐层级、周期、来源事件数、主题动量、模型分数、理由、风险和完整报告链接；不能包含订单、目标仓位、目标股数、账户适当性或账户级配置建议。
+通知默认只展示最终推荐、股票背景、推荐理由、周期、综合分和完整报告链接；不能包含订单、目标仓位、目标股数、账户适当性或账户级配置建议。主题候选只保留在 JSON/Markdown 审计材料中，不进入默认通知摘要。

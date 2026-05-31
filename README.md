@@ -29,6 +29,13 @@ Live site:
 
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
+Key documents:
+
+- [System design](docs/system_design.md) / [系统设计](docs/system_design.zh-CN.md)
+- [Data and factor roadmap](docs/data_factor_roadmap.md) / [数据源与因子路线](docs/data_factor_roadmap.zh-CN.md)
+- [Notification format](docs/notification_format.md) / [通知格式](docs/notification_format.zh-CN.md)
+- [Artifact contract](docs/advisory_contract.md)
+
 
 ## Horizon Source Split
 
@@ -150,16 +157,14 @@ The published HTML, RSS feed title, and Telegram summary default to Simplified
 Chinese (`zh-CN`) because the current audience is Chinese-language retail
 research readers. JSON field names remain stable English contract keys.
 
-For real-source publishing, dispatch the workflow with paths inside sibling
-repositories:
+The scheduled publish workflow defaults to live source artifacts inside sibling
+repositories. Manual dispatch can normally pass only `as_of`; override paths only
+when intentionally testing a different artifact:
 
 ```bash
 gh workflow run "Publish Model Recommendations Site" \
   --repo QuantStrategyLab/QuantAdvisorResearch \
-  -f as_of=2026-05-30 \
-  -f political_events_path=data/live/political_events.csv \
-  -f political_watchlist_path=data/live/political_watchlist.csv \
-  -f ai_signal_path=data/output/latest_signal.json
+  -f as_of=2026-05-30
 ```
 
 Notification channel rules are documented in
@@ -211,11 +216,11 @@ evidence_refs[]
 review_checklist[]
 ```
 
-`theme_first_candidates[]` is an optional display section derived from the
-theme momentum snapshot. Public renderers present it as a 5-10 name "重点股票池":
-industry/theme background, why the name entered the pool, event-confirmation
-state, and key risks. It is still research-only and must not encode orders,
-target weights, or account-level advice.
+`theme_first_candidates[]` is an optional internal explanation artifact derived
+from the theme momentum snapshot. The current public HTML, RSS, and Telegram
+outputs show only final recommendations; theme candidates remain available in
+JSON/Markdown for audit and future review. They are still research-only and must
+not encode orders, target weights, or account-level advice.
 
 Default horizon windows:
 
@@ -226,7 +231,7 @@ Default horizon windows:
 
 ## Versioning
 
-The Python package version is `0.1.1`. Report artifacts are versioned separately:
+The Python package version is `0.1.2`. Report artifacts are versioned separately:
 
 - report schema: `schema_version = 5`
 - report contract: `model_recommendations.v5`
@@ -240,8 +245,13 @@ into executable strategy targets.
 ## Source Mode
 
 Reports built from `examples/` inputs are marked `source_mode=fixture` and the
-HTML/RSS output displays that warning. Live operator-provided inputs are marked
-`source_mode=operator_supplied`.
+individual HTML report displays a fixture warning. Scheduled weekly/monthly and
+Pages workflows now default to `data/live/*` inputs from
+`PoliticalEventTrackingResearch`, so published reports should be
+`source_mode=operator_supplied` and should not show the fixture warning.
+
+`source_mode` remains in the JSON contract for auditability, but the public
+index, RSS, and Telegram summaries do not expose that internal field.
 
 ## Regulatory Boundary
 
@@ -274,12 +284,12 @@ python scripts/build_advisory_report.py \
   --output-md data/output/advisory_report.example.md
 ```
 
-Theme momentum is display-first context: it highlights strong themes and creates
-a `theme_first_candidates[]` stock-pool section so AI/high-tech candidates are
-visible with industry/theme background and reasons even when stable event
-evidence is still pending. It does not change recommendation ratings, scores,
-allocations, or execution policy. Workflows skip the section when the snapshot
-file is absent.
+Theme momentum is explanation-first context: it highlights strong themes and
+creates `theme_first_candidates[]` for JSON/Markdown audit material. The public
+HTML, RSS, and Telegram outputs stay focused on final recommendations only, so
+theme candidates are not mistaken for a buy list. Theme momentum does not change
+recommendation ratings, scores, allocations, or execution policy. Workflows skip
+this context when the snapshot file is absent.
 
 Yahoo chart downloads are only a temporary fallback.  Do not rely on random free
 proxy pools for the stable pipeline; prefer audited price snapshots, cache files,

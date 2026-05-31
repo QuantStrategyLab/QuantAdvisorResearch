@@ -277,12 +277,11 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
         filename = report_filename(report)
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
-        source_mode = str(report["summary"].get("source_mode", "unknown"))
         items.append(
             f"""
             <li>
               <a href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
-              <span>来源：{html.escape(source_mode)}；主要信号：{html.escape(top_themes or '无')}；最终推荐：{html.escape(top_symbols or '无')}</span>
+              <span>主要信号：{html.escape(top_themes or '无')}；最终推荐：{html.escape(top_symbols or '无')}</span>
             </li>
             """
         )
@@ -331,10 +330,8 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
         ET.SubElement(item, "pubDate").text = format_datetime(report["generated_at"])
         top_symbols = ", ".join(report["summary"].get("top_recommended_symbols", []))
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
-        source_mode = str(report["summary"].get("source_mode", "unknown"))
         ET.SubElement(item, "description").text = (
-            f"模式={report['mode']}；来源={source_mode}；主题={top_themes or '无'}；"
-            f"最终推荐={top_symbols or '无'}。"
+            f"主要信号={top_themes or '无'}；最终推荐={top_symbols or '无'}。"
             "非个性化模型输出；不包含下单、仓位配置或账户级建议。"
         )
     rss = ET.Element("rss", {"version": "2.0"})

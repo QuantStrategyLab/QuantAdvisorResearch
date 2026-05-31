@@ -15,12 +15,12 @@ on:
       political_events_path:
         description: "Path inside PoliticalEventTrackingResearch."
         required: false
-        default: "examples/political_events.example.csv"
+        default: "data/live/political_events.csv"
         type: string
       political_watchlist_path:
         description: "Path inside PoliticalEventTrackingResearch."
         required: false
-        default: "examples/political_watchlist.example.csv"
+        default: "data/live/political_watchlist.csv"
         type: string
       ai_signal_path:
         description: "Path inside ResearchSignalContextPipelines."
@@ -73,8 +73,8 @@ jobs:
         env:
           INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
           SITE_URL: ${{ github.event.inputs.site_url || 'https://quantstrategylab.github.io/QuantAdvisorResearch' }}
-          POLITICAL_EVENTS_PATH: ${{ github.event.inputs.political_events_path || 'examples/political_events.example.csv' }}
-          POLITICAL_WATCHLIST_PATH: ${{ github.event.inputs.political_watchlist_path || 'examples/political_watchlist.example.csv' }}
+          POLITICAL_EVENTS_PATH: ${{ github.event.inputs.political_events_path || 'data/live/political_events.csv' }}
+          POLITICAL_WATCHLIST_PATH: ${{ github.event.inputs.political_watchlist_path || 'data/live/political_watchlist.csv' }}
           AI_SIGNAL_PATH: ${{ github.event.inputs.ai_signal_path || 'data/output/latest_signal.json' }}
           THEME_MOMENTUM_PATH: ${{ github.event.inputs.theme_momentum_path || 'data/output/theme_momentum_snapshot.json' }}
         run: |

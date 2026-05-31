@@ -119,10 +119,11 @@ The contract intentionally rejects account-action fields such as `target_weight`
 ## Theme-first Candidate
 
 `theme_first_candidates` is optional and is derived from the theme momentum
-snapshot. Public renderers present it as a 5-10 name stock pool with
-industry/theme background, reasons, event confirmation, and risks. It exists to
-make strong-theme candidates visible before the event-confirmed recommendation
-list. It is still research-only and must not contain account-action fields.
+snapshot. It is kept as JSON/Markdown explanation and audit material with
+industry/theme background, reasons, event confirmation, and risks. The current
+public HTML, RSS, and Telegram renderers show final recommendations only, so
+theme candidates are not mistaken for a buy list. It is still research-only and
+must not contain account-action fields.
 
 Important fields:
 
@@ -175,7 +176,7 @@ generated_at
 
 `summary.source_mode` is:
 
-- `fixture`: one or more inputs came from `examples/`; public output must show a fixture warning.
-- `operator_supplied`: inputs did not come from fixture paths.
+- `fixture`: one or more inputs came from `examples/`; the individual HTML report should show a fixture warning and scheduled publication should avoid this mode.
+- `operator_supplied`: inputs did not come from fixture paths. This is the expected mode for scheduled public publication.
 
-`summary.data_quality_warnings` carries any source-mode warnings for renderers.
+`summary.data_quality_warnings` carries source-mode warnings for renderers. Public index, RSS, and Telegram summaries intentionally do not display `source_mode`; it remains an audit field in JSON.

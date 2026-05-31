@@ -6,6 +6,13 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 
 线上站点：<https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
+主要文档：
+
+- [系统设计](docs/system_design.zh-CN.md) / [System design](docs/system_design.md)
+- [数据源与因子路线](docs/data_factor_roadmap.zh-CN.md) / [Data and factor roadmap](docs/data_factor_roadmap.md)
+- [通知格式](docs/notification_format.zh-CN.md) / [Notification format](docs/notification_format.md)
+- [Artifact contract](docs/advisory_contract.md)
+
 当前运行节奏是：**周度公开推荐 + 周度事件/主题刷新 + 月度 AI shadow 背景 + 单独月度复盘 artifact**。月度复盘只做变化回顾和月末检查；只要报告里仍保留短线 `1-10个交易日` 和中线 `2-12周` 窗口，公开推荐就不应改成月更。
 
 ## 仓库定位
@@ -70,7 +77,9 @@ manifest 会记录 JSON/Markdown 的 SHA256、`as_of`、cadence、来源 artifac
 
 ## 来源模式
 
-如果报告输入来自 `examples/`，输出会标记 `source_mode=fixture`，HTML/RSS 也会显示 fixture 警告，避免把合成样例误认为真实推荐。真实运营输入会标记为 `source_mode=operator_supplied`。
+如果报告输入来自 `examples/`，输出会标记 `source_mode=fixture`，单篇 HTML 报告会显示 fixture 警告，避免把合成样例误认为真实推荐。周度/月度和 Pages 发布 workflow 现在默认读取 `PoliticalEventTrackingResearch` 的 `data/live/*`，因此正式发布应为 `source_mode=operator_supplied`，页面不应出现 fixture 警告。
+
+`source_mode` 继续保留在 JSON 契约里用于审计，但公开首页、RSS 和 Telegram 摘要不再展示这个内部字段。
 
 ## 边界
 
@@ -158,15 +167,12 @@ python scripts/publish_advisory_site.py \
 当前公开页面、RSS 标题和 Telegram 摘要默认使用简体中文（`zh-CN`）。
 JSON 字段名继续保持英文契约键，避免破坏下游程序读取。
 
-发布真实来源时，workflow inputs 要切到 `PoliticalEventTrackingResearch` 内的真实 CSV：
+发布 workflow 默认已经读取 `PoliticalEventTrackingResearch` 内的真实 CSV。手工触发通常只需要传日期；只有刻意测试其他 artifact 时才覆盖路径：
 
 ```bash
 gh workflow run "Publish Model Recommendations Site" \
   --repo QuantStrategyLab/QuantAdvisorResearch \
-  -f as_of=2026-05-30 \
-  -f political_events_path=data/live/political_events.csv \
-  -f political_watchlist_path=data/live/political_watchlist.csv \
-  -f ai_signal_path=data/output/latest_signal.json
+  -f as_of=2026-05-30
 ```
 
 通知格式设计见 [docs/notification_format.zh-CN.md](docs/notification_format.zh-CN.md)。
@@ -188,9 +194,9 @@ python scripts/build_advisory_report.py \
   --output-md data/output/advisory_report.example.md
 ```
 
-主题动量会生成 `theme_first_candidates[]`，公开页面会把它展示为“本期重点股票池”。
-股票池每期保留 5-10 个股票/公司标的，说明行业/主题背景、为什么入选、事件确认状态和主要风险。
-这些候选按主题和个股动量排序，并标明是否已有事件确认；但它们仍然不直接改变推荐评级、分数、仓位或执行状态。
+主题动量会生成 `theme_first_candidates[]`，但它现在只作为 JSON/Markdown 中的解释和审计材料。公开页面、RSS 和 Telegram 摘要默认只显示最终推荐，避免把候选池误读为买入清单。
+
+候选池仍会保留行业/主题背景、入选原因、事件确认状态和主要风险；但它不直接改变推荐评级、分数、仓位或执行状态。
 线上 workflow 如果找不到 `data/output/theme_momentum_snapshot.json`，会自动跳过这个展示区块。
 
 Yahoo chart 下载只作为临时 fallback。不要把随机免费代理 IP 池作为稳定生产方案；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。
