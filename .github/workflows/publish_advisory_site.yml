@@ -143,7 +143,7 @@ jobs:
           HISTORY_DIR="data/output/published/history"
           mkdir -p "${HISTORY_DIR}"
           HISTORY_INDEX="${HISTORY_DIR}/reports_index.json"
-          if curl -fsSL "${SITE_URL%/}/reports_index.json" -o "${HISTORY_INDEX}"; then
+          if curl -fsL "${SITE_URL%/}/reports_index.json" -o "${HISTORY_INDEX}"; then
             python - "${SITE_URL}" "${HISTORY_INDEX}" "${HISTORY_DIR}" "${AS_OF}" <<'PY'
           import json
           import re
