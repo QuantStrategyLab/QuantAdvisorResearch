@@ -55,7 +55,9 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     assert "长线：暂无稳定结论" in html
     assert "中线：MU、NVDA" in html
     assert "短线：暂无稳定结论" in html
-    assert "动量因子主要集中在科技板块" in html
+    assert "本期较突出的方向主要在科技板块" in html
+    assert "综合分" not in html
+    assert "多源依据" not in html
     assert "<span class=\"pill\">模式：" not in html
     assert "受众：" not in html
     assert "AI 状态：" not in html
@@ -109,6 +111,8 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "#172033" in favicon
     assert "Latest advisory" in index_html
     assert "历史归档" in index_html
+    assert "投资有风险，不构成投资建议。" in index_html
+    assert "周度更新 · 静态页面" not in index_html
     assert "近期历史报告" in index_html
     assert "archive.html" in index_html
     assert "历史归档" in archive_html
@@ -230,9 +234,9 @@ def test_render_report_html_groups_final_cards_by_horizon_and_rank() -> None:
     assert "horizon-medium" in html
     assert "horizon-short" in html
     assert html.index("<h2>长线</h2>") < html.index("<h2>中线</h2>") < html.index("<h2>短线</h2>")
-    assert html.index("#1</span>MID1") < html.index("#2</span>MID2")
-    assert "#1</span>LONG1" in html
-    assert "#1</span>SHORT1" in html
+    assert html.index("推荐 #1</span>MID1") < html.index("推荐 #2</span>MID2")
+    assert "推荐 #1</span>LONG1" in html
+    assert "推荐 #1</span>SHORT1" in html
     assert "最终推荐" not in html
 
 
@@ -293,8 +297,8 @@ def test_short_and_medium_columns_use_primary_horizon_only() -> None:
     assert "<h2>短线</h2>" in html
     short_start = html.index("<h2>短线</h2>")
     short_block = html[short_start:]
-    assert "#1</span>DELL" in short_block
-    assert "#1</span>MU" not in short_block
+    assert "推荐 #1</span>DELL" in short_block
+    assert "推荐 #1</span>MU" not in short_block
 
 def test_render_report_html_renders_long_context_as_full_card_when_primary_bucket_is_medium() -> None:
     report = build_sample_report()
@@ -330,7 +334,7 @@ def test_render_report_html_renders_long_context_as_full_card_when_primary_bucke
     html = render_report_html(report)
 
     assert "长线观察" not in html
-    assert "#1</span>MU" in html
+    assert "推荐 #1</span>MU" in html
     assert "长线 / 1-3年" in html
     assert "MU background" in html
     assert "MU reason" in html
@@ -395,7 +399,9 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "<span class=\"pill\">模式：" not in html
     assert "受众：" not in html
     assert "AI 状态：" not in html
-    assert "主题/背景" in html
+    assert "主题/背景" not in html
+    assert "综合分" not in html
+    assert "多源依据" not in html
     assert "AI信号仓库" not in html
     assert "ResearchSignalContextPipelines" not in html
     assert "股票背景" in html
@@ -406,7 +412,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "长线：暂无稳定结论" in html
     assert "中线：MU、NVDA" in html
     assert "短线：暂无稳定结论" in html
-    assert "动量因子主要集中在科技板块" in html
+    assert "本期较突出的方向主要在科技板块" in html
     assert "存储周期" in html
     assert "需复核估值、财报、回撤和流动性" not in html
     assert "做什么" not in html

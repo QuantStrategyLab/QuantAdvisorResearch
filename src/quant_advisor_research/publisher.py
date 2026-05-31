@@ -154,25 +154,18 @@ def horizon_display_meta(pick: dict[str, Any], horizon: str) -> tuple[str, str, 
 
 
 def render_final_card(pick: dict[str, Any], *, rank: int, horizon: str) -> str:
-    reasons = "".join(f"<li>{html.escape(str(reason))}</li>" for reason in pick.get("why_selected", []))
-    horizon_label, horizon_window, score = horizon_display_meta(pick, horizon)
+    horizon_label, horizon_window, _score = horizon_display_meta(pick, horizon)
     return f"""
     <article class="final-card">
       <header>
-        <h3><span class="rank">#{rank}</span>{html.escape(str(pick.get('symbol', '')))}</h3>
+        <h3><span class="rank">推荐 #{rank}</span>{html.escape(str(pick.get('symbol', '')))}</h3>
         <p>{html.escape(str(pick.get('name', '')))}</p>
       </header>
       <dl>
         <div><dt>周期</dt><dd>{html.escape(horizon_label)} / {html.escape(horizon_window)}</dd></div>
-        <div><dt>综合分</dt><dd>{html.escape(display_number(score))}</dd></div>
-        <div><dt>政策/新闻</dt><dd>{html.escape(display_number(pick.get('source_score')))}</dd></div>
-        <div><dt>动量</dt><dd>{html.escape(display_number(pick.get('momentum_score')))}</dd></div>
-        <div><dt>主题/背景</dt><dd>{html.escape(display_number(pick.get('medium_context_score', pick.get('ai_signal_score'))))}</dd></div>
       </dl>
       <p><strong>股票背景：</strong>{html.escape(str(pick.get('business_summary', '')))}</p>
       <p><strong>推荐理由：</strong>{html.escape(str(pick.get('prospect_summary', '')))}</p>
-      <p><strong>多源依据：</strong></p>
-      <ul>{reasons}</ul>
       <p><strong>主要风险：</strong>{html.escape(str(pick.get('risk_summary', '')))}</p>
     </article>
     """
@@ -218,7 +211,7 @@ def format_horizon_conclusion(report: dict[str, Any]) -> str:
 def format_momentum_factor_summary(report: dict[str, Any]) -> str:
     theme_momentum = report.get("theme_momentum", {})
     if not isinstance(theme_momentum, dict) or not theme_momentum.get("available"):
-        return "动量因子暂无可用主题排序。"
+        return "本期暂无足够稳定的主题排序。"
 
     themes = [theme for theme in theme_momentum.get("top_themes", []) if isinstance(theme, dict)]
     theme_names = [theme_label(theme.get("theme_id"), theme.get("theme_name")) for theme in themes[:4]]
@@ -226,8 +219,8 @@ def format_momentum_factor_summary(report: dict[str, Any]) -> str:
     sector_text = join_zh_items(sectors, limit=3, empty="暂无明确板块")
     theme_text = join_zh_items(theme_names, limit=4, empty="暂无明确主题")
     if sector_text == "暂无明确板块":
-        return f"动量因子领先主题包括 {theme_text}。"
-    return f"动量因子主要集中在{sector_text}板块，领先主题包括 {theme_text}。"
+        return f"本期较突出的方向包括 {theme_text}。"
+    return f"本期较突出的方向主要在{sector_text}板块，代表主题包括 {theme_text}。"
 
 
 def format_report_takeaway(report: dict[str, Any]) -> str:
@@ -235,11 +228,11 @@ def format_report_takeaway(report: dict[str, Any]) -> str:
     has_medium = bool(displayed_horizon_symbols(report, "medium"))
     has_short = bool(displayed_horizon_symbols(report, "short"))
     if has_long and has_medium and has_short:
-        return "整体看，当前信号存在跨周期共振，后续重点观察动量延续和风险事件变化。"
+        return "整体看，当前结论存在跨周期共振，后续重点观察趋势能否延续和风险事件变化。"
     if has_long and has_medium:
-        return "整体看，当前信号更偏中长线，短线暂不强调，后续重点观察动量延续和基本面兑现。"
+        return "整体看，当前结论更偏中长线，短线暂不强调，后续重点观察趋势能否延续和基本面兑现。"
     if has_medium:
-        return "整体看，当前信号更偏中线，短线暂不强调，后续重点观察动量延续和基本面兑现。"
+        return "整体看，当前结论更偏中线，短线暂不强调，后续重点观察趋势能否延续和基本面兑现。"
     if has_long:
         return "整体看，当前信号更偏长线观察，短线和中线暂未形成稳定排序。"
     if has_short:
@@ -740,10 +733,8 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-size: .72rem; font-weight: 850; letter-spacing: .18em; text-transform: uppercase; }}
     h1 {{ margin: 0; max-width: 780px; font-family: var(--font-display); font-size: clamp(2.15rem, 5vw, 4.05rem); font-weight: 700; line-height: 1.06; letter-spacing: -.045em; }}
     .hero p {{ margin: 16px 0 0; max-width: 680px; color: var(--muted); font-size: 1rem; line-height: 1.7; }}
-    .rss-card {{ justify-self: end; min-width: 170px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.66); box-shadow: 0 18px 45px rgba(31,45,61,.08); }}
-    .rss-card a {{ display: block; color: var(--ink); text-decoration: none; font-weight: 800; }}
-    .rss-card a + a {{ margin-top: 8px; }}
-    .rss-card span {{ display: block; color: var(--muted); margin-top: 5px; font-size: .88rem; }}
+    .rss-card {{ justify-self: end; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }}
+    .rss-card a {{ min-height: 38px; display: inline-flex; align-items: center; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.72); color: var(--ink); text-decoration: none; font-size: .92rem; font-weight: 750; box-shadow: 0 10px 24px rgba(31,45,61,.06); }}
     .latest-panel {{ position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr); gap: 22px; border: 1px solid rgba(30,77,216,.16); border-radius: 30px; padding: 26px; background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(255,250,240,.76)); box-shadow: 0 26px 70px rgba(31,45,61,.13); }}
     .latest-panel::after {{ content: ""; position: absolute; right: -80px; top: -110px; width: 260px; height: 260px; border-radius: 999px; background: rgba(0,166,200,.16); filter: blur(2px); }}
     .latest-copy {{ position: relative; z-index: 1; }}
@@ -797,12 +788,11 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
             <h1>智慧投顾研究系统</h1>
           </div>
         </div>
-        <p>把主题动量、市场确认和政策/新闻证据整理成普通投资者能读懂的研究结论。页面只展示推荐、周期、背景、理由和风险。</p>
+        <p>把主题动量、市场确认和政策/新闻证据整理成普通投资者能读懂的研究结论。页面只展示推荐、周期、背景、理由和风险。投资有风险，不构成投资建议。</p>
       </div>
       <aside class="rss-card">
         <a href="archive.html">历史归档</a>
         <a href="feed.xml">RSS 订阅</a>
-        <span>周度更新 · 静态页面</span>
       </aside>
     </section>
     {latest_block}
