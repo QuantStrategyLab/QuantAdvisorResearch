@@ -25,6 +25,27 @@ HORIZON_COLUMNS = (
     ("short", "短线", "1-10个交易日"),
 )
 
+SITE_ICON_FILENAME = "favicon.svg"
+SITE_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="qsl-bg" x1="8" y1="6" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1e4dd8"/>
+      <stop offset="0.56" stop-color="#00a6c8"/>
+      <stop offset="1" stop-color="#d99b2b"/>
+    </linearGradient>
+    <filter id="qsl-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#172033" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect x="5" y="5" width="54" height="54" rx="16" fill="#172033"/>
+  <path d="M18 43V25.5L29.2 36.7 44.8 20" fill="none" stroke="url(#qsl-bg)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#qsl-shadow)"/>
+  <circle cx="18" cy="43" r="4" fill="#fffaf0"/>
+  <circle cx="30" cy="36" r="4" fill="#fffaf0"/>
+  <circle cx="46" cy="19" r="4.5" fill="#fffaf0"/>
+  <path d="M45 45c-4 3.7-9.7 5-15.1 3.3-8.8-2.8-13.7-12.2-10.9-21 2.1-6.7 8.1-11.1 14.7-11.6" fill="none" stroke="#fffaf0" stroke-width="3.2" stroke-linecap="round" opacity=".88"/>
+</svg>
+"""
+
 
 def slug(value: str) -> str:
     text = re.sub(r"[^a-zA-Z0-9]+", "-", value.strip().lower()).strip("-")
@@ -72,6 +93,21 @@ def format_candidate_theme_ids(candidate: dict[str, Any]) -> str:
         for theme_id in candidate.get("theme_ids", [])
     ]
     return ", ".join(labels) or "无"
+
+
+def render_site_mark() -> str:
+    return """
+    <span class="site-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" focusable="false">
+        <rect x="5" y="5" width="54" height="54" rx="16"></rect>
+        <path class="mark-line" d="M18 43V25.5L29.2 36.7 44.8 20"></path>
+        <circle cx="18" cy="43" r="4"></circle>
+        <circle cx="30" cy="36" r="4"></circle>
+        <circle cx="46" cy="19" r="4.5"></circle>
+        <path class="mark-ring" d="M45 45c-4 3.7-9.7 5-15.1 3.3-8.8-2.8-13.7-12.2-10.9-21 2.1-6.7 8.1-11.1 14.7-11.6"></path>
+      </svg>
+    </span>
+    """
 
 
 def horizon_pick_score(pick: dict[str, Any], horizon: str) -> float:
@@ -232,12 +268,19 @@ def render_report_html(report: dict[str, Any]) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
+  <link rel="icon" type="image/svg+xml" href="{SITE_ICON_FILENAME}">
   <link rel="alternate" type="application/rss+xml" title="量化模型推荐 RSS" href="feed.xml">
   <style>
     :root {{ color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
     body {{ margin: 0; background: #f6f7f9; color: #1b1f24; }}
     main {{ max-width: 1080px; margin: 0 auto; padding: 32px 20px 56px; }}
     .hero {{ text-align: center; padding: 8px 0 22px; margin-bottom: 10px; }}
+    .site-mark {{ display: inline-flex; width: 58px; height: 58px; margin: 0 auto 14px; filter: drop-shadow(0 12px 22px rgb(9 105 218 / 18%)); }}
+    .site-mark svg {{ width: 100%; height: 100%; }}
+    .site-mark rect {{ fill: #172033; }}
+    .site-mark .mark-line {{ fill: none; stroke: #00a6c8; stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }}
+    .site-mark circle {{ fill: #fffaf0; }}
+    .site-mark .mark-ring {{ fill: none; stroke: #fffaf0; stroke-width: 3.2; stroke-linecap: round; opacity: .88; }}
     h1 {{ margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.15; letter-spacing: -0.04em; }}
     .warning {{ background: #fff1f2; border: 1px solid #fecdd3; padding: 14px 16px; margin-bottom: 20px; }}
     .final-decisions {{ margin-bottom: 20px; }}
@@ -287,6 +330,7 @@ def render_report_html(report: dict[str, Any]) -> str:
 <body>
   <main>
     <section class="hero">
+      {render_site_mark()}
       <h1>{html.escape(title)}</h1>
     </section>
     {final_decisions_html}
@@ -372,6 +416,7 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>量化模型推荐</title>
+  <link rel="icon" type="image/svg+xml" href="{SITE_ICON_FILENAME}">
   <link rel="alternate" type="application/rss+xml" title="量化模型推荐 RSS" href="feed.xml">
   <style>
     :root {{
@@ -410,6 +455,13 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     }}
     main {{ max-width: 1180px; margin: 0 auto; padding: 34px 20px 64px; position: relative; }}
     .hero {{ display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; padding: 22px 0 28px; }}
+    .brand-lockup {{ display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }}
+    .site-mark {{ flex: 0 0 auto; display: inline-flex; width: 64px; height: 64px; filter: drop-shadow(0 18px 28px rgba(30,77,216,.22)); }}
+    .site-mark svg {{ width: 100%; height: 100%; }}
+    .site-mark rect {{ fill: #172033; }}
+    .site-mark .mark-line {{ fill: none; stroke: var(--cyan); stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }}
+    .site-mark circle {{ fill: var(--paper); }}
+    .site-mark .mark-ring {{ fill: none; stroke: var(--paper); stroke-width: 3.2; stroke-linecap: round; opacity: .88; }}
     .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; font-size: .78rem; }}
     h1 {{ margin: 0; max-width: 780px; font-family: "Iowan Old Style", Georgia, ui-serif, serif; font-size: clamp(2.55rem, 7vw, 5.7rem); line-height: .92; letter-spacing: -.07em; }}
     .hero p {{ margin: 18px 0 0; max-width: 680px; color: var(--muted); font-size: 1.06rem; line-height: 1.7; }}
@@ -461,8 +513,13 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
   <main>
     <section class="hero">
       <div>
-        <p class="eyebrow">QuantStrategyLab</p>
-        <h1>量化模型推荐</h1>
+        <div class="brand-lockup">
+          {render_site_mark()}
+          <div>
+            <p class="eyebrow">QuantStrategyLab</p>
+            <h1>量化模型推荐</h1>
+          </div>
+        </div>
         <p>把主题动量、市场确认和政策/新闻证据合成为非个性化研究结论。页面只展示推荐、周期、背景、理由和风险。</p>
       </div>
       <aside class="rss-card">
@@ -517,6 +574,9 @@ def publish_reports(report_paths: list[str | Path], output_dir: str | Path, *, s
         path = output / report_filename(report)
         path.write_text(render_report_html(report), encoding="utf-8")
         written.append(path)
+    icon_path = output / SITE_ICON_FILENAME
+    icon_path.write_text(SITE_ICON_SVG, encoding="utf-8")
+    written.append(icon_path)
     index_path = output / "index.html"
     index_path.write_text(render_index_html(reports), encoding="utf-8")
     written.append(index_path)

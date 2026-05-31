@@ -25,6 +25,8 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
 
     assert "量化模型推荐周度复盘 - 2026-05-30" in html
     assert "text-align: center" in html
+    assert 'rel="icon" type="image/svg+xml" href="favicon.svg"' in html
+    assert "site-mark" in html
     assert "2-12周" in html
     assert "来源模式：fixture" not in html
     assert "股票背景" in html
@@ -67,11 +69,17 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     filenames = {path.name for path in written}
     assert "index.html" in filenames
     assert "feed.xml" in filenames
+    assert "favicon.svg" in filenames
     assert "2026-05-30-weekly-model-recommendations.html" in filenames
     index_html = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+    favicon = (tmp_path / "site" / "favicon.svg").read_text(encoding="utf-8")
     assert "来源：" not in index_html
     assert "主要信号" in index_html
     assert "最终推荐" not in index_html
+    assert 'rel="icon" type="image/svg+xml" href="favicon.svg"' in index_html
+    assert "site-mark" in index_html
+    assert "<svg" in favicon
+    assert "#172033" in favicon
     assert "Latest briefing" in index_html
     assert "latest-panel" in index_html
     assert "snapshot-grid" in index_html
