@@ -156,6 +156,7 @@ recommendations[]
 watchlist[]
 horizon_buckets.short | medium | long
 horizon_rankings.short | medium | long
+horizon_action_buckets.short | medium | long
 ```
 
 Each final pick may carry:
@@ -187,6 +188,25 @@ Scoring and gate intent by horizon:
 
 These fields are audit metadata. Public HTML/RSS/Telegram renderers still show
 only final recommendations, stock background, recommendation reasons, and risks.
+If the primary long bucket is empty but final picks still pass the long-horizon
+`watch` or `recommend` gate, the public HTML may show a compact long-context
+symbol strip instead of exposing internal scores.
+
+## Long-context Diagnostics
+
+`summary` includes long-context health fields so an empty long bucket can be
+debugged without reading renderer code:
+
+```text
+long_context_available
+long_context_symbol_count
+long_context_symbols
+long_context_missing_reason
+```
+
+If `long_context_available=false`, `long_context_missing_reason` should point to
+the first likely ingestion problem, such as missing AI shadow input, a non-long
+`latest_signal` horizon, or missing symbol/theme coverage.
 
 ## Artifact Manifest
 

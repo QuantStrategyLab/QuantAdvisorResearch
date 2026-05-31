@@ -62,6 +62,8 @@ execution targets for this advisory pipeline.
 `QuantAdvisorResearch` records per-recommendation `supporting_context`,
 `horizon_scores`, and `horizon_actions` so each final recommendation can be
 traced back to short-, medium-, and long-horizon inputs and gates.
+The report summary also records long-context availability diagnostics. This
+keeps a genuinely weak long signal separate from an upstream ingestion gap.
 
 ## Design Patterns
 
@@ -96,6 +98,8 @@ The public HTML/RSS/Telegram outputs should stay direct:
   and risks;
 - render public recommendations as long-, medium-, and short-horizon columns,
   sorted by each horizon score inside the column;
+- show a compact long-context symbol strip when the primary long bucket is empty
+  but final picks still pass long-horizon watch/recommend gates;
 - hide internal tags such as `source_mode`, mode labels, audience labels, and
   repository names;
 - keep `theme_first_candidates[]`, `horizon_scores`, and `selection_trace` in

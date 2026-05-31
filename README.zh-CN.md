@@ -33,7 +33,7 @@ QuantStrategyLab 的“智慧投顾研究系统”协调仓库。它把事件证
 - 中线（2-12 周）：`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json`，现在明确标记为 `medium_horizon_theme_context`，重点看主题动量和个股动量。
 - 长线（1-3 年）：`ResearchSignalContextPipelines` 的 `latest_signal.json` / `signal_history/*.json`，作为 AI shadow 背景。
 
-最终研究结论仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。本仓库会为最终推荐记录短/中/长线独立评分和独立门槛，但公开页面仍保持简洁，只展示最终列表、背景、理由和风险。
+最终研究结论仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。本仓库会为最终推荐记录短/中/长线独立评分和独立门槛，并在 JSON 里记录长线背景是否可用。公开页面仍保持简洁，只展示最终列表、背景、理由和风险；如果没有标的以长线作为主周期，但已经通过长线观察门槛，页面会显示一个简洁的“长线观察”标的条。
 
 ## 当前 MVP
 

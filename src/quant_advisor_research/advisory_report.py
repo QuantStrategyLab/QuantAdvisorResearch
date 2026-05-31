@@ -1328,6 +1328,16 @@ def build_final_decisions(
         horizon: [item["symbol"] for item in recommendations_out if item.get("primary_horizon") == horizon]
         for horizon in ("short", "medium", "long")
     }
+    ranked_by_horizon = {
+        horizon: sorted(
+            picks,
+            key=lambda candidate: (
+                -as_float(candidate.get("horizon_scores", {}).get(horizon, {}).get("score")),
+                str(candidate.get("symbol", "")),
+            ),
+        )
+        for horizon in ("short", "medium", "long")
+    }
     horizon_rankings = {
         horizon: [
             {
@@ -1335,14 +1345,19 @@ def build_final_decisions(
                 "score": item["horizon_scores"][horizon]["score"],
                 "action": item["horizon_actions"][horizon],
             }
-            for item in sorted(
-                picks,
-                key=lambda candidate: (
-                    -as_float(candidate.get("horizon_scores", {}).get(horizon, {}).get("score")),
-                    str(candidate.get("symbol", "")),
-                ),
-            )[:max_recommendations]
+            for item in ranked_by_horizon[horizon][:max_recommendations]
         ]
+        for horizon in ("short", "medium", "long")
+    }
+    horizon_action_buckets = {
+        horizon: {
+            action: [
+                item["symbol"]
+                for item in ranked_by_horizon[horizon]
+                if item["horizon_actions"].get(horizon) == action
+            ][:max_recommendations]
+            for action in ("recommend", "watch")
+        }
         for horizon in ("short", "medium", "long")
     }
     return {
@@ -1351,8 +1366,48 @@ def build_final_decisions(
         "watchlist": watchlist_out,
         "horizon_buckets": horizon_buckets,
         "horizon_rankings": horizon_rankings,
+        "horizon_action_buckets": horizon_action_buckets,
         "position_policy": "No target shares, position size, portfolio weight, or account-specific allocation is provided.",
     }
+
+
+def long_context_symbols_from_decisions(final_decisions: dict[str, Any]) -> list[str]:
+    symbols: list[str] = []
+    action_buckets = final_decisions.get("horizon_action_buckets", {})
+    long_buckets = action_buckets.get("long", {}) if isinstance(action_buckets, dict) else {}
+    if isinstance(long_buckets, dict):
+        for action in ("recommend", "watch"):
+            for symbol in long_buckets.get(action, []):
+                symbol_text = str(symbol).upper()
+                if symbol_text and symbol_text not in symbols:
+                    symbols.append(symbol_text)
+    if symbols:
+        return symbols
+
+    for section in ("recommendations", "watchlist"):
+        for item in final_decisions.get(section, []):
+            if not isinstance(item, dict):
+                continue
+            symbol_text = str(item.get("symbol", "")).upper()
+            action = str(item.get("horizon_actions", {}).get("long", ""))
+            has_long_context = action in {"recommend", "watch"} or as_float(item.get("long_context_score")) >= 0.35
+            if symbol_text and has_long_context:
+                if symbol_text not in symbols:
+                    symbols.append(symbol_text)
+    return symbols
+
+
+def infer_long_context_missing_reason(ai_signal: dict[str, Any] | None) -> str:
+    if not ai_signal:
+        return "ai_signal_not_available"
+    horizon_text = str(ai_signal.get("horizon", "")).strip()
+    if horizon_text not in {HORIZON_WINDOWS["long"], "1-3 years"}:
+        return "latest_signal_horizon_not_long"
+    if not ai_signal.get("symbol_bias") and not ai_signal.get("theme_bias"):
+        return "latest_signal_lacks_symbol_or_theme_bias"
+    if not ai_signal.get("symbol_bias") and not ai_signal.get("symbol_theme_exposure"):
+        return "latest_signal_lacks_symbol_theme_exposure"
+    return "current_candidates_do_not_meet_long_context_gate"
 
 
 def build_advisory_report(
@@ -1393,7 +1448,7 @@ def build_advisory_report(
         for key in ("symbol_bias", "research_bias", "candidate_bias"):
             symbols |= {symbol.upper() for symbol in normalize_ai_mapping(ai_signal.get(key) or {})}
 
-    recommendations = [
+    all_recommendations = [
         build_recommendation(
             symbol=symbol,
             item=watchlist.get(symbol),
@@ -1403,10 +1458,11 @@ def build_advisory_report(
         )
         for symbol in sorted(symbols)
     ]
-    recommendations.sort(key=lambda rec: (-rec["evidence_score"], rec["risk_score"], rec["symbol"]))
-    recommendations = recommendations[:max_candidates]
-    theme_first_candidates = build_theme_first_candidates(theme_momentum, recommendations)
-    final_decisions = build_final_decisions(recommendations, theme_momentum, market_confirmations)
+    all_recommendations.sort(key=lambda rec: (-rec["evidence_score"], rec["risk_score"], rec["symbol"]))
+    recommendations = all_recommendations[:max_candidates]
+    theme_first_candidates = build_theme_first_candidates(theme_momentum, all_recommendations)
+    final_decisions = build_final_decisions(all_recommendations, theme_momentum, market_confirmations)
+    long_context_symbols = long_context_symbols_from_decisions(final_decisions)
 
     report = {
         "schema_version": "5",
@@ -1424,6 +1480,7 @@ def build_advisory_report(
         },
         "summary": {
             "recommendation_count": len(recommendations),
+            "candidate_universe_count": len(all_recommendations),
             "source_event_count": len(events),
             "ai_regime": ai_signal.get("regime", "not_available") if ai_signal else "not_available",
             "ai_confidence": ai_signal.get("confidence", 0.0) if ai_signal else 0.0,
@@ -1436,6 +1493,12 @@ def build_advisory_report(
             "top_theme_ids": [theme["theme_id"] for theme in theme_momentum_summary["top_themes"]],
             "theme_first_candidate_count": len(theme_first_candidates),
             "market_confirmation_count": len(market_confirmations),
+            "long_context_available": bool(long_context_symbols),
+            "long_context_symbol_count": len(long_context_symbols),
+            "long_context_symbols": long_context_symbols[:12],
+            "long_context_missing_reason": ""
+            if long_context_symbols
+            else infer_long_context_missing_reason(ai_signal),
             "top_theme_candidate_symbols": [item["symbol"] for item in theme_first_candidates[:8]],
             "top_recommended_symbols": [item["symbol"] for item in final_decisions["recommendations"][:5]],
             "review_note": "Intelligent advisory research output. No order, target quantity, account suitability, or portfolio allocation is encoded.",

@@ -114,6 +114,7 @@ symbol_theme_exposure
 - 长线（1-3 年）：AI shadow 背景层负责，来自 `latest_signal.json` 和 `signal_history/*.json`。
 
 `QuantAdvisorResearch` 只在最后做确定性合成，报告中的 `supporting_context`、`horizon_scores` 和 `horizon_actions` 会记录每个最终推荐用到了短线、中线、长线哪些输入，以及每个周期是否达到推荐或观察门槛。
+报告 summary 还会记录长线背景是否可用，避免把“上游 artifact 缺字段”误读成“长线没有机会”。
 
 ## Theme momentum 展示边界
 
@@ -121,6 +122,7 @@ symbol_theme_exposure
 
 - 公开页面只展示最终推荐，不展示主题候选池；
 - 公开页面按长线 / 中线 / 短线三列展示，每列内按对应周期分数排序；
+- 如果长线主周期为空，但最终推荐已通过长线观察或推荐门槛，公开页面显示简洁的“长线观察”标的条；
 - JSON/Markdown 保留 `theme_first_candidates[]` 供审计；
 - `final_decisions` 可以把主题动量作为中线评分的重要输入；
 - 基础 `recommendations[]` 评级仍由事件、watchlist 和 AI 背景生成；

@@ -131,6 +131,30 @@ def ranked_horizon_picks(final_picks: list[dict[str, Any]], horizon: str) -> lis
     return sorted(picks, key=lambda pick: (-horizon_pick_score(pick, horizon), str(pick.get("symbol", ""))))
 
 
+def ranked_secondary_horizon_picks(final_picks: list[dict[str, Any]], horizon: str) -> list[dict[str, Any]]:
+    picks = [
+        pick
+        for pick in final_picks
+        if pick.get("primary_horizon") != horizon
+        and pick.get("horizon_actions", {}).get(horizon) in {"recommend", "watch"}
+    ]
+    return sorted(picks, key=lambda pick: (-horizon_pick_score(pick, horizon), str(pick.get("symbol", ""))))
+
+
+def render_horizon_context_strip(picks: list[dict[str, Any]]) -> str:
+    if not picks:
+        return ""
+    symbols = "".join(
+        f'<span class="context-symbol">{html.escape(str(pick.get("symbol", "")))}</span>' for pick in picks[:5]
+    )
+    return f"""
+    <div class="context-strip">
+      <p>长线观察</p>
+      <div class="context-symbols">{symbols}</div>
+    </div>
+    """
+
+
 def render_final_card(pick: dict[str, Any], *, rank: int) -> str:
     reasons = "".join(f"<li>{html.escape(str(reason))}</li>" for reason in pick.get("why_selected", []))
     return f"""
@@ -166,7 +190,11 @@ def render_final_decisions_html(report: dict[str, Any]) -> str:
             render_final_card(pick, rank=index)
             for index, pick in enumerate(ranked_horizon_picks(final_picks, horizon), start=1)
         ]
-        body = "".join(cards) if cards else '<p class="empty-column">暂无</p>'
+        body = "".join(cards)
+        if not body and horizon == "long":
+            body = render_horizon_context_strip(ranked_secondary_horizon_picks(final_picks, horizon))
+        if not body:
+            body = '<p class="empty-column">暂无</p>'
         columns.append(
             f"""
             <section class="horizon-column horizon-{html.escape(horizon)}">
@@ -416,6 +444,10 @@ def render_report_html(report: dict[str, Any]) -> str:
     .horizon-column-header p {{ margin: 5px 0 0; color: var(--muted); font-size: .88rem; }}
     .horizon-cards {{ display: grid; gap: 13px; }}
     .empty-column {{ margin: 24px 0; color: var(--muted); text-align: center; }}
+    .context-strip {{ border: 1px dashed rgba(15,139,98,.32); border-radius: 20px; padding: 16px; background: rgba(240,253,244,.74); }}
+    .context-strip p {{ margin: 0 0 10px; color: var(--green); font-size: .92rem; font-weight: 850; }}
+    .context-symbols {{ display: flex; flex-wrap: wrap; gap: 8px; }}
+    .context-symbol {{ display: inline-flex; align-items: center; min-height: 30px; padding: 6px 10px; border-radius: 999px; background: #fff; border: 1px solid rgba(15,139,98,.22); color: var(--ink); font-size: .92rem; font-weight: 850; }}
     .final-card {{
       background: rgba(255,255,255,.9);
       border: 1px solid rgba(217,226,239,.95);
@@ -486,11 +518,32 @@ def render_report_html(report: dict[str, Any]) -> str:
 """
 
 
-def format_horizon_summary(report: dict[str, Any]) -> list[tuple[str, str, str, list[str]]]:
+def horizon_summary_symbols(report: dict[str, Any], horizon: str) -> list[str]:
     decisions = report.get("final_decisions", {})
     buckets = decisions.get("horizon_buckets", {}) if isinstance(decisions, dict) else {}
+    primary_symbols = [str(symbol) for symbol in buckets.get(horizon, [])]
+    if primary_symbols:
+        return primary_symbols
+
+    final_picks = [pick for pick in decisions.get("recommendations", []) if isinstance(pick, dict)]
+    secondary_picks = [
+        pick
+        for pick in final_picks
+        if pick.get("horizon_actions", {}).get(horizon) in {"recommend", "watch"}
+    ]
     return [
-        (horizon, label, window, [str(symbol) for symbol in buckets.get(horizon, [])])
+        str(pick.get("symbol", ""))
+        for pick in sorted(
+            secondary_picks,
+            key=lambda item: (-horizon_pick_score(item, horizon), str(item.get("symbol", ""))),
+        )
+        if str(pick.get("symbol", ""))
+    ]
+
+
+def format_horizon_summary(report: dict[str, Any]) -> list[tuple[str, str, str, list[str]]]:
+    return [
+        (horizon, label, window, horizon_summary_symbols(report, horizon))
         for horizon, label, window in HORIZON_COLUMNS
     ]
 

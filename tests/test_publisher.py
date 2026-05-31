@@ -150,6 +150,11 @@ def test_render_report_html_groups_final_cards_by_horizon_and_rank() -> None:
                 "medium": {"score": score if horizon == "medium" else 0.0},
                 "short": {"score": score if horizon == "short" else 0.0},
             },
+            "horizon_actions": {
+                "long": "recommend" if horizon == "long" else "skip",
+                "medium": "recommend" if horizon == "medium" else "skip",
+                "short": "recommend" if horizon == "short" else "skip",
+            },
             "business_summary": f"{symbol} background",
             "prospect_summary": f"{symbol} reason",
             "why_selected": ["ranked"],
@@ -173,6 +178,44 @@ def test_render_report_html_groups_final_cards_by_horizon_and_rank() -> None:
     assert html.index("#1</span>MID1") < html.index("#2</span>MID2")
     assert "#1</span>LONG1" in html
     assert "#1</span>SHORT1" in html
+    assert "最终推荐" not in html
+
+
+def test_render_report_html_shows_long_context_when_primary_bucket_is_medium() -> None:
+    report = build_sample_report()
+    report["final_decisions"]["recommendations"] = [
+        {
+            "symbol": "MU",
+            "name": "Micron Technology",
+            "primary_horizon": "medium",
+            "primary_horizon_label": "中线",
+            "primary_horizon_window": "2-12周",
+            "combined_score": 0.9,
+            "source_score": 0.1,
+            "momentum_score": 0.9,
+            "medium_context_score": 0.9,
+            "long_context_score": 0.62,
+            "horizon_scores": {
+                "long": {"score": 0.66},
+                "medium": {"score": 0.9},
+                "short": {"score": 0.1},
+            },
+            "horizon_actions": {
+                "long": "watch",
+                "medium": "recommend",
+                "short": "skip",
+            },
+            "business_summary": "MU background",
+            "prospect_summary": "MU reason",
+            "why_selected": ["ranked"],
+            "risk_summary": "risk",
+        }
+    ]
+
+    html = render_report_html(report)
+
+    assert "长线观察" in html
+    assert '<span class="context-symbol">MU</span>' in html
     assert "最终推荐" not in html
 
 

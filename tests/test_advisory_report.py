@@ -307,6 +307,10 @@ def test_theme_bias_can_lift_static_watchlist_item_without_direct_symbol_bias(tm
     assert rec["rating"] == "watch"
     assert rec["evidence_score"] > 4
     assert any("主题=hbm_memory" in reason for reason in rec["reasons"])
+    assert report["summary"]["long_context_available"] is True
+    assert report["summary"]["long_context_missing_reason"] == ""
+    assert "MU" in report["summary"]["long_context_symbols"]
+    assert report["final_decisions"]["horizon_action_buckets"]["long"]["watch"][:1] == ["MU"]
 
 
 def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: Path) -> None:
