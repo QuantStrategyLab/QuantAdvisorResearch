@@ -147,7 +147,7 @@ python scripts/publish_advisory_site.py \
   --site-url https://quantstrategylab.github.io/QuantAdvisorResearch
 ```
 
-Open `site/index.html` locally or subscribe to `site/feed.xml`. The workflow
+Open `site/index.html` locally or subscribe to `site/feed.xml`. The static site also writes `site/archive.html` and `site/reports_index.json`: the homepage keeps the latest report plus the most recent 12 historical entries, while the archive page keeps all generated reports grouped by month. The RSS feed keeps the most recent 20 items. The workflow
 `.github/workflows/publish_advisory_site.yml` deploys the same output to
 GitHub Pages:
 

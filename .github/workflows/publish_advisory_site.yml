@@ -138,12 +138,65 @@ jobs:
             "${MARKET_ARGS[@]}" \
             --output-json "data/output/published/advisory_report_${AS_OF}.json" \
             --output-md "data/output/published/advisory_report_${AS_OF}.md"
+
+          REPORT_ARGS=("data/output/published/advisory_report_${AS_OF}.json")
+          HISTORY_DIR="data/output/published/history"
+          mkdir -p "${HISTORY_DIR}"
+          HISTORY_INDEX="${HISTORY_DIR}/reports_index.json"
+          if curl -fsSL "${SITE_URL%/}/reports_index.json" -o "${HISTORY_INDEX}"; then
+            python - "${SITE_URL}" "${HISTORY_INDEX}" "${HISTORY_DIR}" "${AS_OF}" <<'PY'
+          import json
+          import re
+          import sys
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+
+          site_url, index_path, history_dir, current_as_of = sys.argv[1:]
+          history_dir_path = Path(history_dir)
+          index = json.loads(Path(index_path).read_text(encoding="utf-8"))
+          paths = []
+          seen_as_of = {current_as_of}
+          for item in index.get("reports", []):
+              as_of = str(item.get("as_of", "")).strip()
+              json_name = Path(str(item.get("json", ""))).name
+              if not as_of or as_of in seen_as_of:
+                  continue
+              if not re.fullmatch(r"advisory_report_\d{4}-\d{2}-\d{2}\.json", json_name):
+                  continue
+              seen_as_of.add(as_of)
+              url = f"{site_url.rstrip('/')}/{urllib.parse.quote(json_name)}"
+              destination = history_dir_path / json_name
+              try:
+                  urllib.request.urlretrieve(url, destination)
+                  payload = json.loads(destination.read_text(encoding="utf-8"))
+              except Exception as exc:  # noqa: BLE001 - best-effort public archive recovery
+                  print(f"Skipped historical report {json_name}: {exc}")
+                  continue
+              if str(payload.get("as_of", "")) != as_of:
+                  print(f"Skipped historical report {json_name}: as_of mismatch")
+                  continue
+              paths.append(str(destination))
+
+          (history_dir_path / "report_paths.txt").write_text("\n".join(paths), encoding="utf-8")
+          print(f"Recovered {len(paths)} historical reports from published site.")
+          PY
+            if [ -s "${HISTORY_DIR}/report_paths.txt" ]; then
+              mapfile -t HISTORY_REPORTS < "${HISTORY_DIR}/report_paths.txt"
+              REPORT_ARGS+=("${HISTORY_REPORTS[@]}")
+            fi
+          else
+            echo "No existing reports_index.json found on published site; starting archive with current report."
+          fi
+
           python scripts/publish_advisory_site.py \
-            --reports "data/output/published/advisory_report_${AS_OF}.json" \
+            --reports "${REPORT_ARGS[@]}" \
             --output-dir site \
             --site-url "${SITE_URL}" \
             --feed-title "智慧投顾研究系统"
-          cp "data/output/published/advisory_report_${AS_OF}.json" site/
+          for REPORT_JSON in "${REPORT_ARGS[@]}"; do
+            cp "${REPORT_JSON}" site/
+          done
           cp "data/output/published/advisory_report_${AS_OF}.md" site/
           cp "data/output/published/advisory_report_${AS_OF}.json.manifest.json" site/
           echo "as_of=${AS_OF}" >> "$GITHUB_OUTPUT"

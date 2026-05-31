@@ -160,7 +160,7 @@ python scripts/publish_advisory_site.py \
   --site-url https://quantstrategylab.github.io/QuantAdvisorResearch
 ```
 
-本地打开 `site/index.html`，RSS 文件是 `site/feed.xml`。
+本地打开 `site/index.html`，RSS 文件是 `site/feed.xml`。静态站点同时生成 `site/archive.html` 和 `site/reports_index.json`：首页只保留最新报告和最近 12 期历史报告，完整历史按月份保留在归档页；RSS 默认保留最近 20 条。
 `.github/workflows/publish_advisory_site.yml` 会部署到 GitHub Pages：
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 

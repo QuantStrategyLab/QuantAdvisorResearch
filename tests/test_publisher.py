@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 
 from quant_advisor_research.advisory_report import build_advisory_report, write_json
-from quant_advisor_research.publisher import publish_reports, render_feed_xml, render_report_html
+from quant_advisor_research.publisher import (
+    publish_reports,
+    render_archive_html,
+    render_feed_xml,
+    render_index_html,
+    render_report_html,
+    render_reports_index_json,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,8 +94,11 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "index.html" in filenames
     assert "feed.xml" in filenames
     assert "favicon.svg" in filenames
+    assert "archive.html" in filenames
+    assert "reports_index.json" in filenames
     assert "2026-05-30-weekly-model-recommendations.html" in filenames
     index_html = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+    archive_html = (tmp_path / "site" / "archive.html").read_text(encoding="utf-8")
     favicon = (tmp_path / "site" / "favicon.svg").read_text(encoding="utf-8")
     assert "来源：" not in index_html
     assert "主要信号" in index_html
@@ -97,6 +108,11 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "<svg" in favicon
     assert "#172033" in favicon
     assert "Latest advisory" in index_html
+    assert "历史归档" in index_html
+    assert "近期历史报告" in index_html
+    assert "archive.html" in index_html
+    assert "历史归档" in archive_html
+    assert "2026 年 05 月" in archive_html
     assert "--font-sans" in index_html
     assert "--font-display" in index_html
     assert "latest-panel" in index_html
@@ -105,6 +121,39 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "<p class=\"snapshot-label\">中线</p>" in index_html
     assert "<p class=\"snapshot-label\">短线</p>" in index_html
     assert "打开最新报告" in index_html
+
+
+def make_report_for_date(base_report: dict, as_of: str) -> dict:
+    report = deepcopy(base_report)
+    report["as_of"] = as_of
+    report["generated_at"] = f"{as_of}T00:00:00+00:00"
+    return report
+
+
+def test_index_limits_recent_history_and_archive_keeps_all_reports() -> None:
+    base = build_sample_report()
+    reports = [make_report_for_date(base, f"2026-05-{day:02d}") for day in range(1, 23)]
+
+    index_html = render_index_html(reports)
+    archive_html = render_archive_html(reports)
+    feed = render_feed_xml(reports, site_url="https://example.com/advisor", feed_title="Test Feed")
+    report_index = render_reports_index_json(reports)
+
+    assert "2026-05-22 周度智慧投顾研究" in index_html
+    assert index_html.count('class="archive-card"') == 12
+    assert "2026-05-21 周度复盘" in index_html
+    assert "2026-05-10 周度复盘" in index_html
+    assert "2026-05-09 周度复盘" not in index_html
+    assert "查看全部" in index_html
+    assert "archive.html" in index_html
+    assert archive_html.count('class="archive-card"') == 22
+    assert "2026-05-01 周度复盘" in archive_html
+    assert feed.count("<item>") == 20
+    assert "2026-05-03 周度智慧投顾研究" in feed
+    assert "2026-05-02 周度智慧投顾研究" not in feed
+    assert '"reports"' in report_index
+    assert '"as_of": "2026-05-22"' in report_index
+    assert '"json": "advisory_report_2026-05-01.json"' in report_index
 
 
 def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_path: Path) -> None:

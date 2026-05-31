@@ -24,6 +24,8 @@ HORIZON_COLUMNS = (
     ("medium", "中线", "2-12周"),
     ("short", "短线", "1-10个交易日"),
 )
+INDEX_HISTORY_LIMIT = 12
+RSS_ITEM_LIMIT = 20
 
 SITE_ICON_FILENAME = "favicon.svg"
 SITE_ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
@@ -562,6 +564,7 @@ def render_report_html(report: dict[str, Any]) -> str:
       </a>
       <div class="topbar-actions">
         <a href="index.html">返回首页</a>
+        <a href="archive.html">历史归档</a>
         <a href="feed.xml">RSS 订阅</a>
       </div>
     </nav>
@@ -661,7 +664,8 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
         </section>
         """
     items = []
-    for report in sorted_reports:
+    recent_reports = sorted_reports[1 : INDEX_HISTORY_LIMIT + 1]
+    for report in recent_reports:
         filename = report_filename(report)
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
         top_symbols = [str(symbol) for symbol in report["summary"].get("top_recommended_symbols", [])]
@@ -675,7 +679,7 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
             </article>
             """
         )
-    archive = "".join(items) or '<p class="empty-archive">暂无报告。</p>'
+    archive = "".join(items) or '<p class="empty-archive">暂无更多历史报告。</p>'
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -734,7 +738,8 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     h1 {{ margin: 0; max-width: 780px; font-family: var(--font-display); font-size: clamp(2.15rem, 5vw, 4.05rem); font-weight: 700; line-height: 1.06; letter-spacing: -.045em; }}
     .hero p {{ margin: 16px 0 0; max-width: 680px; color: var(--muted); font-size: 1rem; line-height: 1.7; }}
     .rss-card {{ justify-self: end; min-width: 170px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,.66); box-shadow: 0 18px 45px rgba(31,45,61,.08); }}
-    .rss-card a {{ color: var(--ink); text-decoration: none; font-weight: 800; }}
+    .rss-card a {{ display: block; color: var(--ink); text-decoration: none; font-weight: 800; }}
+    .rss-card a + a {{ margin-top: 8px; }}
     .rss-card span {{ display: block; color: var(--muted); margin-top: 5px; font-size: .88rem; }}
     .latest-panel {{ position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr); gap: 22px; border: 1px solid rgba(30,77,216,.16); border-radius: 30px; padding: 26px; background: linear-gradient(135deg, rgba(255,255,255,.9), rgba(255,250,240,.76)); box-shadow: 0 26px 70px rgba(31,45,61,.13); }}
     .latest-panel::after {{ content: ""; position: absolute; right: -80px; top: -110px; width: 260px; height: 260px; border-radius: 999px; background: rgba(0,166,200,.16); filter: blur(2px); }}
@@ -760,6 +765,7 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     .section-title {{ display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 34px 0 14px; }}
     .section-title h2 {{ font-size: 1.28rem; }}
     .section-title p {{ margin: 0; color: var(--muted); }}
+    .archive-action {{ color: var(--ink); font-weight: 850; text-decoration: none; white-space: nowrap; }}
     .archive-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }}
     .archive-card {{ border: 1px solid var(--line); border-radius: 24px; padding: 18px; background: var(--panel); box-shadow: 0 12px 34px rgba(31,45,61,.08); }}
     .archive-title {{ color: var(--ink); font-size: 1rem; font-weight: 850; text-decoration: none; }}
@@ -791,6 +797,7 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
         <p>把主题动量、市场确认和政策/新闻证据整理成普通投资者能读懂的研究结论。页面只展示推荐、周期、背景、理由和风险。</p>
       </div>
       <aside class="rss-card">
+        <a href="archive.html">历史归档</a>
         <a href="feed.xml">RSS 订阅</a>
         <span>周度更新 · 静态页面</span>
       </aside>
@@ -798,8 +805,11 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
     {latest_block}
     <section class="archive">
       <div class="section-title">
-        <h2>历史报告</h2>
-        <p>按发布日期倒序</p>
+        <div>
+          <h2>近期历史报告</h2>
+          <p>首页最多显示最近 {INDEX_HISTORY_LIMIT} 期，完整记录保留在归档页</p>
+        </div>
+        <a class="archive-action" href="archive.html">查看全部</a>
       </div>
       <div class="archive-grid">{archive}</div>
     </section>
@@ -809,12 +819,161 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
 """
 
 
+def render_archive_card(report: dict[str, Any]) -> str:
+    filename = report_filename(report)
+    top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
+    top_symbols = [str(symbol) for symbol in report["summary"].get("top_recommended_symbols", [])]
+    return f"""
+    <article class="archive-card">
+      <a class="archive-title" href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
+      <p>主要信号：{html.escape(top_themes or '无')}</p>
+      <div class="archive-symbols">{render_symbol_tags(top_symbols)}</div>
+      {render_horizon_snapshot(report, linked=True)}
+    </article>
+    """
+
+
+def render_archive_html(reports: list[dict[str, Any]]) -> str:
+    sorted_reports = sorted(reports, key=lambda item: item["as_of"], reverse=True)
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for report in sorted_reports:
+        key = str(report.get("as_of", ""))[:7] or "unknown"
+        groups.setdefault(key, []).append(report)
+
+    sections = []
+    for key, group_reports in groups.items():
+        year, _, month = key.partition("-")
+        title = f"{year} 年 {month} 月" if month else key
+        cards = "".join(render_archive_card(report) for report in group_reports)
+        sections.append(
+            f"""
+            <section class="month-group">
+              <h2>{html.escape(title)}</h2>
+              <div class="archive-grid">{cards}</div>
+            </section>
+            """
+        )
+    archive = "".join(sections) or '<p class="empty-archive">暂无报告。</p>'
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>历史归档 - 智慧投顾研究系统</title>
+  <link rel="icon" type="image/svg+xml" href="{SITE_ICON_FILENAME}">
+  <link rel="alternate" type="application/rss+xml" title="智慧投顾研究 RSS" href="feed.xml">
+  <style>
+    :root {{
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9e2ef;
+      --paper: #fffaf0;
+      --panel: rgba(255, 255, 255, .78);
+      --blue: #1e4dd8;
+      --cyan: #00a6c8;
+      --gold: #d99b2b;
+      --green: #0f8b62;
+      --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", ui-sans-serif, system-ui, sans-serif;
+      --font-display: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "STSong", "SimSun", ui-serif, serif;
+      font-family: var(--font-sans);
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(0,166,200,.18), transparent 28rem),
+        radial-gradient(circle at 88% 0%, rgba(217,155,43,.18), transparent 24rem),
+        linear-gradient(135deg, #f8fafc 0%, #eef4fb 52%, #fff7e6 100%);
+      min-height: 100vh;
+    }}
+    main {{ max-width: 1180px; margin: 0 auto; padding: 34px 20px 64px; }}
+    .topbar {{ display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 28px; }}
+    .brand-link {{ display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-size: .98rem; font-weight: 800; }}
+    .brand-link .site-mark {{ width: 38px; height: 38px; margin: 0; }}
+    .topbar-actions {{ display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }}
+    .topbar-actions a {{ min-height: 38px; display: inline-flex; align-items: center; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.72); color: var(--ink); text-decoration: none; font-size: .92rem; font-weight: 750; }}
+    .site-mark {{ display: inline-flex; width: 64px; height: 64px; filter: drop-shadow(0 18px 28px rgba(30,77,216,.22)); }}
+    .site-mark svg {{ width: 100%; height: 100%; }}
+    .site-mark rect {{ fill: #172033; }}
+    .site-mark .mark-line {{ fill: none; stroke: var(--cyan); stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }}
+    .site-mark circle {{ fill: var(--paper); }}
+    .site-mark .mark-ring {{ fill: none; stroke: var(--paper); stroke-width: 3.2; stroke-linecap: round; opacity: .88; }}
+    .hero {{ padding: 22px 0 30px; }}
+    .eyebrow {{ margin: 0 0 10px; color: var(--blue); font-size: .72rem; font-weight: 850; letter-spacing: .18em; text-transform: uppercase; }}
+    h1 {{ margin: 0; font-family: var(--font-display); font-size: clamp(2.1rem, 4.4vw, 3.7rem); font-weight: 700; line-height: 1.08; letter-spacing: -.045em; }}
+    .hero p {{ margin: 14px 0 0; max-width: 720px; color: var(--muted); line-height: 1.7; }}
+    .month-group {{ margin-top: 30px; }}
+    .month-group h2 {{ margin: 0 0 14px; font-size: 1.28rem; font-weight: 850; }}
+    .archive-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }}
+    .archive-card {{ border: 1px solid var(--line); border-radius: 24px; padding: 18px; background: var(--panel); box-shadow: 0 12px 34px rgba(31,45,61,.08); }}
+    .archive-title {{ color: var(--ink); font-size: 1rem; font-weight: 850; text-decoration: none; }}
+    .archive-card p {{ margin: 10px 0; color: var(--muted); line-height: 1.55; }}
+    .archive-symbols {{ margin: 0 0 14px; }}
+    .symbol-strip {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
+    .symbol-tag {{ display: inline-flex; align-items: center; min-height: 30px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(30,77,216,.22); background: #fff; color: var(--ink); font-size: .94rem; font-weight: 800; box-shadow: 0 6px 16px rgba(31,45,61,.06); }}
+    .symbol-tag.empty {{ color: var(--muted); font-weight: 700; }}
+    .snapshot-grid {{ display: grid; grid-template-columns: 1fr; gap: 8px; }}
+    .snapshot-column {{ padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.72); }}
+    .snapshot-label {{ margin: 0; font-size: 1rem; font-weight: 850; }}
+    .snapshot-window {{ margin: 4px 0 8px; color: var(--muted); font-size: .88rem; }}
+    .snapshot-long {{ border-top: 4px solid var(--green); }}
+    .snapshot-medium {{ border-top: 4px solid var(--blue); }}
+    .snapshot-short {{ border-top: 4px solid var(--gold); }}
+    .horizon-link {{ color: inherit; text-decoration: none; }}
+    .empty-archive {{ color: var(--muted); }}
+    @media (max-width: 720px) {{
+      .topbar {{ align-items: flex-start; flex-direction: column; }}
+      .topbar-actions {{ justify-content: flex-start; }}
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <nav class="topbar" aria-label="站点导航">
+      <a class="brand-link" href="index.html">
+        {render_site_mark()}
+        <span>QuantStrategyLab</span>
+      </a>
+      <div class="topbar-actions">
+        <a href="index.html">返回首页</a>
+        <a href="feed.xml">RSS 订阅</a>
+      </div>
+    </nav>
+    <section class="hero">
+      <p class="eyebrow">Archive</p>
+      <h1>历史归档</h1>
+      <p>报告文件长期保留，便于复盘系统结论、观察风格漂移和检查不同阶段的主题变化。首页只展示最新和近期记录，这里按月份列出全部报告。</p>
+    </section>
+    {archive}
+  </main>
+</body>
+</html>
+"""
+
+
+def render_reports_index_json(reports: list[dict[str, Any]]) -> str:
+    items = []
+    for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
+        as_of = str(report.get("as_of", ""))
+        items.append(
+            {
+                "as_of": as_of,
+                "cadence": str(report.get("cadence", "")),
+                "html": report_filename(report),
+                "json": f"advisory_report_{as_of}.json",
+            }
+        )
+    return json.dumps({"schema_version": 1, "reports": items}, ensure_ascii=False, indent=2) + "\n"
+
+
 def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title: str) -> str:
     channel = ET.Element("channel")
     ET.SubElement(channel, "title").text = feed_title
     ET.SubElement(channel, "link").text = site_url
     ET.SubElement(channel, "description").text = "QuantStrategyLab 智慧投顾研究系统，包含推荐理由、周期和风险提示。"
-    for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
+    for report in sorted(reports, key=lambda item: item["as_of"], reverse=True)[:RSS_ITEM_LIMIT]:
         filename = report_filename(report)
         link = f"{site_url.rstrip('/')}/{quote(filename)}"
         item = ET.SubElement(channel, "item")
@@ -848,6 +1007,12 @@ def publish_reports(report_paths: list[str | Path], output_dir: str | Path, *, s
     index_path = output / "index.html"
     index_path.write_text(render_index_html(reports), encoding="utf-8")
     written.append(index_path)
+    archive_path = output / "archive.html"
+    archive_path.write_text(render_archive_html(reports), encoding="utf-8")
+    written.append(archive_path)
+    reports_index_path = output / "reports_index.json"
+    reports_index_path.write_text(render_reports_index_json(reports), encoding="utf-8")
+    written.append(reports_index_path)
     feed_path = output / "feed.xml"
     feed_path.write_text(render_feed_xml(reports, site_url=site_url, feed_title=feed_title), encoding="utf-8")
     written.append(feed_path)
