@@ -3,6 +3,10 @@
   "as_of": "2026-05-30",
   "generated_at": "2026-05-30T00:00:00Z",
   "mode": "theme_momentum_snapshot",
+  "artifact_type": "medium_horizon_theme_context",
+  "horizon": "medium",
+  "horizon_window": "2-12 weeks",
+  "horizon_window_label": "2-12周",
   "taxonomy_version": "2026-05-31-core-themes-v1",
   "methodology": {
     "windows": {
@@ -56,13 +60,20 @@
     }
   ],
   "data_quality": {
+    "coverage": {
+      "configured_symbol_count": 4,
+      "priced_symbol_count": 4,
+      "price_coverage_ratio": 1.0,
+      "insufficient_history_symbol_count": 0
+    },
     "missing_price_symbols": [],
+    "insufficient_history_symbols": [],
     "unranked_themes": []
   },
   "policy": {
     "execution_allowed": false,
     "portfolio_allocation_allowed": false,
     "theme_rank_is_research_context_only": true,
-    "downstream_use": "Theme momentum snapshot for research ranking and replay only; do not route to broker execution."
+    "downstream_use": "Medium-horizon theme context for research ranking and replay only; do not route to broker execution."
   }
 }

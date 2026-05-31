@@ -123,7 +123,8 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "<span class=\"pill\">模式：" not in html
     assert "受众：" not in html
     assert "AI 状态：" not in html
-    assert "AI信号仓库" in html
+    assert "中线主题" in html
+    assert "AI信号仓库" not in html
     assert "AiLongHorizonSignalPipelines" not in html
     assert "股票背景" in html
     assert "推荐理由" in html

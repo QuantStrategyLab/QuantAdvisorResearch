@@ -104,6 +104,15 @@ symbol_theme_exposure
 
 但使用边界保持不变：主题 bias 只能作为研究背景和轻量评分输入，不能绕过事件证据、来源质量、风险提示和非个性化/不执行的合约约束。这样可以避免因为近期热点临时修改 universe 或权重，从而降低类似量化回测过拟合的问题。
 
+
+## 短中长线来源分工
+
+- 短线（1-10 个交易日）：事件事实层负责，主要来自 `PoliticalEventTrackingResearch` 的官方来源、新闻政策和事件新鲜度。
+- 中线（2-12 周）：主题上下文层负责，`AiLongHorizonSignalPipelines` 的 `theme_momentum_snapshot.json` 标记为 `medium_horizon_theme_context`。
+- 长线（1-3 年）：AI shadow 背景层负责，来自 `latest_signal.json` 和 `signal_history/*.json`。
+
+`QuantAdvisorResearch` 只在最后做确定性合成，报告中的 `supporting_context` 会记录每个最终推荐用到了短线、中线、长线哪些输入。
+
 ## Theme momentum 展示边界
 
 `QuantAdvisorResearch` 可以消费 `theme_momentum_snapshot.json`，但只用于报告展示：

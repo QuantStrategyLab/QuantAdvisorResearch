@@ -178,6 +178,8 @@ def test_render_markdown_keeps_public_report_direct() -> None:
     assert "受众:" not in markdown
     assert "AI 状态" not in markdown
     assert "本期最终结论" not in markdown
+    assert "中线主题上下文" in markdown
+    assert "AI信号仓库" not in markdown
     assert "AiLongHorizonSignalPipelines" not in markdown
 
 
@@ -340,6 +342,9 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
         theme_momentum_path=theme_momentum_path,
     )
 
+    assert report_with_theme["summary"]["theme_momentum_artifact_type"] == "medium_horizon_theme_context"
+    assert report_with_theme["summary"]["theme_momentum_horizon"] == "medium"
+    assert report_with_theme["summary"]["theme_momentum_horizon_window"] == "2-12周"
     assert report_with_theme["summary"]["top_theme_ids"][:1] == ["hbm_memory"]
     assert report_with_theme["summary"]["top_theme_candidate_symbols"][:3] == ["MU", "NVDA", "DELL"]
     assert report_with_theme["theme_momentum"]["top_themes"][0]["theme_id"] == "hbm_memory"
@@ -349,10 +354,13 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert report_with_theme["theme_first_candidates"][0]["industry_background"]
     assert report_with_theme["theme_first_candidates"][0]["recommendation_summary"]
     assert report_with_theme["theme_first_candidates"][2]["symbol"] == "DELL"
-    assert report_with_theme["final_decisions"]["recommendations"][0]["symbol"] == "MU"
-    assert report_with_theme["final_decisions"]["recommendations"][0]["business_summary"]
-    assert "存储周期" in report_with_theme["final_decisions"]["recommendations"][0]["risk_summary"]
-    assert "ai_signal_score" in report_with_theme["final_decisions"]["recommendations"][0]
+    first_pick = report_with_theme["final_decisions"]["recommendations"][0]
+    assert first_pick["symbol"] == "MU"
+    assert first_pick["business_summary"]
+    assert "存储周期" in first_pick["risk_summary"]
+    assert "ai_signal_score" in first_pick
+    assert first_pick["medium_context_score"] == first_pick["ai_signal_score"]
+    assert first_pick["supporting_context"]["medium"] == ["theme_momentum_snapshot"]
     assert "AiLongHorizonSignalPipelines" not in report_with_theme["final_decisions"]["method"]
     assert report_with_theme["final_decisions"]["watchlist"][0]["symbol"] == "DELL"
     assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
@@ -362,6 +370,8 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert "## 本期最终结论" not in markdown
     assert "股票背景" in markdown
     assert "推荐理由" in markdown
+    assert "中线主题上下文" in markdown
+    assert "AI信号仓库" not in markdown
     assert "AiLongHorizonSignalPipelines" not in markdown
     assert "## 主题候选（解释材料，不是最终推荐）" not in markdown
     assert "为什么入选" not in markdown

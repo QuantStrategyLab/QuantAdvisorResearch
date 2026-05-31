@@ -51,6 +51,7 @@ HORIZON_WINDOWS = {
     "long": "1-3年",
     "not_applicable": "不适用",
 }
+THEME_MOMENTUM_ARTIFACT_TYPE = "medium_horizon_theme_context"
 
 CADENCE_LABELS_ZH = {
     "daily": "日度",
@@ -284,12 +285,17 @@ def summarize_theme_momentum(payload: dict[str, Any] | None, *, max_themes: int 
     return {
         "available": True,
         "as_of": payload.get("as_of", ""),
+        "artifact_type": payload.get("artifact_type", THEME_MOMENTUM_ARTIFACT_TYPE),
+        "horizon": payload.get("horizon", "medium"),
+        "horizon_window": payload.get("horizon_window", "2-12 weeks"),
+        "horizon_window_label": payload.get("horizon_window_label", HORIZON_WINDOWS["medium"]),
         "taxonomy_version": payload.get("taxonomy_version", ""),
         "top_themes": top_themes,
         "data_quality": payload.get("data_quality", {}),
         "policy": {
             "execution_allowed": False,
             "theme_rank_is_research_context_only": True,
+            "direct_short_term_recommendation_allowed": False,
         },
     }
 
@@ -728,6 +734,10 @@ def build_recommendation(
         ]
     )
 
+    long_horizon_ai_score = 0.0
+    if ai_bias in {"positive", "watch", "neutral"}:
+        long_horizon_ai_score = round(clamp(ai_confidence, 0, 1), 3)
+
     return {
         "symbol": symbol,
         "name": item.name if item else symbol,
@@ -752,6 +762,15 @@ def build_recommendation(
         "evidence_summary": " ".join(reasons),
         "evidence_refs": dedupe(evidence_refs),
         "review_checklist": dedupe(review_checklist),
+        "ai_context": {
+            "source": "latest_signal" if ai_signal else "",
+            "horizon": "long" if ai_signal else "",
+            "horizon_window": HORIZON_WINDOWS["long"] if ai_signal else "",
+            "bias": ai_bias or "",
+            "confidence": round(ai_confidence, 3),
+            "theme_ids": ai_bias_source_themes,
+        },
+        "long_horizon_ai_score": long_horizon_ai_score,
     }
 
 
@@ -829,6 +848,7 @@ def theme_symbol_context(theme_momentum: dict[str, Any] | None) -> dict[str, dic
                     "primary_theme_label": theme_label(theme_id, theme_name),
                     "best_theme_rank": rank,
                     "ai_signal_score": ai_signal_score,
+                    "medium_context_score": ai_signal_score,
                     "symbol_momentum_score": symbol_momentum_score,
                     "momentum_score": momentum_score,
                     "return_3m": return_3m,
@@ -843,6 +863,7 @@ def theme_symbol_context(theme_momentum: dict[str, Any] | None) -> dict[str, dic
                 current["best_theme_rank"] = rank
             if ai_signal_score > as_float(current.get("ai_signal_score")):
                 current["ai_signal_score"] = ai_signal_score
+                current["medium_context_score"] = ai_signal_score
             if momentum_score > as_float(current.get("momentum_score")):
                 current["symbol_momentum_score"] = symbol_momentum_score
                 current["momentum_score"] = momentum_score
@@ -881,6 +902,24 @@ def final_action_label(action: str) -> str:
     }.get(action, "跳过")
 
 
+def supporting_context_for(
+    rec: dict[str, Any] | None,
+    *,
+    source_score: float,
+    momentum_score: float,
+    medium_context_score: float,
+    long_context_score: float,
+) -> dict[str, list[str]]:
+    context = {"short": [], "medium": [], "long": []}
+    if source_score >= 0.35 and rec:
+        context["short"].append("source_events")
+    if momentum_score >= 0.35 or medium_context_score >= 0.35:
+        context["medium"].append("theme_momentum_snapshot")
+    if long_context_score >= 0.35 and rec:
+        context["long"].append("latest_signal")
+    return context
+
+
 def build_final_decisions(
     recommendations: list[dict[str, Any]],
     theme_momentum: dict[str, Any] | None,
@@ -898,10 +937,13 @@ def build_final_decisions(
         theme = theme_context.get(symbol, {})
         source_score = normalize_source_score(rec)
         momentum_score = as_float(theme.get("momentum_score"))
-        ai_signal_score = as_float(theme.get("ai_signal_score"))
-        support_count = sum(score >= 0.35 for score in (source_score, momentum_score, ai_signal_score))
-        combined_score = round(source_score * 0.15 + momentum_score * 0.40 + ai_signal_score * 0.45, 3)
-        action = final_action_for(rec, combined_score, support_count, momentum_score, ai_signal_score)
+        medium_context_score = as_float(theme.get("medium_context_score", theme.get("ai_signal_score")))
+        long_context_score = as_float(rec.get("long_horizon_ai_score")) if rec else 0.0
+        support_count = sum(
+            score >= 0.35 for score in (source_score, momentum_score, medium_context_score, long_context_score)
+        )
+        combined_score = round(source_score * 0.15 + momentum_score * 0.40 + medium_context_score * 0.45, 3)
+        action = final_action_for(rec, combined_score, support_count, momentum_score, medium_context_score)
         if action == "skip":
             continue
         name = rec.get("name", symbol) if rec else symbol
@@ -915,9 +957,12 @@ def build_final_decisions(
             reasons.append(
                 f"动量：个股动量分数={display_number(theme.get('symbol_momentum_score'))}，近3个月={display_percent(theme.get('return_3m'))}。"
             )
-        if ai_signal_score >= 0.35:
+        if medium_context_score >= 0.35:
             labels = ", ".join(theme.get("theme_labels", [])[:3]) or str(theme.get("primary_theme_label", ""))
-            reasons.append(f"AI信号仓库：{labels}。")
+            reasons.append(f"中线主题上下文：{labels}。")
+        if long_context_score >= 0.35 and rec:
+            bias = rec.get("ai_context", {}).get("bias", "")
+            reasons.append(f"长线AI背景：{bias or '已读取'}。")
         if not reasons:
             reasons.append("当前进入观察名单，但多源证据仍需继续补强。")
         if rec and rec.get("primary_horizon") != "not_applicable":
@@ -944,7 +989,16 @@ def build_final_decisions(
                 "combined_score": combined_score,
                 "source_score": round(source_score, 3),
                 "momentum_score": round(momentum_score, 3),
-                "ai_signal_score": round(ai_signal_score, 3),
+                "ai_signal_score": round(medium_context_score, 3),
+                "medium_context_score": round(medium_context_score, 3),
+                "long_context_score": round(long_context_score, 3),
+                "supporting_context": supporting_context_for(
+                    rec,
+                    source_score=source_score,
+                    momentum_score=momentum_score,
+                    medium_context_score=medium_context_score,
+                    long_context_score=long_context_score,
+                ),
                 "business_summary": profile["business"],
                 "prospect_summary": profile["prospect"],
                 "why_selected": dedupe(reasons),
@@ -1051,6 +1105,9 @@ def build_advisory_report(
             "source_mode": source_mode,
             "data_quality_warnings": data_quality_warnings,
             "theme_momentum_available": theme_momentum_summary["available"],
+            "theme_momentum_artifact_type": theme_momentum_summary.get("artifact_type", ""),
+            "theme_momentum_horizon": theme_momentum_summary.get("horizon", ""),
+            "theme_momentum_horizon_window": theme_momentum_summary.get("horizon_window_label", ""),
             "top_theme_ids": [theme["theme_id"] for theme in theme_momentum_summary["top_themes"]],
             "theme_first_candidate_count": len(theme_first_candidates),
             "top_theme_candidate_symbols": [item["symbol"] for item in theme_first_candidates[:8]],

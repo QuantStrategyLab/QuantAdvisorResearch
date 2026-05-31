@@ -29,6 +29,17 @@ Live site:
 
 <https://quantstrategylab.github.io/QuantAdvisorResearch/>
 
+
+## Horizon Source Split
+
+Advisor is the final composition layer. Source ownership by horizon is:
+
+- Short term (`1-10 trading days`): `source_events.csv` / `political_events.csv` from `PoliticalEventTrackingResearch` for event and policy/news catalysts.
+- Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `AiLongHorizonSignalPipelines`, now explicitly marked as `medium_horizon_theme_context`.
+- Long term (`1-3 years`): `latest_signal.json` / `signal_history/*.json` from `AiLongHorizonSignalPipelines` as AI shadow context.
+
+Final recommendations are still deterministic Advisor outputs. The AI repository does not directly produce short-term recommendations or replace the final decision engine.
+
 ## Boundary
 
 This repository owns:
