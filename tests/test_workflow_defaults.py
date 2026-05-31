@@ -20,8 +20,8 @@ def test_public_workflows_default_to_live_event_inputs() -> None:
         assert "scripts/build_market_confirmation.py" not in text
         assert "market_data_proxy_urls" in text
         assert "MARKET_DATA_PROXY_POOL_URL" in text
-        assert "actions/cache/restore@v4" in text
-        assert "actions/cache/save@v4" in text
+        assert "actions/cache/restore@v5" in text
+        assert "actions/cache/save@v5" in text
         assert "--market-cache-dir .cache/market-data" in text
         assert "--recommendation-review" in text
 

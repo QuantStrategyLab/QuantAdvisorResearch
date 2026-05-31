@@ -50,8 +50,6 @@ on:
   schedule:
     - cron: "20 13 1 * *"
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build-monthly-review:
@@ -78,7 +76,7 @@ jobs:
         working-directory: advisor
         run: python -m pip install -e .
       - name: Restore market data cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         continue-on-error: true
         with:
           path: advisor/.cache/market-data
@@ -130,7 +128,7 @@ jobs:
           python scripts/build_advisory_artifacts.py "${ARGS[@]}"
       - name: Save market data cache
         if: ${{ success() }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         continue-on-error: true
         with:
           path: advisor/.cache/market-data
