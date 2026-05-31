@@ -41,11 +41,11 @@ Key documents:
 
 Advisor is the final composition layer. Source ownership by horizon is:
 
-- Short term (`1-10 trading days`): `source_events.csv` / `political_events.csv` from `PoliticalEventTrackingResearch` for event and policy/news catalysts.
-- Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `ResearchSignalContextPipelines`, now explicitly marked as `medium_horizon_theme_context`.
+- Short term (`1-10 trading days`): event and policy/news catalysts plus generated `market_confirmation.csv`, focused on relative strength, volume, drawdown, and volatility.
+- Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `ResearchSignalContextPipelines`, now explicitly marked as `medium_horizon_theme_context`, focused on theme momentum and symbol momentum.
 - Long term (`1-3 years`): `latest_signal.json` / `signal_history/*.json` from `ResearchSignalContextPipelines` as AI shadow context.
 
-Final recommendations are still deterministic Advisor outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine. Advisor now records separate short/medium/long horizon scores for each final pick; public pages keep the simpler final recommendation layout.
+Final recommendations are still deterministic Advisor outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine. Advisor now records separate short/medium/long horizon scores and gates for each final pick; public pages keep the simpler final recommendation layout.
 
 ## Boundary
 
@@ -170,6 +170,32 @@ gh workflow run "Publish Model Recommendations Site" \
 Notification channel rules are documented in
 [`docs/notification_format.md`](docs/notification_format.md) and
 [`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md).
+
+## Market Confirmation
+
+`scripts/build_market_confirmation.py` collects symbols from the watchlist,
+signal context, and theme momentum snapshot, then writes a
+`market_confirmation.csv` file:
+
+```bash
+python scripts/build_market_confirmation.py \
+  --as-of 2026-05-30 \
+  --political-watchlist examples/political_watchlist.example.csv \
+  --ai-signal examples/research_signal_context.example.json \
+  --theme-momentum examples/theme_momentum_snapshot.example.json \
+  --output data/output/market_confirmation_2026-05-30.csv
+```
+
+The generated columns include `return_5d`, `return_20d`, `return_63d`,
+relative returns versus SPY, volume z-score, 63-day drawdown, 21-day annualized
+volatility, and `market_score`. The weekly/monthly/publish workflows generate
+this file automatically before building advisory reports.
+
+Yahoo chart is currently the no-dependency free price endpoint. If it is
+unavailable, the script falls back to price-momentum fields already saved in
+`theme_momentum_snapshot.json`, so report generation continues. Random free
+proxy pools should not be treated as a stable production data source; prefer
+organization-owned price snapshots, caches, or auditable controlled proxies.
 
 ## Output Contract
 

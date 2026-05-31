@@ -398,6 +398,9 @@ def test_market_confirmation_is_optional_audit_input_not_public_copy() -> None:
     assert report["summary"]["market_confirmation_count"] == 5
     assert "market_confirmation" in pick["horizon_scores"]["medium"]["drivers"]
     assert "market_confirmation" in pick["supporting_context"]["medium"]
+    assert set(pick["horizon_actions"]) == {"short", "medium", "long"}
+    assert pick["horizon_actions"]["medium"] == "recommend"
+    assert pick["primary_horizon"] == "medium"
     assert any("medium_score=" in item for item in pick["selection_trace"])
 
     markdown = render_markdown(report)

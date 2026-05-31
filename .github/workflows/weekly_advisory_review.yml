@@ -73,12 +73,27 @@ jobs:
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
           mkdir -p data/output/weekly_advisory_review
           THEME_ARGS=()
+          RESOLVED_THEME_MOMENTUM=""
           if [ -n "${THEME_MOMENTUM_PATH}" ] && [ -f "../research-signal-context/${THEME_MOMENTUM_PATH}" ]; then
-            THEME_ARGS=(--theme-momentum "../research-signal-context/${THEME_MOMENTUM_PATH}")
+            RESOLVED_THEME_MOMENTUM="../research-signal-context/${THEME_MOMENTUM_PATH}"
+            THEME_ARGS=(--theme-momentum "${RESOLVED_THEME_MOMENTUM}")
           fi
           MARKET_ARGS=()
           if [ -n "${MARKET_CONFIRMATION_PATH}" ] && [ -f "${MARKET_CONFIRMATION_PATH}" ]; then
             MARKET_ARGS=(--market-confirmation "${MARKET_CONFIRMATION_PATH}")
+          else
+            GENERATED_MARKET_CONFIRMATION="data/output/weekly_advisory_review/market_confirmation_${AS_OF}.csv"
+            MARKET_BUILD_ARGS=(
+              --as-of "${AS_OF}"
+              --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}"
+              --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}"
+              --output "${GENERATED_MARKET_CONFIRMATION}"
+            )
+            if [ -n "${RESOLVED_THEME_MOMENTUM}" ]; then
+              MARKET_BUILD_ARGS+=(--theme-momentum "${RESOLVED_THEME_MOMENTUM}")
+            fi
+            python scripts/build_market_confirmation.py "${MARKET_BUILD_ARGS[@]}"
+            MARKET_ARGS=(--market-confirmation "${GENERATED_MARKET_CONFIRMATION}")
           fi
           python scripts/build_advisory_report.py \
             --as-of "${AS_OF}" \

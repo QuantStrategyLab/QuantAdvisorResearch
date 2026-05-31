@@ -203,6 +203,9 @@ class MarketConfirmation:
     volume_zscore: float
     drawdown_63d: float
     volatility_21d: float
+    market_score: float | None = None
+    data_source: str = ""
+    price_observation_count: int = 0
 
 
 def parse_date(value: str) -> dt.date:
@@ -357,6 +360,9 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
             volume_zscore=as_float(row.get("volume_zscore")),
             drawdown_63d=as_float(row.get("drawdown_63d")),
             volatility_21d=as_float(row.get("volatility_21d")),
+            market_score=as_float(row.get("market_score")) if str(row.get("market_score", "")).strip() else None,
+            data_source=str(row.get("data_source", "")),
+            price_observation_count=int(as_float(row.get("price_observation_count"))),
         )
     return confirmations
 
@@ -950,17 +956,23 @@ def theme_symbol_context(theme_momentum: dict[str, Any] | None) -> dict[str, dic
 def market_confirmation_score(market: MarketConfirmation | None) -> float | None:
     if market is None:
         return None
+    if market.data_source == "theme_momentum_fallback":
+        return None
+    if market.market_score is not None:
+        return round(clamp(market.market_score, 0, 1), 3)
     relative_20d = clamp(market.relative_return_20d / 0.20, -1, 1)
     relative_63d = clamp(market.relative_return_63d / 0.35, -1, 1)
     absolute_20d = clamp(market.return_20d / 0.20, -1, 1)
+    absolute_63d = clamp(market.return_63d / 0.35, -1, 1)
     volume = clamp(market.volume_zscore / 3, 0, 1)
     drawdown_penalty = clamp(abs(min(market.drawdown_63d, 0)) / 0.30, 0, 1)
     volatility_penalty = clamp((market.volatility_21d - 0.35) / 0.45, 0, 1)
     score = (
         0.50
-        + relative_20d * 0.22
-        + relative_63d * 0.18
+        + relative_20d * 0.20
+        + relative_63d * 0.16
         + absolute_20d * 0.08
+        + absolute_63d * 0.08
         + volume * 0.10
         - drawdown_penalty * 0.07
         - volatility_penalty * 0.06
@@ -1005,7 +1017,12 @@ def build_horizon_scores(
     long_context_score = as_float(components["long_context"])
     market_score = components["market_confirmation"]
 
-    short_base = round(source_score * 0.70 + (as_float(market_score) if market_score is not None else 0.0) * 0.30, 3)
+    short_base = round(
+        source_score * 0.25
+        + momentum_score * 0.30
+        + (as_float(market_score) if market_score is not None else 0.0) * 0.45,
+        3,
+    )
     if market_score is None:
         short_base = round(source_score, 3)
     medium_base = round(source_score * 0.15 + momentum_score * 0.40 + medium_context_score * 0.45, 3)
@@ -1015,7 +1032,14 @@ def build_horizon_scores(
     scores = {
         "short": {
             "score": short_base,
-            "drivers": ["source_events"] if source_score >= 0.35 else [],
+            "drivers": [
+                driver
+                for driver, score in (
+                    ("source_events", source_score),
+                    ("theme_momentum_snapshot", momentum_score),
+                )
+                if score >= 0.35
+            ],
         },
         "medium": {
             "score": blend_optional_market(medium_base, market_score, market_weight=0.15),
@@ -1078,28 +1102,81 @@ def selection_trace_for(
     return trace
 
 
-def final_action_for(
-    rec: dict[str, Any] | None,
-    combined_score: float,
-    support_count: int,
+def horizon_action_for(
+    horizon: str,
+    *,
+    score: float,
+    source_score: float,
     momentum_score: float,
-    ai_signal_score: float,
+    medium_context_score: float,
+    long_context_score: float,
+    market_score: float | None,
 ) -> str:
-    theme_and_momentum_confirmed = momentum_score >= 0.35 and ai_signal_score >= 0.35
-    if combined_score >= 0.52 and theme_and_momentum_confirmed:
-        return "recommend"
-    if (
-        rec
-        and rec.get("recommendation_tier") in {"tier_1", "tier_2"}
-        and combined_score >= 0.45
-        and (theme_and_momentum_confirmed or momentum_score >= 0.35 or ai_signal_score >= 0.35)
-    ):
-        return "recommend"
-    if rec and rec.get("recommendation_tier") in {"watchlist", "source_check"}:
-        return "watch"
-    if combined_score >= 0.35 and support_count >= 2:
-        return "watch"
+    """Return the horizon-specific action using deliberately different gates.
+
+    Short horizon is market-confirmation led; medium horizon is theme/momentum led;
+    long horizon is context led. Policy/news evidence can improve confidence, but
+    is not required for medium-horizon recommendations.
+    """
+    market_value = as_float(market_score) if market_score is not None else 0.0
+    if horizon == "short":
+        if market_score is None:
+            return "skip"
+        if score >= 0.60 and market_value >= 0.55 and momentum_score >= 0.35 and (
+            source_score >= 0.35 or market_value >= 0.70
+        ):
+            return "recommend"
+        if score >= 0.45 and market_value >= 0.45 and (source_score >= 0.35 or momentum_score >= 0.35):
+            return "watch"
+        return "skip"
+    if horizon == "medium":
+        if score >= 0.52 and momentum_score >= 0.35 and medium_context_score >= 0.35:
+            return "recommend"
+        if score >= 0.38 and (momentum_score >= 0.35 or medium_context_score >= 0.35 or source_score >= 0.35):
+            return "watch"
+        return "skip"
+    if horizon == "long":
+        if score >= 0.62 and long_context_score >= 0.55 and (medium_context_score >= 0.35 or source_score >= 0.35):
+            return "recommend"
+        if score >= 0.45 and long_context_score >= 0.35:
+            return "watch"
+        return "skip"
     return "skip"
+
+
+def horizon_actions_for(
+    horizon_scores: dict[str, dict[str, Any]],
+) -> dict[str, str]:
+    components = horizon_scores["medium"]["components"]
+    source_score = as_float(components.get("source"))
+    momentum_score = as_float(components.get("momentum"))
+    medium_context_score = as_float(components.get("medium_context"))
+    long_context_score = as_float(components.get("long_context"))
+    market_score = components.get("market_confirmation")
+    return {
+        horizon: horizon_action_for(
+            horizon,
+            score=as_float(horizon_scores[horizon]["score"]),
+            source_score=source_score,
+            momentum_score=momentum_score,
+            medium_context_score=medium_context_score,
+            long_context_score=long_context_score,
+            market_score=market_score,
+        )
+        for horizon in ("short", "medium", "long")
+    }
+
+
+def primary_horizon_from_actions(
+    horizon_scores: dict[str, dict[str, Any]],
+    horizon_actions: dict[str, str],
+) -> tuple[str, str]:
+    for target_action in ("recommend", "watch"):
+        eligible = [horizon for horizon, action in horizon_actions.items() if action == target_action]
+        if eligible:
+            eligible.sort(key=lambda horizon: (-as_float(horizon_scores[horizon]["score"]), horizon))
+            return eligible[0], target_action
+    return "medium", "skip"
 
 
 def final_action_label(action: str) -> str:
@@ -1157,20 +1234,11 @@ def build_final_decisions(
         medium_context_score = as_float(score_components.get("medium_context"))
         long_context_score = as_float(score_components.get("long_context"))
         market_score = score_components.get("market_confirmation")
-        support_count = sum(
-            score >= 0.35
-            for score in (
-                source_score,
-                momentum_score,
-                medium_context_score,
-                long_context_score,
-                as_float(market_score) if market_score is not None else 0.0,
-            )
-        )
-        combined_score = round(as_float(horizon_scores["medium"]["score"]), 3)
-        action = final_action_for(rec, combined_score, support_count, momentum_score, medium_context_score)
+        horizon_actions = horizon_actions_for(horizon_scores)
+        selected_horizon, action = primary_horizon_from_actions(horizon_scores, horizon_actions)
         if action == "skip":
             continue
+        combined_score = round(as_float(horizon_scores[selected_horizon]["score"]), 3)
         name = rec.get("name", symbol) if rec else symbol
         profile = company_profile(symbol, name)
         reasons: list[str] = []
@@ -1190,7 +1258,11 @@ def build_final_decisions(
             reasons.append(f"长线AI背景：{bias or '已读取'}。")
         if not reasons:
             reasons.append("当前进入观察名单，但多源证据仍需继续补强。")
-        if rec and rec.get("primary_horizon") != "not_applicable":
+        if selected_horizon in {"short", "medium", "long"}:
+            primary_horizon = selected_horizon
+            primary_horizon_label = {"short": "短线", "medium": "中线", "long": "长线"}[selected_horizon]
+            primary_horizon_window = HORIZON_WINDOWS[selected_horizon]
+        elif rec and rec.get("primary_horizon") != "not_applicable":
             primary_horizon = rec.get("primary_horizon", "long")
             primary_horizon_label = rec.get("primary_horizon_label", "长线")
             primary_horizon_window = rec.get("primary_horizon_window", HORIZON_WINDOWS["long"])
@@ -1226,6 +1298,7 @@ def build_final_decisions(
                     market_score=as_float(market_score) if market_score is not None else None,
                 ),
                 "horizon_scores": horizon_scores,
+                "horizon_actions": horizon_actions,
                 "selection_trace": selection_trace_for(symbol, rec, theme, horizon_scores, action),
                 "business_summary": profile["business"],
                 "prospect_summary": profile["prospect"],
@@ -1255,7 +1328,11 @@ def build_final_decisions(
     }
     horizon_rankings = {
         horizon: [
-            {"symbol": item["symbol"], "score": item["horizon_scores"][horizon]["score"], "action": item["action"]}
+            {
+                "symbol": item["symbol"],
+                "score": item["horizon_scores"][horizon]["score"],
+                "action": item["horizon_actions"][horizon],
+            }
             for item in sorted(
                 picks,
                 key=lambda candidate: (

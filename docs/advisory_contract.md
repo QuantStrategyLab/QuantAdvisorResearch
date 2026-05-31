@@ -167,6 +167,7 @@ momentum_score
 medium_context_score
 long_context_score
 horizon_scores.short|medium|long
+horizon_actions.short|medium|long
 supporting_context.short|medium|long
 selection_trace[]
 business_summary
@@ -175,11 +176,14 @@ why_selected[]
 risk_summary
 ```
 
-Scoring intent by horizon:
+Scoring and gate intent by horizon:
 
-- short: event/source evidence first, optionally confirmed by recent market behavior;
-- medium: theme momentum and individual momentum first, with event/news and optional market confirmation as supporting inputs;
-- long: saved AI shadow context and durable theme context first, with event/news as supporting evidence.
+- short: recent market confirmation is required; event/news evidence and momentum
+  can upgrade confidence;
+- medium: theme momentum and individual momentum are required for final
+  recommendation; event/news and market confirmation are supporting inputs;
+- long: saved AI shadow context or durable long-horizon context must be strong;
+  event/news is supporting evidence.
 
 These fields are audit metadata. Public HTML/RSS/Telegram renderers still show
 only final recommendations, stock background, recommendation reasons, and risks.

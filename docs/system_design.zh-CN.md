@@ -109,11 +109,11 @@ symbol_theme_exposure
 
 ## 短中长线来源分工
 
-- 短线（1-10 个交易日）：事件事实层负责，主要来自 `PoliticalEventTrackingResearch` 的官方来源、新闻政策和事件新鲜度。
-- 中线（2-12 周）：主题上下文层负责，`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json` 标记为 `medium_horizon_theme_context`。
+- 短线（1-10 个交易日）：事件事实层 + 市场确认共同负责。事件来自 `PoliticalEventTrackingResearch`，市场确认由本仓库生成，主要看相对强度、成交量、回撤和波动。
+- 中线（2-12 周）：主题上下文层负责，`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json` 标记为 `medium_horizon_theme_context`，主要看主题动量和个股动量。
 - 长线（1-3 年）：AI shadow 背景层负责，来自 `latest_signal.json` 和 `signal_history/*.json`。
 
-`QuantAdvisorResearch` 只在最后做确定性合成，报告中的 `supporting_context` 会记录每个最终推荐用到了短线、中线、长线哪些输入。
+`QuantAdvisorResearch` 只在最后做确定性合成，报告中的 `supporting_context`、`horizon_scores` 和 `horizon_actions` 会记录每个最终推荐用到了短线、中线、长线哪些输入，以及每个周期是否达到推荐或观察门槛。
 
 ## Theme momentum 展示边界
 
@@ -127,4 +127,6 @@ symbol_theme_exposure
 
 如果上游 `ResearchSignalContextPipelines` 没有生成该 snapshot，workflow 会跳过该输入，报告仍可正常生成。
 
-Yahoo chart 只能作为临时 fallback。随机免费代理 IP 池不应进入稳定生产链路；如果需要代理，应使用自控代理或更稳定的数据快照，并记录来源、时间和 hash，便于 replay。
+`market_confirmation.csv` 是可选输入，但线上 workflow 默认会自动生成。短线门槛要求有市场确认；中线门槛以主题动量和个股动量为主；长线门槛要求 AI shadow 或长期上下文足够强。
+
+Yahoo chart 只能作为当前无依赖行情入口。随机免费代理 IP 池不应进入稳定生产链路；如果需要代理，应使用自控代理或更稳定的数据快照，并记录来源、时间和 hash，便于 replay。

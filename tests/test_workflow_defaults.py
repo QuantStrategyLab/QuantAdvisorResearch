@@ -16,3 +16,5 @@ def test_public_workflows_default_to_live_event_inputs() -> None:
         assert "QuantStrategyLab/ResearchSignalContextPipelines" in text
         assert "research-signal-context" in text
         assert "market_confirmation_path" in text
+        assert "scripts/build_market_confirmation.py" in text
+        assert "GENERATED_MARKET_CONFIRMATION" in text

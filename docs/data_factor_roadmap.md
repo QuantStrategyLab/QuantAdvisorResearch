@@ -89,9 +89,12 @@ Priority order:
    releases, SEC/EDGAR, company IR, policy/procurement sources, alias maps, and
    source registry coverage.
 3. Add optional market confirmation CSVs while keeping report generation working
-   when the data is absent. The CSV should carry point-in-time returns, relative
-   returns, abnormal volume, drawdown, and volatility; it should not contain
-   target weights or trade instructions.
+   when the data is absent. The CSV now carries point-in-time returns, relative
+   returns, abnormal volume, drawdown, volatility, `market_score`, source, row
+   count, and warnings. `scripts/build_market_confirmation.py` generates it from
+   watchlists, saved signal context, and theme momentum snapshots; if the free
+   price endpoint is unavailable, it falls back to saved theme momentum fields.
+   It must not contain target weights or trade instructions.
 4. Add event review inputs for 1/5/20/60 trading-day follow-up.
 5. Add fundamentals/valuation snapshots for risk explanation, not execution.
 6. Only then consider read-only references from existing snapshot repositories.

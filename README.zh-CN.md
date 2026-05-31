@@ -29,11 +29,11 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 
 Advisor 是最终合成层，三个周期的输入分工如下：
 
-- 短线（1-10 个交易日）：`PoliticalEventTrackingResearch` 的 `source_events.csv` / `political_events.csv`，用于事件和新闻政策催化。
-- 中线（2-12 周）：`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json`，现在明确标记为 `medium_horizon_theme_context`。
+- 短线（1-10 个交易日）：事件/新闻政策催化 + 自动生成的 `market_confirmation.csv`，重点看相对强度、成交量、回撤和波动。
+- 中线（2-12 周）：`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json`，现在明确标记为 `medium_horizon_theme_context`，重点看主题动量和个股动量。
 - 长线（1-3 年）：`ResearchSignalContextPipelines` 的 `latest_signal.json` / `signal_history/*.json`，作为 AI shadow 背景。
 
-最终推荐仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。本仓库会为最终推荐记录短/中/长线独立评分，但公开页面仍保持简洁，只展示最终列表、背景、理由和风险。
+最终推荐仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。本仓库会为最终推荐记录短/中/长线独立评分和独立门槛，但公开页面仍保持简洁，只展示最终列表、背景、理由和风险。
 
 ## 当前 MVP
 
@@ -68,7 +68,7 @@ python scripts/build_advisory_report.py \
 
 ## 版本管理
 
-- Python 包版本：`0.1.2`
+- Python 包版本：`0.1.3`
 - 报告 schema：`schema_version = 5`
 - 报告 contract：`model_recommendations.v5`
 - 报告 manifest：`<output-json>.manifest.json`
@@ -200,4 +200,19 @@ python scripts/build_advisory_report.py \
 基础 `recommendations[]` 评级仍来自事件、watchlist 和 AI 背景；`final_decisions` 会用中线主题动量和可选市场确认对最终公开列表排序。候选池不改变仓位或执行状态。
 线上 workflow 如果找不到 `data/output/theme_momentum_snapshot.json`，会自动跳过这个展示区块。
 
-Yahoo chart 下载只作为临时 fallback。不要把随机免费代理 IP 池作为稳定生产方案；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。
+## 市场确认
+
+`scripts/build_market_confirmation.py` 会从 watchlist、信号上下文和主题动量快照收集股票代码，生成 `market_confirmation.csv`：
+
+```bash
+python scripts/build_market_confirmation.py \
+  --as-of 2026-05-30 \
+  --political-watchlist examples/political_watchlist.example.csv \
+  --ai-signal examples/research_signal_context.example.json \
+  --theme-momentum examples/theme_momentum_snapshot.example.json \
+  --output data/output/market_confirmation_2026-05-30.csv
+```
+
+字段包括 `return_5d`、`return_20d`、`return_63d`、相对 SPY 收益、成交量 z-score、63 日回撤、21 日年化波动和 `market_score`。线上 weekly/monthly/publish workflow 会自动生成该文件，再传给报告生成器。
+
+Yahoo chart 下载只是当前无依赖的免费行情入口；如果不可用，脚本会退回到 `theme_momentum_snapshot.json` 里的价格动量信息，报告仍能生成。不要把随机免费代理 IP 池作为稳定生产方案；它有稳定性、数据污染、封禁、隐私和合规风险。更稳的做法是使用本组织已有价格快照、缓存文件，或可审计的自有代理/数据源。

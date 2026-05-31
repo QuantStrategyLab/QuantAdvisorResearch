@@ -51,15 +51,17 @@ execution targets for this advisory pipeline.
 ## Horizon Ownership
 
 - Short term (`1-10 trading days`): event evidence from
-  `PoliticalEventTrackingResearch`.
+  `PoliticalEventTrackingResearch`, plus Advisor-generated market confirmation
+  for relative strength, volume, drawdown, and volatility.
 - Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from
-  `ResearchSignalContextPipelines`, marked as `medium_horizon_theme_context`.
+  `ResearchSignalContextPipelines`, marked as `medium_horizon_theme_context`,
+  focused on theme momentum and symbol momentum.
 - Long term (`1-3 years`): `latest_signal.json` and `signal_history/*.json` from
   `ResearchSignalContextPipelines` as AI shadow context.
 
-`QuantAdvisorResearch` records per-recommendation `supporting_context` so each
-final recommendation can be traced back to short-, medium-, and long-horizon
-inputs.
+`QuantAdvisorResearch` records per-recommendation `supporting_context`,
+`horizon_scores`, and `horizon_actions` so each final recommendation can be
+traced back to short-, medium-, and long-horizon inputs and gates.
 
 ## Design Patterns
 
@@ -100,6 +102,11 @@ The public HTML/RSS/Telegram outputs should stay direct:
   `final_decisions` ranking;
 - never show orders, target weights, target share quantities, account suitability,
   or account-specific allocation advice.
+
+Market confirmation is optional at the contract level, but the scheduled weekly,
+monthly, and publish workflows generate it automatically. Short-horizon gates
+require market confirmation, medium-horizon gates are led by theme and symbol
+momentum, and long-horizon gates require durable AI shadow or context strength.
 
 ## Fixture vs Live Inputs
 

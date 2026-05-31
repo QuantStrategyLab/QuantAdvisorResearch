@@ -15,6 +15,7 @@ REPORT_CONTRACT_VERSION = "model_recommendations.v5"
 ALLOWED_RECOMMENDATION_RATINGS = frozenset({"recommend", "watch", "verify_source", "defer", "monitor"})
 ALLOWED_RECOMMENDATION_TIERS = frozenset({"tier_1", "tier_2", "watchlist", "source_check", "defer", "monitor"})
 ALLOWED_HORIZONS = frozenset({"short", "medium", "long", "not_applicable"})
+ALLOWED_FINAL_ACTIONS = frozenset({"recommend", "watch", "skip"})
 ALLOWED_SOURCE_CONFIDENCE = frozenset({"high", "medium", "low", "mixed", "no_event", "unknown"})
 ALLOWED_STRATEGY_STYLES = frozenset(
     {
@@ -218,6 +219,16 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
                         _require_number_0_1(score_item.get("score"), f"final_decisions.{section}[{index}].{horizon}.score")
                 if "selection_trace" in item:
                     _require_sequence(item["selection_trace"], f"final_decisions.{section}[{index}].selection_trace")
+                if "horizon_actions" in item:
+                    horizon_actions = _require_mapping(
+                        item["horizon_actions"], f"final_decisions.{section}[{index}].horizon_actions"
+                    )
+                    for horizon in ("short", "medium", "long"):
+                        action = horizon_actions.get(horizon)
+                        if action not in ALLOWED_FINAL_ACTIONS:
+                            raise AdvisoryValidationError(
+                                f"final_decisions.{section}[{index}].horizon_actions.{horizon} is not allowed"
+                            )
 
     policy = _require_mapping(payload["policy"], "policy")
     if policy.get("execution_allowed") is not False:

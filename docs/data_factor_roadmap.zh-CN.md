@@ -178,8 +178,10 @@ Crypto 可作为跨资产风险情绪参考，但暂时不应混入 US equity �
    - X / Truth Social / 社区内容暂不作为稳定默认源。
 
 3. 在 `QuantAdvisorResearch` 增加 market confirmation 输入，但保持可选：
-   - 当前 CSV 字段为 `symbol,as_of,return_5d,return_20d,return_63d,relative_return_20d,relative_return_63d,volume_zscore,drawdown_63d,volatility_21d`。
-   - 如果没有市场确认数据，报告继续生成；该输入只影响 `final_decisions` 的短/中/长线审计评分，不包含目标仓位或交易指令。
+   - 当前 CSV 字段为 `symbol,as_of,return_5d,return_20d,return_63d,relative_return_20d,relative_return_63d,volume_zscore,drawdown_63d,volatility_21d,market_score,data_source,price_observation_count,warnings`。
+   - `scripts/build_market_confirmation.py` 已能自动从 watchlist、信号上下文和主题动量快照收集标的，线上 workflow 默认生成该 CSV。
+   - 如果免费行情接口不可用，脚本会退回到 `theme_momentum_snapshot.json` 中的价格动量字段；报告继续生成，但短线结论会更保守。
+   - 该输入只影响 `final_decisions` 的短/中/长线审计评分，不包含目标仓位或交易指令。
 
 4. 增加事件复盘结果输入：
    - `event_id,symbol,event_date,window,absolute_return,benchmark_relative_return`。
