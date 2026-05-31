@@ -113,7 +113,7 @@ symbol_theme_exposure
 - 中线（2-12 周）：主题上下文层负责，`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json` 标记为 `medium_horizon_theme_context`，主要看主题动量和个股动量。
 - 长线（1-3 年）：AI shadow 背景层负责，来自 `latest_signal.json` 和 `signal_history/*.json`。
 
-`QuantAdvisorResearch` 只在最后做确定性合成，报告中的 `supporting_context`、`horizon_scores` 和 `horizon_actions` 会记录每个最终推荐用到了短线、中线、长线哪些输入，以及每个周期是否达到推荐或观察门槛。
+`QuantAdvisorResearch` 只在最后做确定性合成，报告中的 `supporting_context`、`horizon_scores` 和 `horizon_actions` 会记录每个最终推荐用到了短线、中线、长线哪些输入，以及每个周期是否达到推荐或观察门槛。公开页面不会把所有 `horizon_actions` 都提升为分栏结论：短线和中线以 `primary_horizon` 为准，长线在没有主周期长线标的时允许用长线背景作为展示补充。
 报告 summary 还会记录长线背景是否可用，避免把“上游 artifact 缺字段”误读成“长线没有机会”。
 
 ## Theme momentum 展示边界
@@ -121,8 +121,9 @@ symbol_theme_exposure
 `QuantAdvisorResearch` 可以消费 `theme_momentum_snapshot.json`，用途分两层：
 
 - 公开页面只展示最终推荐，不展示主题候选池；
-- 公开页面按长线 / 中线 / 短线三列展示，每列内按对应周期分数排序；
-- 只要最终推荐通过某个周期的推荐或观察门槛，就在该周期栏渲染完整卡片；同一标的可以同时出现在多个周期栏；
+- 公开页面按长线 / 中线 / 短线三列展示；
+- 短线和中线只展示主周期归类，避免把辅助短线评分误读成最终短线推荐；
+- 长线如果没有主周期长线标的，可以展示长线背景成立的最终推荐，用于保留中长期研究视角；
 - JSON/Markdown 保留 `theme_first_candidates[]` 供审计；
 - `final_decisions` 可以把主题动量作为中线评分的重要输入；
 - 基础 `recommendations[]` 评级仍由事件、watchlist 和 AI 背景生成；

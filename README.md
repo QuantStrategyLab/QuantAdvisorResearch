@@ -45,7 +45,7 @@ Advisor is the final composition layer. Source ownership by horizon is:
 - Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `ResearchSignalContextPipelines`, now explicitly marked as `medium_horizon_theme_context`, focused on theme momentum and symbol momentum.
 - Long term (`1-3 years`): `latest_signal.json` / `signal_history/*.json` from `ResearchSignalContextPipelines` as AI shadow context.
 
-Final recommendations are still deterministic Intelligent Advisory outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine. Advisor records separate short/medium/long horizon scores and gates for each final pick, plus JSON diagnostics that explain whether long-horizon context was actually available. Public pages render each horizon column from that horizon's own gates, so a stock can appear in more than one horizon when both views are supported.
+Final recommendations are still deterministic Intelligent Advisory outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine. Advisor records separate short/medium/long horizon scores and gates for each final pick, plus JSON diagnostics that explain whether long-horizon context was actually available. Public pages render short and medium columns from the pick's primary horizon, while the long column can also show long-horizon context when no primary long bucket exists. Horizon actions remain in JSON as diagnostics, but they are not all promoted to public short/medium columns.
 
 ## Boundary
 

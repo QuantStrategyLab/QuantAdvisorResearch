@@ -96,10 +96,11 @@ The public HTML/RSS/Telegram outputs should stay direct:
 
 - show final recommendations, horizons, stock background, recommendation reasons,
   and risks;
-- render public recommendations as long-, medium-, and short-horizon columns,
-  sorted by each horizon score inside the column;
-- render a full card in every horizon where a final pick passes that horizon
-  gate, even when another horizon is the pick's primary bucket;
+- render public recommendations as long-, medium-, and short-horizon columns;
+- keep short and medium columns tied to each pick's `primary_horizon`, so auxiliary
+  horizon actions do not inflate public short/medium conclusions;
+- allow the long column to use long-horizon action/context as a fallback when no
+  final pick has primary long horizon, preserving long-term context visibility;
 - hide internal tags such as `source_mode`, mode labels, audience labels, and
   repository names;
 - keep `theme_first_candidates[]`, `horizon_scores`, and `selection_trace` in
