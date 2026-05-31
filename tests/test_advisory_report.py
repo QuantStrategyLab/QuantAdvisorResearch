@@ -340,12 +340,18 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert report_with_theme["theme_first_candidates"][0]["industry_background"]
     assert report_with_theme["theme_first_candidates"][0]["recommendation_summary"]
     assert report_with_theme["theme_first_candidates"][2]["symbol"] == "DELL"
+    assert report_with_theme["final_decisions"]["recommendations"][0]["symbol"] == "MU"
+    assert report_with_theme["final_decisions"]["recommendations"][0]["business_summary"]
+    assert "ai_signal_score" in report_with_theme["final_decisions"]["recommendations"][0]
+    assert report_with_theme["final_decisions"]["watchlist"][0]["symbol"] == "DELL"
     assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
     assert report_with_theme["recommendations"][0]["score"] == report_without_theme["recommendations"][0]["score"]
 
     markdown = render_markdown(report_with_theme)
-    assert "## 本期重点股票池" in markdown
+    assert "## 本期最终结论" in markdown
+    assert "## 主题候选（解释材料，不是最终推荐）" in markdown
     assert "为什么入选" in markdown
+    assert "买入数量、仓位" in markdown
     assert "## 主题动量" in markdown
     assert "HBM / 存储" in markdown
     assert "事件证据" in markdown

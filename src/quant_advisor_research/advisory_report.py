@@ -88,6 +88,57 @@ THEME_LABELS_ZH = {
     "automobility_ev": "汽车智能化 / EV 转型",
 }
 
+COMPANY_PROFILES_ZH = {
+    "AMD": {
+        "business": "AMD 主要做 CPU、GPU、AI 加速器和数据中心芯片。",
+        "prospect": "前景主要来自 AI 加速器放量、数据中心服务器更新，以及与 NVIDIA 之外第二供应商相关的需求。",
+    },
+    "AVGO": {
+        "business": "Broadcom 主要做网络芯片、定制 ASIC、半导体连接方案和企业软件。",
+        "prospect": "前景主要来自 AI 数据中心网络、定制加速芯片、云厂商资本开支和软件现金流。",
+    },
+    "COIN": {
+        "business": "Coinbase 是美国主要加密资产交易和托管平台。",
+        "prospect": "前景主要取决于数字资产监管清晰度、交易活跃度和机构托管需求。",
+    },
+    "CVX": {
+        "business": "Chevron 是综合油气公司，覆盖上游勘探生产、炼化和天然气业务。",
+        "prospect": "前景主要来自能源安全、油气供给约束、现金流和股东回报能力。",
+    },
+    "DELL": {
+        "business": "Dell 主要做企业服务器、存储、PC 和 AI 服务器基础设施。",
+        "prospect": "前景主要来自 AI 服务器、企业基础设施更新和数据中心资本开支。",
+    },
+    "INTC": {
+        "business": "Intel 主要做 CPU、数据中心芯片、制造工艺和晶圆代工。",
+        "prospect": "前景主要来自美国本土半导体制造、CHIPS Act、代工恢复和 AI PC / 数据中心需求。",
+    },
+    "MSTR": {
+        "business": "Strategy 经营企业软件业务，同时持有大量比特币资产。",
+        "prospect": "前景主要取决于比特币价格、资本市场融资能力和数字资产监管环境。",
+    },
+    "MU": {
+        "business": "Micron 主要做 DRAM、NAND 和 HBM 等存储芯片。",
+        "prospect": "前景主要来自 AI 服务器对 HBM 和高端 DRAM 的需求，以及存储周期修复。",
+    },
+    "NEE": {
+        "business": "NextEra Energy 是美国大型电力公用事业和可再生能源公司。",
+        "prospect": "前景主要来自电网投资、数据中心用电增长、可再生能源和储能项目需求。",
+    },
+    "TSM": {
+        "business": "台积电是全球领先晶圆代工厂，服务 AI、手机、高性能计算和汽车芯片客户。",
+        "prospect": "前景主要来自先进制程、AI 芯片代工需求和长期半导体外包趋势。",
+    },
+    "VRT": {
+        "business": "Vertiv 主要做数据中心电源、散热、机柜和关键基础设施设备。",
+        "prospect": "前景主要来自 AI 数据中心建设、电力密度提升、液冷和供电基础设施升级。",
+    },
+    "XOM": {
+        "business": "Exxon Mobil 是综合油气公司，覆盖上游生产、炼化、化工和 LNG。",
+        "prospect": "前景主要来自能源安全、LNG 需求、油气供给约束和长期现金流。",
+    },
+}
+
 EXCLUDED_THEME_PICK_SYMBOLS = {
     "DIA",
     "IWM",
@@ -272,6 +323,18 @@ def event_evidence_label(confidence: Any) -> str:
         "no_event": "暂无明确事件催化",
     }
     return labels.get(str(confidence or "").strip(), "暂无明确事件催化")
+
+
+def company_profile(symbol: Any, name: Any = "") -> dict[str, str]:
+    symbol_text = str(symbol or "").upper()
+    profile = COMPANY_PROFILES_ZH.get(symbol_text)
+    if profile:
+        return profile
+    display_name = str(name or symbol_text).strip() or symbol_text
+    return {
+        "business": f"{display_name}（{symbol_text}）为当前观察股票池标的。",
+        "prospect": "前景需要结合行业需求、公司财报、估值、事件证据和价格趋势继续复核。",
+    }
 
 
 def normalize_ai_mapping(mapping: Any) -> dict[str, Any]:
@@ -687,6 +750,214 @@ def source_mode_for_paths(*paths: str | Path | None) -> tuple[str, list[str]]:
     return ("fixture", warnings) if warnings else ("operator_supplied", warnings)
 
 
+def normalize_source_score(rec: dict[str, Any] | None) -> float:
+    if not rec:
+        return 0.0
+    confidence_scores = {
+        "high": 1.0,
+        "medium": 0.75,
+        "mixed": 0.55,
+        "low": 0.25,
+        "unknown": 0.1,
+        "no_event": 0.0,
+    }
+    tier_scores = {
+        "tier_1": 1.0,
+        "tier_2": 0.85,
+        "watchlist": 0.6,
+        "source_check": 0.25,
+        "defer": 0.0,
+        "monitor": 0.0,
+    }
+    evidence_component = clamp(as_float(rec.get("evidence_score")) / 18, 0, 1)
+    confidence_component = confidence_scores.get(str(rec.get("source_confidence", "")), 0.0)
+    blended = evidence_component * 0.65 + confidence_component * 0.35
+    return round(max(blended, tier_scores.get(str(rec.get("recommendation_tier", "")), 0.0)), 3)
+
+
+def theme_symbol_context(theme_momentum: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    if not theme_momentum:
+        return {}
+    theme_ranks = [theme for theme in theme_momentum.get("theme_ranks", []) if isinstance(theme, dict)]
+    total_themes = max(len(theme_ranks), 1)
+    contexts: dict[str, dict[str, Any]] = {}
+    for theme in theme_ranks:
+        theme_id = str(theme.get("theme_id", ""))
+        theme_name = str(theme.get("theme_name", ""))
+        rank = int(as_float(theme.get("rank"), default=total_themes))
+        rank_score = clamp((total_themes - min(rank, total_themes) + 1) / total_themes, 0, 1)
+        theme_score = clamp(as_float(theme.get("momentum_score")) / 2, 0, 1)
+        ai_signal_score = round(rank_score * 0.65 + theme_score * 0.35, 3)
+        for item in theme.get("top_symbols", []):
+            if not isinstance(item, dict) or not item.get("symbol"):
+                continue
+            symbol = str(item["symbol"]).upper()
+            if symbol in EXCLUDED_THEME_PICK_SYMBOLS:
+                continue
+            symbol_momentum_score = round(as_float(item.get("momentum_score")), 6)
+            momentum_score = round(clamp(symbol_momentum_score / 1.5, 0, 1), 3)
+            return_3m = item.get("return_3m")
+            current = contexts.setdefault(
+                symbol,
+                {
+                    "theme_ids": [],
+                    "theme_labels": [],
+                    "primary_theme_id": theme_id,
+                    "primary_theme_label": theme_label(theme_id, theme_name),
+                    "best_theme_rank": rank,
+                    "ai_signal_score": ai_signal_score,
+                    "symbol_momentum_score": symbol_momentum_score,
+                    "momentum_score": momentum_score,
+                    "return_3m": return_3m,
+                },
+            )
+            if theme_id and theme_id not in current["theme_ids"]:
+                current["theme_ids"].append(theme_id)
+                current["theme_labels"].append(theme_label(theme_id, theme_name))
+            if rank < int(current.get("best_theme_rank", total_themes + 1)):
+                current["primary_theme_id"] = theme_id
+                current["primary_theme_label"] = theme_label(theme_id, theme_name)
+                current["best_theme_rank"] = rank
+            if ai_signal_score > as_float(current.get("ai_signal_score")):
+                current["ai_signal_score"] = ai_signal_score
+            if momentum_score > as_float(current.get("momentum_score")):
+                current["symbol_momentum_score"] = symbol_momentum_score
+                current["momentum_score"] = momentum_score
+                current["return_3m"] = return_3m
+    return contexts
+
+
+def final_action_for(
+    rec: dict[str, Any] | None,
+    combined_score: float,
+    support_count: int,
+    momentum_score: float,
+    ai_signal_score: float,
+) -> str:
+    theme_and_momentum_confirmed = momentum_score >= 0.35 and ai_signal_score >= 0.35
+    if combined_score >= 0.52 and theme_and_momentum_confirmed:
+        return "recommend"
+    if (
+        rec
+        and rec.get("recommendation_tier") in {"tier_1", "tier_2"}
+        and combined_score >= 0.45
+        and (theme_and_momentum_confirmed or momentum_score >= 0.35 or ai_signal_score >= 0.35)
+    ):
+        return "recommend"
+    if rec and rec.get("recommendation_tier") in {"watchlist", "source_check"}:
+        return "watch"
+    if combined_score >= 0.35 and support_count >= 2:
+        return "watch"
+    return "skip"
+
+
+def final_action_label(action: str) -> str:
+    return {
+        "recommend": "最终推荐",
+        "watch": "观察名单",
+    }.get(action, "跳过")
+
+
+def build_final_decisions(
+    recommendations: list[dict[str, Any]],
+    theme_momentum: dict[str, Any] | None,
+    *,
+    max_recommendations: int = 5,
+    max_watchlist: int = 8,
+) -> dict[str, Any]:
+    rec_by_symbol = {str(rec.get("symbol", "")).upper(): rec for rec in recommendations}
+    theme_context = theme_symbol_context(theme_momentum)
+    symbols = sorted(set(rec_by_symbol) | set(theme_context))
+    picks: list[dict[str, Any]] = []
+
+    for symbol in symbols:
+        rec = rec_by_symbol.get(symbol)
+        theme = theme_context.get(symbol, {})
+        source_score = normalize_source_score(rec)
+        momentum_score = as_float(theme.get("momentum_score"))
+        ai_signal_score = as_float(theme.get("ai_signal_score"))
+        support_count = sum(score >= 0.35 for score in (source_score, momentum_score, ai_signal_score))
+        combined_score = round(source_score * 0.15 + momentum_score * 0.40 + ai_signal_score * 0.45, 3)
+        action = final_action_for(rec, combined_score, support_count, momentum_score, ai_signal_score)
+        if action == "skip":
+            continue
+        name = rec.get("name", symbol) if rec else symbol
+        profile = company_profile(symbol, name)
+        reasons: list[str] = []
+        if source_score >= 0.35 and rec:
+            reasons.append(
+                f"政策/新闻：{rec.get('source_confidence_label')}置信来源，证据分数={rec.get('evidence_score')}。"
+            )
+        if momentum_score >= 0.35:
+            reasons.append(
+                f"动量：个股动量分数={display_number(theme.get('symbol_momentum_score'))}，近3个月={display_percent(theme.get('return_3m'))}。"
+            )
+        if ai_signal_score >= 0.35:
+            labels = ", ".join(theme.get("theme_labels", [])[:3]) or str(theme.get("primary_theme_label", ""))
+            reasons.append(f"AI信号仓库：{labels}。")
+        if not reasons:
+            reasons.append("当前进入观察名单，但多源证据仍需继续补强。")
+        if rec and rec.get("primary_horizon") != "not_applicable":
+            primary_horizon = rec.get("primary_horizon", "long")
+            primary_horizon_label = rec.get("primary_horizon_label", "长线")
+            primary_horizon_window = rec.get("primary_horizon_window", HORIZON_WINDOWS["long"])
+        elif momentum_score >= 0.35:
+            primary_horizon = "medium"
+            primary_horizon_label = "中线"
+            primary_horizon_window = HORIZON_WINDOWS["medium"]
+        else:
+            primary_horizon = "long"
+            primary_horizon_label = "长线"
+            primary_horizon_window = HORIZON_WINDOWS["long"]
+        picks.append(
+            {
+                "symbol": symbol,
+                "name": name,
+                "action": action,
+                "action_label": final_action_label(action),
+                "primary_horizon": primary_horizon,
+                "primary_horizon_label": primary_horizon_label,
+                "primary_horizon_window": primary_horizon_window,
+                "combined_score": combined_score,
+                "source_score": round(source_score, 3),
+                "momentum_score": round(momentum_score, 3),
+                "ai_signal_score": round(ai_signal_score, 3),
+                "business_summary": profile["business"],
+                "prospect_summary": profile["prospect"],
+                "why_selected": dedupe(reasons),
+                "risk_summary": rec.get("risk_notes", ["需复核估值、财报、回撤和流动性。"])[0] if rec else "需复核估值、财报、回撤和流动性。",
+                "buy_amount_guidance": "不提供买入数量或仓位；这是非个性化模型研究，不知道你的账户规模、风险承受能力和现有持仓。",
+            }
+        )
+
+    picks.sort(
+        key=lambda item: (
+            0 if item["action"] == "recommend" else 1,
+            -as_float(item.get("combined_score")),
+            str(item.get("symbol", "")),
+        )
+    )
+    recommendation_candidates = [item for item in picks if item["action"] == "recommend"]
+    recommendations_out = recommendation_candidates[:max_recommendations]
+    recommendation_symbols = {item["symbol"] for item in recommendations_out}
+    watchlist_out = [
+        item
+        for item in picks
+        if item["action"] == "watch" or (item["action"] == "recommend" and item["symbol"] not in recommendation_symbols)
+    ][:max_watchlist]
+    horizon_buckets = {
+        horizon: [item["symbol"] for item in recommendations_out if item.get("primary_horizon") == horizon]
+        for horizon in ("short", "medium", "long")
+    }
+    return {
+        "method": "AiLongHorizonSignalPipelines signal and price momentum first; policy/news evidence is a confidence and risk modifier",
+        "recommendations": recommendations_out,
+        "watchlist": watchlist_out,
+        "horizon_buckets": horizon_buckets,
+        "position_policy": "No target shares, position size, portfolio weight, or account-specific allocation is provided.",
+    }
+
+
 def build_advisory_report(
     *,
     as_of: str,
@@ -735,6 +1006,7 @@ def build_advisory_report(
     recommendations.sort(key=lambda rec: (-rec["evidence_score"], rec["risk_score"], rec["symbol"]))
     recommendations = recommendations[:max_candidates]
     theme_first_candidates = build_theme_first_candidates(theme_momentum, recommendations)
+    final_decisions = build_final_decisions(recommendations, theme_momentum)
 
     report = {
         "schema_version": "5",
@@ -760,10 +1032,11 @@ def build_advisory_report(
             "top_theme_ids": [theme["theme_id"] for theme in theme_momentum_summary["top_themes"]],
             "theme_first_candidate_count": len(theme_first_candidates),
             "top_theme_candidate_symbols": [item["symbol"] for item in theme_first_candidates[:8]],
-            "top_recommended_symbols": [rec["symbol"] for rec in recommendations if rec["recommendation_tier"] == "tier_1"][:5],
+            "top_recommended_symbols": [item["symbol"] for item in final_decisions["recommendations"][:5]],
             "review_note": "Non-personalized model recommendations. No order, target quantity, account suitability, or portfolio allocation is encoded.",
         },
         "recommendations": recommendations,
+        "final_decisions": final_decisions,
         "theme_first_candidates": theme_first_candidates,
         "theme_momentum": theme_momentum_summary,
         "policy": {
@@ -798,9 +1071,41 @@ def render_markdown(report: dict[str, Any]) -> str:
         "- 允许账户级建议: `false`",
         "",
     ]
+    final_decisions = report.get("final_decisions", {})
+    if final_decisions:
+        lines.extend(["## 本期最终结论", ""])
+        lines.append("- 口径: 以 AI信号仓库（AiLongHorizonSignalPipelines）和动量为主，政策/新闻事件用于提高置信度和提示风险；不包含买入数量、仓位或账户级配置。")
+        horizon_buckets = final_decisions.get("horizon_buckets", {})
+        for horizon, label in (("short", "短线"), ("medium", "中线"), ("long", "长线")):
+            symbols = ", ".join(horizon_buckets.get(horizon, [])) or "暂无最终推荐"
+            lines.append(f"- {label}({HORIZON_WINDOWS[horizon]}): {symbols}")
+        lines.append("")
+        for pick in final_decisions.get("recommendations", []):
+            lines.extend(
+                [
+                    f"### {pick.get('symbol')} - {pick.get('action_label')}",
+                    "",
+                    f"- 周期: {pick.get('primary_horizon_label')}({pick.get('primary_horizon_window')})",
+                    f"- 做什么: {pick.get('business_summary')}",
+                    f"- 为什么有前景: {pick.get('prospect_summary')}",
+                    "- 多源依据:",
+                ]
+            )
+            lines.extend(f"  - {reason}" for reason in pick.get("why_selected", []))
+            lines.extend(
+                [
+                    f"- 主要风险: {pick.get('risk_summary')}",
+                    f"- 买多少: {pick.get('buy_amount_guidance')}",
+                    "",
+                ]
+            )
+        if final_decisions.get("watchlist"):
+            watch_symbols = ", ".join(item.get("symbol", "") for item in final_decisions["watchlist"])
+            lines.append(f"- 观察名单，不是最终推荐: {watch_symbols}")
+            lines.append("")
     theme_candidates = report.get("theme_first_candidates", [])
     if theme_candidates:
-        lines.extend(["## 本期重点股票池", ""])
+        lines.extend(["## 主题候选（解释材料，不是最终推荐）", ""])
         lines.append("- 先看这里: 每期选出 5-10 个股票/公司标的，说明行业主题、入选理由、事件证据和主要风险。")
         lines.append("- 边界: 这是非个性化模型股票池，不是买入清单；`暂无明确事件催化` 表示该标的主要来自主题/动量排序。")
         lines.append("")

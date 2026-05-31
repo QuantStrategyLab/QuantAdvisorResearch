@@ -103,8 +103,14 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
 
     html = render_report_html(report)
 
-    assert "本期重点股票池" in html
-    assert "先看这里" in html
+    assert "本期最终结论" in html
+    assert "最终推荐" in html
+    assert "买多少" in html
+    assert "不提供买入金额" in html
+    assert "AI信号仓库" in html
+    assert "AiLongHorizonSignalPipelines" in html
+    assert "主题候选（解释材料，不是最终推荐）" in html
+    assert "最终推荐以上方“本期最终结论”为准" in html
     assert "+28.0%" in html
     assert "为什么入选" in html
     assert "主题动量" in html
@@ -149,8 +155,10 @@ def test_format_telegram_message_contains_themes_policy_and_link() -> None:
     message = format_telegram_message(report, site_url="https://example.com/advisor")
 
     assert "量化模型推荐" in message
-    assert "本期重点股票池" in message
-    assert "不等于买入" in message
+    assert "本期最终推荐" in message
+    assert "买多少：不提供" in message
+    assert "AI信号仓库" in message
+    assert "主题候选（不是最终推荐）" in message
     assert "近3月" in message
     assert "事件证据" in message
     assert "为什么" in message

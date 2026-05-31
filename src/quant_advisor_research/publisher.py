@@ -68,6 +68,87 @@ def format_candidate_theme_ids(candidate: dict[str, Any]) -> str:
     return ", ".join(labels) or "无"
 
 
+def render_final_decisions_html(report: dict[str, Any]) -> str:
+    decisions = report.get("final_decisions", {})
+    if not decisions:
+        return ""
+    final_picks = decisions.get("recommendations", [])
+    watchlist = decisions.get("watchlist", [])
+    buckets = decisions.get("horizon_buckets", {})
+    horizon_rows = []
+    for horizon, label, window in (
+        ("short", "短线", "1-10个交易日"),
+        ("medium", "中线", "2-12周"),
+        ("long", "长线", "1-3年"),
+    ):
+        symbols = buckets.get(horizon, [])
+        horizon_rows.append(
+            f"<li><strong>{label}（{window}）：</strong>{html.escape(', '.join(symbols) if symbols else '暂无最终推荐')}</li>"
+        )
+
+    cards = []
+    for pick in final_picks:
+        reasons = "".join(f"<li>{html.escape(str(reason))}</li>" for reason in pick.get("why_selected", []))
+        cards.append(
+            f"""
+            <article class="final-card">
+              <header>
+                <h3>{html.escape(str(pick.get('symbol', '')))} <span>{html.escape(str(pick.get('action_label', '')))}</span></h3>
+                <p>{html.escape(str(pick.get('name', '')))}</p>
+              </header>
+              <dl>
+                <div><dt>周期</dt><dd>{html.escape(str(pick.get('primary_horizon_label', '')))} / {html.escape(str(pick.get('primary_horizon_window', '')))}</dd></div>
+                <div><dt>综合分</dt><dd>{html.escape(display_number(pick.get('combined_score')))}</dd></div>
+                <div><dt>政策/新闻</dt><dd>{html.escape(display_number(pick.get('source_score')))}</dd></div>
+                <div><dt>动量</dt><dd>{html.escape(display_number(pick.get('momentum_score')))}</dd></div>
+                <div><dt>AI信号仓库</dt><dd>{html.escape(display_number(pick.get('ai_signal_score')))}</dd></div>
+                <div><dt>仓位/数量</dt><dd>不提供</dd></div>
+              </dl>
+              <p><strong>做什么：</strong>{html.escape(str(pick.get('business_summary', '')))}</p>
+              <p><strong>为什么有前景：</strong>{html.escape(str(pick.get('prospect_summary', '')))}</p>
+              <p><strong>多源依据：</strong></p>
+              <ul>{reasons}</ul>
+              <p><strong>主要风险：</strong>{html.escape(str(pick.get('risk_summary', '')))}</p>
+              <p class="position-note"><strong>买多少：</strong>{html.escape(str(pick.get('buy_amount_guidance', '不提供买入数量或仓位。')))}</p>
+            </article>
+            """
+        )
+
+    watch_rows = []
+    for item in watchlist:
+        watch_rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(item.get('symbol', '')))}</td>"
+            f"<td>{html.escape(str(item.get('primary_horizon_label', '')))}</td>"
+            f"<td>{html.escape(display_number(item.get('combined_score')))}</td>"
+            f"<td>{html.escape(str(item.get('business_summary', '')))}</td>"
+            f"<td>{html.escape(str(item.get('prospect_summary', '')))}</td>"
+            "</tr>"
+        )
+    watch_html = ""
+    if watch_rows:
+        watch_html = f"""
+        <h3>观察名单（不是最终推荐）</h3>
+        <p>这些标的可能有主题或动量，但事件证据、风险或推荐层级还不足，不作为本期最终推荐。</p>
+        <table>
+          <thead><tr><th>股票</th><th>周期</th><th>综合分</th><th>做什么</th><th>为什么可跟踪</th></tr></thead>
+          <tbody>{''.join(watch_rows)}</tbody>
+        </table>
+        """
+
+    final_intro = "、".join(str(pick.get("symbol", "")) for pick in final_picks) or "暂无"
+    return f"""
+    <section class="final-decisions">
+      <h2>本期最终结论</h2>
+      <p><strong>最终推荐：</strong>{html.escape(final_intro)}。合成口径以 AI信号仓库（AiLongHorizonSignalPipelines）和动量为主，政策/新闻事件用于提高置信度和提示风险。</p>
+      <p><strong>买多少：</strong>不提供买入金额、股数、仓位或账户级配置；这里只能作为非个性化模型研究。</p>
+      <ul class="horizon-list">{''.join(horizon_rows)}</ul>
+      <div class="final-grid">{''.join(cards)}</div>
+      {watch_html}
+    </section>
+    """
+
+
 def render_theme_first_candidates_html(report: dict[str, Any]) -> str:
     candidates = report.get("theme_first_candidates", [])
     if not candidates:
@@ -103,8 +184,8 @@ def render_theme_first_candidates_html(report: dict[str, Any]) -> str:
         )
     return f"""
     <section class="theme-candidates">
-      <h2>本期重点股票池</h2>
-      <p><strong>先看这里：</strong>每期选出 5-10 个股票/公司标的，说明行业主题、入选理由、事件证据和主要风险。</p>
+      <h2>主题候选（解释材料，不是最终推荐）</h2>
+      <p><strong>用途：</strong>这里只解释哪些股票进入主题/动量候选池，最终推荐以上方“本期最终结论”为准。</p>
       <p><strong>怎么理解：</strong>这是非个性化模型股票池，不是买入清单；“暂无明确事件催化”表示该标的主要来自主题/动量排序，
       还没有足够稳定的新闻、政策或公司事件证据。</p>
       <div class="candidate-grid">{''.join(cards)}</div>
@@ -157,6 +238,7 @@ def render_report_html(report: dict[str, Any]) -> str:
         """
     theme_candidates_html = render_theme_first_candidates_html(report)
     theme_momentum_html = render_theme_momentum_html(report)
+    final_decisions_html = render_final_decisions_html(report)
     recommendation_cards = []
     background_count = 0
     for rec in report["recommendations"]:
@@ -217,6 +299,16 @@ def render_report_html(report: dict[str, Any]) -> str:
     .pill {{ border: 1px solid #d0d7de; border-radius: 999px; padding: 5px 10px; background: #fff; }}
     .policy {{ background: #fff7ed; border: 1px solid #fed7aa; padding: 14px 16px; margin-bottom: 20px; }}
     .warning {{ background: #fff1f2; border: 1px solid #fecdd3; padding: 14px 16px; margin-bottom: 20px; }}
+    .final-decisions {{ background: #ecfeff; border: 1px solid #67e8f9; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
+    .final-decisions > p {{ color: #334155; line-height: 1.55; }}
+    .horizon-list {{ background: #fff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 16px 12px 32px; }}
+    .final-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }}
+    .final-card {{ background: #fff; border: 1px solid #67e8f9; border-radius: 8px; padding: 16px; }}
+    .final-card h3 {{ margin: 0; font-size: 1.2rem; }}
+    .final-card h3 span {{ font-size: .85rem; color: #0f766e; margin-left: 8px; }}
+    .final-card header p {{ margin: 4px 0 12px; color: #57606a; }}
+    .final-card p {{ line-height: 1.55; color: #334155; }}
+    .position-note {{ background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 12px; }}
     .theme-candidates {{ background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; margin-bottom: 20px; border-radius: 8px; }}
     .candidate-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }}
     .candidate-card {{ background: #fff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; }}
@@ -263,6 +355,7 @@ def render_report_html(report: dict[str, Any]) -> str:
       不允许下单、组合配置、账户适当性判断或个性化建议。
     </section>
     {warning_html}
+    {final_decisions_html}
     {theme_candidates_html}
     {theme_momentum_html}
     <section class="recommendation-section">
