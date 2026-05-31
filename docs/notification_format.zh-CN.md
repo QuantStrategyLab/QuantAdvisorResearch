@@ -1,5 +1,15 @@
 # 智慧投顾研究通知格式
 
+
+## English summary
+
+- Full English version: [`notification_format.md`](notification_format.md). This summary keeps an English entry point in the Chinese file.
+- Purpose: this document covers `智慧投顾研究通知格式` for `QuantAdvisorResearch`.
+- Main topics: `设计原则`, `通用字段`, `RSS 摘要`, `Telegram 摘要`, `邮件摘要`.
+- Read the boundaries, inputs, outputs, and permission requirements before running commands, CI jobs, dry-runs, releases, or runtime switches.
+- For live trading, secrets, Cloud Run, exchange, or broker API changes, validate in test or dry-run mode first and do not change production only from examples.
+- If this summary differs from the detailed Chinese body, follow the concrete commands, configuration keys, and constraints in the body.
+
 ## 设计原则
 
 通知可以明确展示“推荐什么标的、为什么、适合短中长哪类周期”。边界不是禁止推荐，而是禁止把智慧投顾研究结论变成账户级操作：

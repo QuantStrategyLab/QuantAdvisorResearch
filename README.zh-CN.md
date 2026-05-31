@@ -2,6 +2,16 @@
 
 > ⚠️ 投资有风险，不构成投资建议，仅供学习交流用途。
 
+
+## English summary
+
+- Full English version: [`README.md`](README.md). This summary keeps an English entry point in the Chinese file.
+- Purpose: this document covers `QuantAdvisorResearch` for `QuantAdvisorResearch`.
+- Main topics: `仓库定位`, `短中长线来源分工`, `当前 MVP`, `版本管理`, `来源模式`.
+- Read the boundaries, inputs, outputs, and permission requirements before running commands, CI jobs, dry-runs, releases, or runtime switches.
+- For live trading, secrets, Cloud Run, exchange, or broker API changes, validate in test or dry-run mode first and do not change production only from examples.
+- If this summary differs from the detailed Chinese body, follow the concrete commands, configuration keys, and constraints in the body.
+
 [English](README.md) | [简体中文](README.zh-CN.md)
 
 QuantStrategyLab 的“智慧投顾研究系统”协调仓库。它把事件证据、主题动量、市场确认和 AI shadow 背景整理成普通投资者能读懂的研究结论；不下单、不管理仓位、不接券商凭证，也不做账户级个性化建议。
