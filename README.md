@@ -15,7 +15,7 @@ investor.
 system:
 
 - consume political/public-event context from `PoliticalEventTrackingResearch`
-- consume saved AI shadow context from `AiLongHorizonSignalPipelines`
+- consume saved AI shadow context from `ResearchSignalContextPipelines`
 - keep other strategy and snapshot repositories independent from this pipeline
 - leave broker execution in platform repositories
 
@@ -35,10 +35,10 @@ Live site:
 Advisor is the final composition layer. Source ownership by horizon is:
 
 - Short term (`1-10 trading days`): `source_events.csv` / `political_events.csv` from `PoliticalEventTrackingResearch` for event and policy/news catalysts.
-- Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `AiLongHorizonSignalPipelines`, now explicitly marked as `medium_horizon_theme_context`.
-- Long term (`1-3 years`): `latest_signal.json` / `signal_history/*.json` from `AiLongHorizonSignalPipelines` as AI shadow context.
+- Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `ResearchSignalContextPipelines`, now explicitly marked as `medium_horizon_theme_context`.
+- Long term (`1-3 years`): `latest_signal.json` / `signal_history/*.json` from `ResearchSignalContextPipelines` as AI shadow context.
 
-Final recommendations are still deterministic Advisor outputs. The AI repository does not directly produce short-term recommendations or replace the final decision engine.
+Final recommendations are still deterministic Advisor outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine.
 
 ## Boundary
 
@@ -61,9 +61,9 @@ This repository does not own:
 ## AI Usage
 
 This repository does not call Codex, OpenAI, Anthropic, or any other model API.
-It only consumes saved `mode=shadow` artifacts from `AiLongHorizonSignalPipelines`.
+It only consumes saved `mode=shadow` artifacts from `ResearchSignalContextPipelines`.
 The only repository in this three-repo flow that can involve AI is
-`AiLongHorizonSignalPipelines`, and even there provider execution is delegated to
+`ResearchSignalContextPipelines`, and even there provider execution is delegated to
 `QuantStrategyLab/CodexAuditBridge`. Model API keys and fallback routing belong
 there, not in this repository.
 
@@ -75,7 +75,7 @@ python scripts/build_advisory_report.py \
   --cadence weekly \
   --political-events examples/political_events.example.csv \
   --political-watchlist examples/political_watchlist.example.csv \
-  --ai-signal examples/ai_long_horizon_signal.example.json \
+  --ai-signal examples/research_signal_context.example.json \
   --output-json data/output/advisory_report.example.json \
   --output-md data/output/advisory_report.example.md
 ```
@@ -96,7 +96,7 @@ python scripts/build_advisory_report.py \
   --cadence weekly \
   --political-events ../PoliticalEventTrackingResearch/examples/political_events.example.csv \
   --political-watchlist ../PoliticalEventTrackingResearch/examples/political_watchlist.example.csv \
-  --ai-signal ../AiLongHorizonSignalPipelines/data/output/latest_signal.json \
+  --ai-signal ../ResearchSignalContextPipelines/data/output/latest_signal.json \
   --output-json data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
   --output-md data/output/weekly_advisory_review/advisory_report_2026-05-30.md
 ```
@@ -268,7 +268,7 @@ python scripts/build_advisory_report.py \
   --cadence weekly \
   --political-events examples/political_events.example.csv \
   --political-watchlist examples/political_watchlist.example.csv \
-  --ai-signal examples/ai_long_horizon_signal.example.json \
+  --ai-signal examples/research_signal_context.example.json \
   --theme-momentum examples/theme_momentum_snapshot.example.json \
   --output-json data/output/advisory_report.example.json \
   --output-md data/output/advisory_report.example.md

@@ -19,7 +19,7 @@ def test_build_advisory_report_blocks_execution_and_allocation() -> None:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
 
     assert report["mode"] == "model_recommendations"
@@ -40,7 +40,7 @@ def test_low_confidence_events_remain_verify_source_until_verified() -> None:
         cadence="daily",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
 
     by_symbol = {item["symbol"]: item for item in report["recommendations"]}
@@ -55,7 +55,7 @@ def test_ai_avoid_bias_defers_research_item() -> None:
         cadence="monthly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
 
     by_symbol = {item["symbol"]: item for item in report["recommendations"]}
@@ -69,7 +69,7 @@ def test_high_evidence_events_generate_recommendations_with_horizon() -> None:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
 
     by_symbol = {item["symbol"]: item for item in report["recommendations"]}
@@ -132,7 +132,7 @@ def test_long_horizon_window_is_measured_in_years() -> None:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
 
     by_symbol = {item["symbol"]: item for item in report["recommendations"]}
@@ -148,7 +148,7 @@ def test_contract_rejects_execution_enabled_report() -> None:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
     report["policy"]["execution_allowed"] = True
 
@@ -162,7 +162,7 @@ def test_render_markdown_keeps_public_report_direct() -> None:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
         theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
     )
 
@@ -180,7 +180,7 @@ def test_render_markdown_keeps_public_report_direct() -> None:
     assert "本期最终结论" not in markdown
     assert "中线主题上下文" in markdown
     assert "AI信号仓库" not in markdown
-    assert "AiLongHorizonSignalPipelines" not in markdown
+    assert "ResearchSignalContextPipelines" not in markdown
 
 
 def test_contract_rejects_account_action_fields() -> None:
@@ -189,7 +189,7 @@ def test_contract_rejects_account_action_fields() -> None:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
     report["recommendations"][0]["target_weight"] = 0.1
 
@@ -203,7 +203,7 @@ def test_contract_rejects_theme_candidate_account_action_fields() -> None:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
         theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
     )
     report["theme_first_candidates"][0]["target_weight"] = 0.1
@@ -218,7 +218,7 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
     report_path = tmp_path / "advisory_report.json"
     markdown_path = tmp_path / "advisory_report.md"
@@ -361,7 +361,7 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert "ai_signal_score" in first_pick
     assert first_pick["medium_context_score"] == first_pick["ai_signal_score"]
     assert first_pick["supporting_context"]["medium"] == ["theme_momentum_snapshot"]
-    assert "AiLongHorizonSignalPipelines" not in report_with_theme["final_decisions"]["method"]
+    assert "ResearchSignalContextPipelines" not in report_with_theme["final_decisions"]["method"]
     assert report_with_theme["final_decisions"]["watchlist"][0]["symbol"] == "DELL"
     assert report_with_theme["recommendations"][0]["rating"] == report_without_theme["recommendations"][0]["rating"]
     assert report_with_theme["recommendations"][0]["score"] == report_without_theme["recommendations"][0]["score"]
@@ -372,7 +372,7 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     assert "推荐理由" in markdown
     assert "中线主题上下文" in markdown
     assert "AI信号仓库" not in markdown
-    assert "AiLongHorizonSignalPipelines" not in markdown
+    assert "ResearchSignalContextPipelines" not in markdown
     assert "## 主题候选（解释材料，不是最终推荐）" not in markdown
     assert "为什么入选" not in markdown
     assert "买多少" not in markdown

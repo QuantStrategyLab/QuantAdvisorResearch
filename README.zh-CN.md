@@ -13,7 +13,7 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 这个仓库把事件研究和 AI shadow 产物组合成 model recommendation artifact：
 
 - `PoliticalEventTrackingResearch`：政治/公开事件事实、催化剂、来源置信度。
-- `AiLongHorizonSignalPipelines`：已保存的长周期 AI shadow context。
+- `ResearchSignalContextPipelines`：已保存的长周期 AI shadow context。
 - 其他量化策略/快照仓库：保持独立，不作为当前推荐链路的直接输入。
 - 各券商平台仓库：继续只负责执行链路；本仓库不调用它们。
 
@@ -23,10 +23,10 @@ QuantStrategyLab 的“智慧顾投”研究协调仓库。它生成非个性化
 Advisor 是最终合成层，三个周期的输入分工如下：
 
 - 短线（1-10 个交易日）：`PoliticalEventTrackingResearch` 的 `source_events.csv` / `political_events.csv`，用于事件和新闻政策催化。
-- 中线（2-12 周）：`AiLongHorizonSignalPipelines` 的 `theme_momentum_snapshot.json`，现在明确标记为 `medium_horizon_theme_context`。
-- 长线（1-3 年）：`AiLongHorizonSignalPipelines` 的 `latest_signal.json` / `signal_history/*.json`，作为 AI shadow 背景。
+- 中线（2-12 周）：`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json`，现在明确标记为 `medium_horizon_theme_context`。
+- 长线（1-3 年）：`ResearchSignalContextPipelines` 的 `latest_signal.json` / `signal_history/*.json`，作为 AI shadow 背景。
 
-最终推荐仍由本仓库确定性合成。AI 仓库不直接输出短线推荐，也不替代本仓库的最终决策。
+最终推荐仍由本仓库确定性合成。信号上下文仓库不直接输出短线推荐，也不替代本仓库的最终决策。
 
 ## 当前 MVP
 
@@ -38,7 +38,7 @@ python scripts/build_advisory_report.py \
   --cadence weekly \
   --political-events examples/political_events.example.csv \
   --political-watchlist examples/political_watchlist.example.csv \
-  --ai-signal examples/ai_long_horizon_signal.example.json \
+  --ai-signal examples/research_signal_context.example.json \
   --output-json data/output/advisory_report.example.json \
   --output-md data/output/advisory_report.example.md
 ```
@@ -91,9 +91,9 @@ manifest 会记录 JSON/Markdown 的 SHA256、`as_of`、cadence、来源 artifac
 
 ## AI 使用边界
 
-本仓库不直接调用 Codex、OpenAI、Anthropic 或其他模型 API。它只读取 `AiLongHorizonSignalPipelines` 已保存的 `mode=shadow` artifact。
+本仓库不直接调用 Codex、OpenAI、Anthropic 或其他模型 API。它只读取 `ResearchSignalContextPipelines` 已保存的 `mode=shadow` artifact。
 
-这三个仓库里，只有 `AiLongHorizonSignalPipelines` 的月度 shadow signal 流程会涉及 AI，而且模型执行也委托给 `QuantStrategyLab/CodexAuditBridge`。模型 API key 和 fallback provider routing 都应集中在那里，不应放到本仓库。
+这三个仓库里，只有 `ResearchSignalContextPipelines` 的月度 shadow signal 流程会涉及 AI，而且模型执行也委托给 `QuantStrategyLab/CodexAuditBridge`。模型 API key 和 fallback provider routing 都应集中在那里，不应放到本仓库。
 
 ## 合规提醒
 
@@ -117,7 +117,7 @@ python -m pytest -q
 ## 周度复盘
 
 `.github/workflows/weekly_advisory_review.yml` 会 checkout 本仓库、`PoliticalEventTrackingResearch`
-和 `AiLongHorizonSignalPipelines`，生成周度 `model_recommendations` 报告并上传为 GitHub Actions artifact。
+和 `ResearchSignalContextPipelines`，生成周度 `model_recommendations` 报告并上传为 GitHub Actions artifact。
 
 它不会提交文件、不会通知投资者、不会创建订单。
 
@@ -182,7 +182,7 @@ python scripts/build_advisory_report.py \
   --cadence weekly \
   --political-events examples/political_events.example.csv \
   --political-watchlist examples/political_watchlist.example.csv \
-  --ai-signal examples/ai_long_horizon_signal.example.json \
+  --ai-signal examples/research_signal_context.example.json \
   --theme-momentum examples/theme_momentum_snapshot.example.json \
   --output-json data/output/advisory_report.example.json \
   --output-md data/output/advisory_report.example.md

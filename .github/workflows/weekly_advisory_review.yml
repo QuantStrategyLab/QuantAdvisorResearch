@@ -18,12 +18,12 @@ on:
         default: "examples/political_watchlist.example.csv"
         type: string
       ai_signal_path:
-        description: "Path inside AiLongHorizonSignalPipelines."
+        description: "Path inside ResearchSignalContextPipelines."
         required: false
         default: "data/output/latest_signal.json"
         type: string
       theme_momentum_path:
-        description: "Optional path inside AiLongHorizonSignalPipelines. Empty disables theme momentum context."
+        description: "Optional path inside ResearchSignalContextPipelines. Empty disables theme momentum context."
         required: false
         default: "data/output/theme_momentum_snapshot.json"
         type: string
@@ -43,11 +43,11 @@ jobs:
         with:
           repository: QuantStrategyLab/PoliticalEventTrackingResearch
           path: political-events
-      - name: Checkout AI shadow repository
+      - name: Checkout signal context repository
         uses: actions/checkout@v6
         with:
-          repository: QuantStrategyLab/AiLongHorizonSignalPipelines
-          path: ai-long-horizon
+          repository: QuantStrategyLab/ResearchSignalContextPipelines
+          path: research-signal-context
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
@@ -67,15 +67,15 @@ jobs:
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
           mkdir -p data/output/weekly_advisory_review
           THEME_ARGS=()
-          if [ -n "${THEME_MOMENTUM_PATH}" ] && [ -f "../ai-long-horizon/${THEME_MOMENTUM_PATH}" ]; then
-            THEME_ARGS=(--theme-momentum "../ai-long-horizon/${THEME_MOMENTUM_PATH}")
+          if [ -n "${THEME_MOMENTUM_PATH}" ] && [ -f "../research-signal-context/${THEME_MOMENTUM_PATH}" ]; then
+            THEME_ARGS=(--theme-momentum "../research-signal-context/${THEME_MOMENTUM_PATH}")
           fi
           python scripts/build_advisory_report.py \
             --as-of "${AS_OF}" \
             --cadence weekly \
             --political-events "../political-events/${POLITICAL_EVENTS_PATH}" \
             --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}" \
-            --ai-signal "../ai-long-horizon/${AI_SIGNAL_PATH}" \
+            --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}" \
             "${THEME_ARGS[@]}" \
             --output-json "data/output/weekly_advisory_review/advisory_report_${AS_OF}.json" \
             --output-md "data/output/weekly_advisory_review/advisory_report_${AS_OF}.md"

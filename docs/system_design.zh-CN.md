@@ -5,7 +5,7 @@
 QuantStrategyLab 现有仓库已经天然分层：
 
 - `PoliticalEventTrackingResearch`：事实事件层。
-- `AiLongHorizonSignalPipelines`：AI 长周期 shadow 观点层。
+- `ResearchSignalContextPipelines`：研究信号上下文层，包含中线主题动量和长周期 AI shadow 背景。
 - `QuantStrategyPlugins`：sidecar 风控、事件和通知 artifact 层。
 - 券商平台仓库：执行、通知、凭证和运行时适配层。
 
@@ -20,7 +20,7 @@ PoliticalEventTrackingResearch
 event evidence + source confidence
         |
         v
-QuantAdvisorResearch <--- AiLongHorizonSignalPipelines latest_signal.json
+QuantAdvisorResearch <--- ResearchSignalContextPipelines latest_signal.json
         |
         v
 model-recommendation artifact
@@ -50,7 +50,7 @@ broker platform repositories
 
 ## 不推荐方案
 
-不建议把 `PoliticalEventTrackingResearch` 和 `AiLongHorizonSignalPipelines` 合并：
+不建议把 `PoliticalEventTrackingResearch` 和 `ResearchSignalContextPipelines` 合并：
 
 - 事实与模型观点混在一起会降低可审计性。
 - 事件高频、AI 长周期，两者 cadence 不同。
@@ -87,13 +87,13 @@ broker platform repositories
 推荐节奏是：
 
 - `PoliticalEventTrackingResearch`：事件/RSS 事实层周更，必要时手工触发；
-- `AiLongHorizonSignalPipelines`：主题动量周更，长周期 AI shadow signal 月更；
+- `ResearchSignalContextPipelines`：主题动量周更，长周期 AI shadow signal 月更；
 - `QuantAdvisorResearch`：公开 HTML/JSON/RSS 推荐继续周更；
 - 月度复盘单独生成 artifact，用来回顾本月最终推荐和相对上次变化，不替代周度公开推荐。
 
 ## 跨板块长期主题层
 
-`AiLongHorizonSignalPipelines` 的长期主题层不应只覆盖 AI。当前设计使用静态、版本化 taxonomy，把 AI、半导体、数据中心电力、网络安全、国防、能源、金融、医疗、消费平台、工业自动化、crypto 和 EV/汽车等板块统一成主题暴露。
+`ResearchSignalContextPipelines` 的主题上下文不应只覆盖 AI。当前设计使用静态、版本化 taxonomy，把 AI、半导体、数据中心电力、网络安全、国防、能源、金融、医疗、消费平台、工业自动化、crypto 和 EV/汽车等板块统一成主题暴露。
 
 `QuantAdvisorResearch` 可以读取 AI shadow artifact 中的：
 
@@ -108,7 +108,7 @@ symbol_theme_exposure
 ## 短中长线来源分工
 
 - 短线（1-10 个交易日）：事件事实层负责，主要来自 `PoliticalEventTrackingResearch` 的官方来源、新闻政策和事件新鲜度。
-- 中线（2-12 周）：主题上下文层负责，`AiLongHorizonSignalPipelines` 的 `theme_momentum_snapshot.json` 标记为 `medium_horizon_theme_context`。
+- 中线（2-12 周）：主题上下文层负责，`ResearchSignalContextPipelines` 的 `theme_momentum_snapshot.json` 标记为 `medium_horizon_theme_context`。
 - 长线（1-3 年）：AI shadow 背景层负责，来自 `latest_signal.json` 和 `signal_history/*.json`。
 
 `QuantAdvisorResearch` 只在最后做确定性合成，报告中的 `supporting_context` 会记录每个最终推荐用到了短线、中线、长线哪些输入。
@@ -122,6 +122,6 @@ symbol_theme_exposure
 - 写入 `summary.top_theme_ids` 和 `theme_momentum.top_themes`；
 - 不改变推荐评级、评分、周期、仓位或执行策略。
 
-如果上游 `AiLongHorizonSignalPipelines` 没有生成该 snapshot，workflow 会跳过该输入，报告仍可正常生成。
+如果上游 `ResearchSignalContextPipelines` 没有生成该 snapshot，workflow 会跳过该输入，报告仍可正常生成。
 
 Yahoo chart 只能作为临时 fallback。随机免费代理 IP 池不应进入稳定生产链路；如果需要代理，应使用自控代理或更稳定的数据快照，并记录来源、时间和 hash，便于 replay。

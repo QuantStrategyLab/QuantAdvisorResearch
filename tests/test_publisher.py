@@ -15,7 +15,7 @@ def build_sample_report() -> dict:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
         theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
     )
 
@@ -38,7 +38,7 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     assert "本期最终结论" not in html
     assert "最终推荐：" not in html
     assert "合成口径" not in html
-    assert "AiLongHorizonSignalPipelines" not in html
+    assert "ResearchSignalContextPipelines" not in html
     assert "背景跟踪（非推荐" not in html
     assert "复核清单" not in html
     assert "主题候选（解释材料，不是最终推荐）" not in html
@@ -72,7 +72,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/ai_long_horizon_signal.example.json",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
         theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
     )
     report["summary"]["top_theme_ids"] = ["hbm_memory"]
@@ -125,7 +125,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "AI 状态：" not in html
     assert "中线主题" in html
     assert "AI信号仓库" not in html
-    assert "AiLongHorizonSignalPipelines" not in html
+    assert "ResearchSignalContextPipelines" not in html
     assert "股票背景" in html
     assert "推荐理由" in html
     assert "主要风险" in html
