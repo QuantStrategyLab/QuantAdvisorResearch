@@ -2,63 +2,46 @@
 
 [Chinese README](README.zh-CN.md)
 
-> ⚠️ Investing involves risk. This project does not provide investment advice and is for educational and research purposes only.
+> Investing involves risk. This project does not provide investment advice and is for education, research, and engineering review only.
 
-## What this project does
+## What this repository is
 
-QuantAdvisorResearch is a **Research advisory system** in the QuantStrategyLab ecosystem. It publishes research-oriented advisory content from web/RSS evidence without placing orders or providing account-specific advice.
+QuantAdvisorResearch is a QuantStrategyLab research publishing system. It publishes research-oriented advisory content from web and RSS evidence without placing orders.
 
-## Who this is for
+It produces research, audit, or orchestration artifacts. It should not submit broker orders or mutate live allocations by itself.
 
-- Engineers and researchers who want to inspect, reproduce, or extend this part of the QuantStrategyLab stack.
-- Operators who need a clear entry point before reading the deeper runbooks or workflow files.
-- Reviewers who need to understand the repository purpose, safety boundary, and evidence requirements before enabling automation.
+## Output boundary
 
-## Current status
-
-Research and publishing system; outputs require human review before use.
+- Treat generated reports as evidence or review material, not automatic trading instructions.
+- Keep source traceability and artifact timestamps visible.
+- Require human review before using outputs in downstream strategy or platform changes.
+- Keep credentials, private data, and external service tokens out of Git and logs.
 
 ## Repository layout
 
-- `src/`: main library and runtime code.
-- `tests/`: unit and contract tests.
-- `docs/`: detailed design notes, runbooks, and evidence docs.
-- `.github/workflows/`: CI, scheduled jobs, and deployment workflows.
+- `src/`: library and runtime code.
+- `tests/`: unit, contract, and regression tests.
+- `docs/`: runbooks, design notes, evidence, and integration contracts.
+- `.github/workflows/`: CI, scheduled jobs, release, or deployment workflows.
 - `scripts/`: operator scripts and local helpers.
 
 ## Quick start
-
-From a fresh clone:
 
 ```bash
 python -m pip install -e .
 python -m pytest -q
 ```
 
-If a command requires credentials, run it only after reading the relevant workflow or runbook and configuring secrets outside Git.
+## Useful docs
 
-## Deployment and operation
-
-Configure data sources, publishing credentials, and scheduled workflows. Start with a manual run, inspect generated content and citations, then enable schedule.
-
-Prefer manual or dry-run execution first. Enable schedules or live execution only after logs, artifacts, permissions, and rollback steps are reviewed.
-
-## Strategy performance and evidence
-
-Not a trading strategy repository. Evaluate it by evidence quality, citation accuracy, freshness, and whether outputs avoid account-specific investment advice.
-
-README files are intentionally not a source of dated performance promises. Re-run the relevant tests, backtests, or pipeline jobs before relying on any result.
-
-## Safety notes
-
-- Never commit API keys, broker credentials, OAuth tokens, cookies, or account identifiers.
-- Run new strategies and platform changes in dry-run or paper mode before any live execution.
-- Review generated orders, artifacts, and logs manually before enabling schedules.
-
-## Contributing
-
-Keep changes small, reproducible, and covered by the narrowest useful tests. For strategy-facing changes, include the evidence artifact or command used to validate behavior.
+- [`docs/advisory_contract.md`](docs/advisory_contract.md)
+- [`docs/data_factor_roadmap.md`](docs/data_factor_roadmap.md)
+- [`docs/data_factor_roadmap.zh-CN.md`](docs/data_factor_roadmap.zh-CN.md)
+- [`docs/notification_format.md`](docs/notification_format.md)
+- [`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md)
+- [`docs/system_design.md`](docs/system_design.md)
+- [`docs/system_design.zh-CN.md`](docs/system_design.zh-CN.md)
 
 ## License
 
-See [LICENSE](LICENSE) if present in this repository.
+See [LICENSE](LICENSE).
