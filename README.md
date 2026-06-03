@@ -1,5 +1,36 @@
 # QuantAdvisorResearch
 
+<!-- qsl-doc-overview:start -->
+
+> ⚠️ 投资有风险，不构成投资建议，仅供学习交流用途。
+> ⚠️ Investing involves risk. This project does not provide investment advice and is for educational and research purposes only.
+
+## Open-source overview / 开源项目入口
+
+| Item | Description |
+| --- | --- |
+| Project type | research publisher |
+| What it does | Publishes advisory research reports from web/RSS, market confirmation and review artifacts without creating orders. |
+| 中文说明 | 投研报告生成与发布系统，整合新闻/RSS、市场确认和复盘，不生成订单或账户建议。 |
+| Current status | Research-only publisher. It must stay separate from execution systems. |
+
+### Quick start
+
+- `python -m pip install -e '.[test]'`
+- `python -m pytest -q`
+
+### Deploy / operate safely
+
+Use its publishing workflows after checking sources and output destination. Do not store API keys in README or artifacts.
+
+### Strategy performance / evidence boundary
+
+Recommendation review artifacts track absolute/relative returns for accountability; see `docs/system_design.md` and `.zh-CN.md`.
+
+> Detailed runbooks, migration notes, workflow internals, and historical decisions are kept below. Start with this overview before using the lower-level operational sections.
+
+<!-- qsl-doc-overview:end -->
+
 > ⚠️ 投资有风险，不构成投资建议，仅供学习交流用途。
 
 
