@@ -1,453 +1,64 @@
 # QuantAdvisorResearch
 
-<!-- qsl-doc-overview:start -->
+[Chinese README](README.zh-CN.md)
 
-> ⚠️ 投资有风险，不构成投资建议，仅供学习交流用途。
 > ⚠️ Investing involves risk. This project does not provide investment advice and is for educational and research purposes only.
 
-## Open-source overview / 开源项目入口
+## What this project does
 
-| Item | Description |
-| --- | --- |
-| Project type | research publisher |
-| What it does | Publishes advisory research reports from web/RSS, market confirmation and review artifacts without creating orders. |
-| 中文说明 | 投研报告生成与发布系统，整合新闻/RSS、市场确认和复盘，不生成订单或账户建议。 |
-| Current status | Research-only publisher. It must stay separate from execution systems. |
+QuantAdvisorResearch is a **Research advisory system** in the QuantStrategyLab ecosystem. It publishes research-oriented advisory content from web/RSS evidence without placing orders or providing account-specific advice.
 
-### Quick start
+## Who this is for
 
-- `python -m pip install -e '.[test]'`
-- `python -m pytest -q`
+- Engineers and researchers who want to inspect, reproduce, or extend this part of the QuantStrategyLab stack.
+- Operators who need a clear entry point before reading the deeper runbooks or workflow files.
+- Reviewers who need to understand the repository purpose, safety boundary, and evidence requirements before enabling automation.
 
-### Deploy / operate safely
+## Current status
 
-Use its publishing workflows after checking sources and output destination. Do not store API keys in README or artifacts.
+Research and publishing system; outputs require human review before use.
 
-### Strategy performance / evidence boundary
+## Repository layout
 
-Recommendation review artifacts track absolute/relative returns for accountability; see `docs/system_design.md` and `.zh-CN.md`.
+- `src/`: main library and runtime code.
+- `tests/`: unit and contract tests.
+- `docs/`: detailed design notes, runbooks, and evidence docs.
+- `.github/workflows/`: CI, scheduled jobs, and deployment workflows.
+- `scripts/`: operator scripts and local helpers.
 
-> Detailed runbooks, migration notes, workflow internals, and historical decisions are kept below. Start with this overview before using the lower-level operational sections.
+## Quick start
 
-<!-- qsl-doc-overview:end -->
-
-> ⚠️ 投资有风险，不构成投资建议，仅供学习交流用途。
-
-
-## 中文摘要
-
-- 完整中文版见 [`README.zh-CN.md`](README.zh-CN.md)；本节保留在英文文件顶部，方便从当前文件直接找到中文入口。
-- 用途：本文档围绕 `QuantAdvisorResearch`，用于理解 `QuantAdvisorResearch` 的配置、运行、部署、研究或验收边界。
-- 主要覆盖：`Repository Role`、`Horizon Source Split`、`Boundary`、`AI Usage`、`Local Example`。
-- 阅读顺序：先确认边界、输入输出和权限要求，再执行文档里的命令、CI、dry-run、发布或切换步骤。
-- 风险提示：涉及实盘、密钥、权限、Cloud Run、交易所或券商 API 的变更，必须先在测试环境或 dry-run 验证；不要只凭示例直接修改生产。
-- 英文正文保留更完整的命令、字段名和配置键；如果摘要和正文不一致，以正文中的实际命令和配置为准。
-[English](README.md) | [简体中文](README.zh-CN.md)
-
-Intelligent advisory research system for QuantStrategyLab.
-
-This repository combines deterministic event evidence, theme momentum, market
-confirmation, and saved AI shadow context into investor-readable advisory
-research reports. It does not place orders, store broker credentials, manage
-portfolios, or personalize advice for a specific investor.
-
-## Repository Role
-
-`QuantAdvisorResearch` is the coordinator for the Intelligent Advisory Research
-System:
-
-- consume political/public-event context from `PoliticalEventTrackingResearch`
-- consume saved AI shadow context from `ResearchSignalContextPipelines`
-- keep other strategy and snapshot repositories independent from this pipeline
-- leave broker execution in platform repositories
-
-The current operating cadence is a weekly public intelligent-advisory snapshot,
-supported by weekly event/theme refreshes and monthly long-horizon AI shadow
-context. Monthly review reports are generated separately for change review and
-month-end inspection. They do not replace the weekly publication while
-short-horizon windows are part of the contract.
-
-Live site:
-
-<https://quantstrategylab.github.io/QuantAdvisorResearch/>
-
-Key documents:
-
-- [System design](docs/system_design.md) / [系统设计](docs/system_design.zh-CN.md)
-- [Data and factor roadmap](docs/data_factor_roadmap.md) / [数据源与因子路线](docs/data_factor_roadmap.zh-CN.md)
-- [Notification format](docs/notification_format.md) / [通知格式](docs/notification_format.zh-CN.md)
-- [Artifact contract](docs/advisory_contract.md)
-
-
-## Horizon Source Split
-
-Advisor is the final composition layer. Source ownership by horizon is:
-
-- Short term (`1-10 trading days`): event and policy/news catalysts plus generated `market_confirmation.csv`, focused on relative strength, volume, drawdown, and volatility.
-- Medium term (`2-12 weeks`): `theme_momentum_snapshot.json` from `ResearchSignalContextPipelines`, now explicitly marked as `medium_horizon_theme_context`, focused on theme momentum and symbol momentum.
-- Long term (`1-3 years`): `latest_signal.json` / `signal_history/*.json` from `ResearchSignalContextPipelines` as AI shadow context.
-
-Final recommendations are still deterministic Intelligent Advisory outputs. The signal context repository does not directly produce short-term recommendations or replace the final decision engine. Advisor records separate short/medium/long horizon scores and gates for each final pick, plus JSON diagnostics that explain whether long-horizon context was actually available. Public pages render short and medium columns from the pick's primary horizon, while the long column can also show long-horizon context when no primary long bucket exists. Horizon actions remain in JSON as diagnostics, but they are not all promoted to public short/medium columns.
-
-## Boundary
-
-This repository owns:
-
-- intelligent advisory artifact schemas
-- deterministic scoring and review policy
-- daily/weekly/monthly report generation
-- evidence and risk summaries
-- intelligent advisory history for later review
-
-This repository does not own:
-
-- broker API access or order placement
-- target quantities, portfolio weights, or account rebalancing
-- investor-specific suitability decisions
-- model provider routing or prompt execution
-- raw paid market-data redistribution
-
-## AI Usage
-
-This repository does not call Codex, OpenAI, Anthropic, or any other model API.
-It only consumes saved `mode=shadow` artifacts from `ResearchSignalContextPipelines`.
-The only repository in this three-repo flow that can involve AI is
-`ResearchSignalContextPipelines`, and even there provider execution is delegated to
-`QuantStrategyLab/CodexAuditBridge`. Model API keys and fallback routing belong
-there, not in this repository.
-
-## Local Example
-
-Build the full artifact set the same way GitHub Actions does:
+From a fresh clone:
 
 ```bash
-python scripts/build_advisory_artifacts.py \
-  --as-of 2026-05-30 \
-  --cadence weekly \
-  --political-events examples/political_events.example.csv \
-  --political-watchlist examples/political_watchlist.example.csv \
-  --ai-signal examples/research_signal_context.example.json \
-  --theme-momentum examples/theme_momentum_snapshot.example.json \
-  --market-no-network \
-  --market-cache-dir .cache/market-data \
-  --recommendation-review \
-  --output-dir data/output/weekly_advisory_review \
-  --site-output-dir site
-```
-
-This single command can generate market confirmation, the advisory JSON/Markdown,
-manifest, optional monthly review, optional recommendation follow-up review, and
-optional static site output. The weekly, monthly, and Pages workflows all use
-this shared build path so report generation does not drift between publication
-modes.
-
-The lower-level report builder is still available for focused debugging:
-
-```bash
-python scripts/build_advisory_report.py \
-  --as-of 2026-05-30 \
-  --cadence weekly \
-  --political-events examples/political_events.example.csv \
-  --political-watchlist examples/political_watchlist.example.csv \
-  --ai-signal examples/research_signal_context.example.json \
-  --output-json data/output/advisory_report.example.json \
-  --output-md data/output/advisory_report.example.md
-```
-
-The command also writes `data/output/advisory_report.example.json.manifest.json`.
-
-Run tests:
-
-```bash
+python -m pip install -e .
 python -m pytest -q
 ```
 
-Build the weekly report from sibling checkouts:
+If a command requires credentials, run it only after reading the relevant workflow or runbook and configuring secrets outside Git.
 
-```bash
-python scripts/build_advisory_report.py \
-  --as-of 2026-05-30 \
-  --cadence weekly \
-  --political-events ../PoliticalEventTrackingResearch/examples/political_events.example.csv \
-  --political-watchlist ../PoliticalEventTrackingResearch/examples/political_watchlist.example.csv \
-  --ai-signal ../ResearchSignalContextPipelines/data/output/latest_signal.json \
-  --output-json data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
-  --output-md data/output/weekly_advisory_review/advisory_report_2026-05-30.md
-```
+## Deployment and operation
 
-`.github/workflows/weekly_advisory_review.yml` runs the same command on a weekly
-schedule and uploads the report as a GitHub Actions artifact. It does not commit
-files, create orders, or notify investors.
+Configure data sources, publishing credentials, and scheduled workflows. Start with a manual run, inspect generated content and citations, then enable schedule.
 
-`.github/workflows/publish_advisory_site.yml` publishes the HTML/JSON/RSS site on
-a weekly schedule. If `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured
-as repository secrets, the workflow sends a short intelligent-advisory Telegram
-summary after a successful Pages deployment. If either secret is missing, the
-notification step is skipped without failing the publication. Telegram delivery
-errors are logged and do not block Pages/RSS output.
+Prefer manual or dry-run execution first. Enable schedules or live execution only after logs, artifacts, permissions, and rollback steps are reviewed.
 
-The weekly publication cadence is intentional: the report contract still
-contains short-horizon (`1-10 trading days`) and medium-horizon (`2-12 weeks`)
-windows, so a monthly-only public report would make short-horizon conclusions
-stale. The AI shadow input remains monthly because it is long-horizon context,
-not a weekly trading signal.
+## Strategy performance and evidence
 
-Build the separate monthly review artifact:
+Not a trading strategy repository. Evaluate it by evidence quality, citation accuracy, freshness, and whether outputs avoid account-specific investment advice.
 
-```bash
-python scripts/build_monthly_review.py \
-  --current-report data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
-  --output-json data/output/monthly_advisory_review/monthly_review_2026-05-30.json \
-  --output-md data/output/monthly_advisory_review/monthly_review_2026-05-30.md
-```
+README files are intentionally not a source of dated performance promises. Re-run the relevant tests, backtests, or pipeline jobs before relying on any result.
 
-`.github/workflows/monthly_advisory_review.yml` runs monthly and uploads the
-monthly report/review artifacts only. It is intentionally separate from the
-weekly public HTML/RSS publication.
+## Safety notes
 
-Publish a static HTML + RSS preview:
+- Never commit API keys, broker credentials, OAuth tokens, cookies, or account identifiers.
+- Run new strategies and platform changes in dry-run or paper mode before any live execution.
+- Review generated orders, artifacts, and logs manually before enabling schedules.
 
-```bash
-python scripts/publish_advisory_site.py \
-  --reports data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
-  --output-dir site \
-  --site-url https://quantstrategylab.github.io/QuantAdvisorResearch
-```
+## Contributing
 
-Open `site/index.html` locally or subscribe to `site/feed.xml`. The static site also writes `site/archive.html` and `site/reports_index.json`: the homepage keeps the latest report plus the most recent 12 historical entries, while the archive page keeps all generated reports grouped by month. The RSS feed keeps the most recent 20 items. The workflow
-`.github/workflows/publish_advisory_site.yml` deploys the same output to
-GitHub Pages:
+Keep changes small, reproducible, and covered by the narrowest useful tests. For strategy-facing changes, include the evidence artifact or command used to validate behavior.
 
-<https://quantstrategylab.github.io/QuantAdvisorResearch/>
+## License
 
-The published HTML, RSS feed title, and Telegram summary default to Simplified
-Chinese (`zh-CN`) and use the public-facing Intelligent Advisory Research System wording because the current audience is Chinese-language retail research readers. JSON field names remain stable English contract keys.
-
-The scheduled publish workflow defaults to live source artifacts inside sibling
-repositories. Manual dispatch can normally pass only `as_of`; override paths only
-when intentionally testing a different artifact:
-
-```bash
-gh workflow run "Publish Intelligent Advisory Site" \
-  --repo QuantStrategyLab/QuantAdvisorResearch \
-  -f as_of=2026-05-30
-```
-
-Notification channel rules are documented in
-[`docs/notification_format.md`](docs/notification_format.md) and
-[`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md).
-
-Backfill a local static archive from downloaded workflow artifacts:
-
-```bash
-python scripts/backfill_site_archive.py \
-  --artifact-root path/to/downloaded/actions/artifacts \
-  --output-dir site \
-  --site-url https://quantstrategylab.github.io/QuantAdvisorResearch
-```
-
-Run a deterministic cross-repository smoke test without live price downloads:
-
-```bash
-python scripts/run_cross_repo_smoke.py \
-  --as-of 2026-05-30 \
-  --political-events ../PoliticalEventTrackingResearch/data/live/political_events.csv \
-  --political-watchlist ../PoliticalEventTrackingResearch/data/live/political_watchlist.csv \
-  --ai-signal ../ResearchSignalContextPipelines/data/output/latest_signal.json \
-  --theme-momentum ../ResearchSignalContextPipelines/data/output/theme_momentum_snapshot.json \
-  --work-dir data/output/cross_repo_smoke
-```
-
-`.github/workflows/cross_repo_smoke.yml` runs the same no-network smoke on a
-weekly schedule and uploads the generated report/site artifacts for inspection.
-
-## Market Confirmation
-
-`scripts/build_market_confirmation.py` collects symbols from the watchlist,
-signal context, and theme momentum snapshot, then writes a
-`market_confirmation.csv` file:
-
-```bash
-python scripts/build_market_confirmation.py \
-  --as-of 2026-05-30 \
-  --political-watchlist examples/political_watchlist.example.csv \
-  --ai-signal examples/research_signal_context.example.json \
-  --theme-momentum examples/theme_momentum_snapshot.example.json \
-  --output data/output/market_confirmation_2026-05-30.csv
-```
-
-The generated columns include `return_5d`, `return_20d`, `return_63d`,
-relative returns versus SPY, volume z-score, 63-day drawdown, 21-day annualized
-volatility, `market_score`, `price_age_days`, `confirmation_quality`, data
-source, row count, and warnings. The weekly/monthly/publish workflows generate
-this file automatically before building advisory reports.
-
-Optional proxy inputs:
-
-- `--proxy-urls`: comma/newline-separated proxy URLs.
-- `--proxy-list`: local text file with one proxy per line.
-- `--proxy-pool-url`: public text URL returning one proxy per line.
-- `--cache-dir`: local directory for saved point-in-time Yahoo daily bars.
-- `--cache-max-age-days`: maximum accepted cache staleness when live fetches fail.
-
-The scheduled workflows also read repository variables `MARKET_DATA_PROXY_URLS`
-and `MARKET_DATA_PROXY_POOL_URL`. The script tries direct Yahoo access first and
-then retries through proxies. Logs record proxy indexes only, not full proxy
-URLs.
-
-Yahoo chart is currently the no-dependency free price endpoint. If it is
-unavailable, the script falls back to price-momentum fields already saved in
-`theme_momentum_snapshot.json`, so report generation continues. Random free
-proxy pools can be used as an emergency supplement, but should not be treated as
-a stable production data source; prefer organization-owned price snapshots,
-caches, or auditable controlled proxies. The scheduled workflows restore and
-save `.cache/market-data` with GitHub Actions cache, so one successful price run
-can support later recommendation review and temporary Yahoo outages.
-
-## Recommendation Follow-up Review
-
-`scripts/build_recommendation_review.py` reviews past final recommendations
-against cached point-in-time prices. It is a research audit artifact, not a new
-recommendation list.
-
-```bash
-python scripts/build_recommendation_review.py \
-  --as-of 2026-06-30 \
-  --reports data/output/weekly_advisory_review/advisory_report_2026-05-30.json \
-  --benchmark SPY \
-  --cache-dir .cache/market-data \
-  --output-json data/output/recommendation_review_2026-06-30.json \
-  --output-md data/output/recommendation_review_2026-06-30.md
-```
-
-The review calculates absolute return, benchmark-relative return, outcome
-labels, horizon summaries, and data-quality warnings. The unified build command
-can generate it with `--recommendation-review`; the Pages workflow also includes
-recovered published reports when available, so the review improves as history
-accumulates.
-
-## Output Contract
-
-The main JSON artifact is `ModelRecommendationReport`:
-
-```text
-schema_version = 5
-as_of
-generated_at
-mode = model_recommendations
-cadence = daily | weekly | monthly
-audience_scope = non_personalized_model_research
-policy.non_personalized_recommendations_allowed = true
-policy.execution_allowed = false
-policy.portfolio_allocation_allowed = false
-policy.account_specific_advice_allowed = false
-recommendations[]
-theme_first_candidates[]
-```
-
-Each recommendation carries:
-
-```text
-symbol
-rating
-rating_label
-recommendation_tier
-recommendation_tier_label
-primary_horizon
-primary_horizon_label
-primary_horizon_window
-horizon_note
-suitable_horizons[]
-suitable_horizon_windows{}
-strategy_style
-score
-evidence_score
-risk_score
-source_confidence
-source_confidence_label
-reasons[]
-risk_notes[]
-evidence_refs[]
-review_checklist[]
-```
-
-`theme_first_candidates[]` is an optional internal explanation artifact derived
-from the theme momentum snapshot. The current public HTML, RSS, and Telegram
-outputs show only final recommendations; theme candidates remain available in
-JSON/Markdown for audit and future review. They are still research-only and must
-not encode orders, target weights, or account-level advice.
-
-Default horizon windows:
-
-- short: `1-10 trading days`
-- medium: `2-12 weeks`
-- long: `1-3 years`
-- not_applicable: source check, defer, or background tracking only
-
-## Versioning
-
-The Python package version is `0.1.3`. Report artifacts are versioned separately:
-
-- report schema: `schema_version = 5`
-- report contract: `model_recommendations.v5`
-- report manifest: `<output-json>.manifest.json`
-
-The manifest records the JSON and Markdown SHA256 hashes, `as_of`, cadence,
-source artifacts, policy boundary, Git SHA, GitHub run id, and contract version.
-This mirrors the snapshot and AI artifact repos without turning recommendations
-into executable strategy targets.
-
-## Source Mode
-
-Reports built from `examples/` inputs are still marked `source_mode=fixture` in
-JSON, but public HTML/RSS/Telegram output no longer displays fixture or source-mode
-badges. Scheduled weekly/monthly and Pages workflows default to `data/live/*`
-inputs from `PoliticalEventTrackingResearch`, so published reports should be
-`source_mode=operator_supplied` in the audit artifact.
-
-`source_mode` remains in the JSON contract for auditability only.
-
-## Regulatory Boundary
-
-Even when no orders or allocations are generated, specific securities
-recommendations can still raise investment-adviser or broker-dealer obligations
-depending on compensation, audience, personalization, and business model. This
-repository therefore keeps recommendations non-personalized and blocks execution,
-allocation, and account-specific advice.
-
-See:
-
-- SEC investment adviser definition: <https://www.sec.gov/interps/legal/slbim11.htm>
-- SEC automated investment advice resources: <https://www.sec.gov/about/divisions-offices/office-strategic-hub-innovation-financial-technology-finhub/automated-investment-advice>
-- FINRA Regulation Best Interest: <https://www.finra.org/rules-guidance/key-topics/regulation-best-interest>
-- FINRA suitability: <https://www.finra.org/rules-guidance/key-topics/suitability>
-
-## Theme Momentum Display
-
-`build_advisory_report.py` accepts an optional theme momentum snapshot:
-
-```bash
-python scripts/build_advisory_report.py \
-  --as-of 2026-05-30 \
-  --cadence weekly \
-  --political-events examples/political_events.example.csv \
-  --political-watchlist examples/political_watchlist.example.csv \
-  --ai-signal examples/research_signal_context.example.json \
-  --theme-momentum examples/theme_momentum_snapshot.example.json \
-  --market-confirmation examples/market_confirmation.example.csv \
-  --output-json data/output/advisory_report.example.json \
-  --output-md data/output/advisory_report.example.md
-```
-
-Theme momentum is explanation-first context: it highlights strong themes and
-creates `theme_first_candidates[]` for JSON/Markdown audit material. The public
-HTML, RSS, and Telegram outputs stay focused on final recommendations only, so
-theme candidates are not mistaken for a buy list. The base `recommendations[]`
-rating still comes from event/watchlist/AI evidence; `final_decisions` can use
-medium-horizon theme momentum plus optional market confirmation to rank the final
-public list. It never changes allocation or execution policy. Workflows skip this
-context when the snapshot file is absent.
-
-Yahoo chart downloads are only a temporary fallback.  Do not rely on random free
-proxy pools for the stable pipeline; prefer audited price snapshots, cache files,
-or a controlled proxy/data provider.
+See [LICENSE](LICENSE) if present in this repository.
