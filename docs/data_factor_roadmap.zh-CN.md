@@ -1,15 +1,5 @@
 # 数据源与因子完善路线
 
-
-## English summary
-
-- Full English version: [`data_factor_roadmap.md`](data_factor_roadmap.md). This summary keeps an English entry point in the Chinese file.
-- Purpose: this document covers `数据源与因子完善路线` for `QuantAdvisorResearch`.
-- Main topics: `当前结论`, `现有数据源盘点`, `PoliticalEventTrackingResearch`, `ResearchSignalContextPipelines`, `QuantAdvisorResearch`.
-- Read the boundaries, inputs, outputs, and permission requirements before running commands, CI jobs, dry-runs, releases, or runtime switches.
-- For live trading, secrets, Cloud Run, exchange, or broker API changes, validate in test or dry-run mode first and do not change production only from examples.
-- If this summary differs from the detailed Chinese body, follow the concrete commands, configuration keys, and constraints in the body.
-
 [English](data_factor_roadmap.md) | [简体中文](data_factor_roadmap.zh-CN.md)
 
 ## 当前结论
