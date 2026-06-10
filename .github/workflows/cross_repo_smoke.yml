@@ -10,9 +10,17 @@ on:
   schedule:
     - cron: "45 11 * * 6"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-repo-advisory-smoke-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   cross-repo-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout advisor repository
         uses: actions/checkout@v6

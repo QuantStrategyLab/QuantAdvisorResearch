@@ -45,10 +45,17 @@ on:
   schedule:
     - cron: "30 12 * * 6"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-advisory-review-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   build-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout advisor repository
         uses: actions/checkout@v6

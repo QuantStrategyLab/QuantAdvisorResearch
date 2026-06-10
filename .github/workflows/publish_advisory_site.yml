@@ -56,9 +56,14 @@ permissions:
   id-token: write
 
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   build-site:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
