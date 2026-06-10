@@ -50,10 +50,17 @@ on:
   schedule:
     - cron: "20 13 1 * *"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: monthly-advisory-review-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   build-monthly-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout advisor repository
         uses: actions/checkout@v6
