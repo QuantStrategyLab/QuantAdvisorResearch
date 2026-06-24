@@ -59,6 +59,46 @@ def load_report(path: str | Path) -> dict[str, Any]:
         return json.load(handle)
 
 
+def report_content_fingerprint(report: dict[str, Any]) -> str:
+    ignored_top_level_keys = {"as_of", "generated_at", "source_artifacts"}
+    normalized = {key: value for key, value in report.items() if key not in ignored_top_level_keys}
+    return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def report_as_of_date(report: dict[str, Any]) -> dt.date | None:
+    try:
+        return dt.date.fromisoformat(str(report.get("as_of", "")))
+    except ValueError:
+        return None
+
+
+def is_same_period_duplicate(report: dict[str, Any], previous_report: dict[str, Any]) -> bool:
+    if str(report.get("cadence", "")) != str(previous_report.get("cadence", "")):
+        return False
+    as_of = report_as_of_date(report)
+    previous_as_of = report_as_of_date(previous_report)
+    if as_of is None or previous_as_of is None:
+        return True
+    if str(report.get("cadence", "")) == "weekly":
+        return abs((as_of - previous_as_of).days) < 7
+    return as_of == previous_as_of
+
+
+def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]:
+    unique_paths: list[Path] = []
+    seen_reports_by_fingerprint: dict[str, list[dict[str, Any]]] = {}
+    for report_path in report_paths:
+        path = Path(report_path)
+        report = load_report(path)
+        fingerprint = report_content_fingerprint(report)
+        previous_reports = seen_reports_by_fingerprint.setdefault(fingerprint, [])
+        if any(is_same_period_duplicate(report, previous) for previous in previous_reports):
+            continue
+        previous_reports.append(report)
+        unique_paths.append(path)
+    return unique_paths
+
+
 def format_datetime(value: str) -> str:
     normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
     parsed = dt.datetime.fromisoformat(normalized)
@@ -1191,6 +1231,7 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
 def publish_reports(report_paths: list[str | Path], output_dir: str | Path, *, site_url: str, feed_title: str) -> list[Path]:
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
+    report_paths = unique_report_paths_by_content(report_paths)
     reports = [load_report(path) for path in report_paths]
     written: list[Path] = []
     for report in reports:

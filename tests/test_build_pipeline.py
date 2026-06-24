@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from quant_advisor_research.archive_backfill import backfill_site_archive, discover_report_paths
-from quant_advisor_research.build_pipeline import build_advisory_artifacts
+from quant_advisor_research.build_pipeline import build_advisory_artifacts, default_weekly_as_of
 from quant_advisor_research.cross_repo_smoke import run_cross_repo_smoke
 
 
@@ -38,6 +38,12 @@ def build_fixture_report(tmp_path: Path, as_of: dt.date) -> Path:
         market_cache_max_age_days=14,
     )
     return result.report_json
+
+
+def test_default_weekly_as_of_uses_most_recent_saturday() -> None:
+    assert default_weekly_as_of(dt.date(2026, 6, 20)) == dt.date(2026, 6, 20)
+    assert default_weekly_as_of(dt.date(2026, 6, 21)) == dt.date(2026, 6, 20)
+    assert default_weekly_as_of(dt.date(2026, 6, 24)) == dt.date(2026, 6, 20)
 
 
 def test_build_advisory_artifacts_builds_market_report_and_site(tmp_path: Path) -> None:

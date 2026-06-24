@@ -11,6 +11,7 @@ from quant_advisor_research.publisher import (
     render_index_html,
     render_report_html,
     render_reports_index_json,
+    unique_report_paths_by_content,
 )
 
 
@@ -132,6 +133,24 @@ def make_report_for_date(base_report: dict, as_of: str) -> dict:
     report["as_of"] = as_of
     report["generated_at"] = f"{as_of}T00:00:00+00:00"
     return report
+
+
+def test_unique_report_paths_by_content_keeps_first_duplicate_report(tmp_path: Path) -> None:
+    base = build_sample_report()
+    current = make_report_for_date(base, "2026-06-20")
+    duplicate = make_report_for_date(base, "2026-06-21")
+    older = make_report_for_date(base, "2026-06-13")
+
+    current_path = tmp_path / "advisory_report_2026-06-20.json"
+    duplicate_path = tmp_path / "advisory_report_2026-06-21.json"
+    older_path = tmp_path / "advisory_report_2026-06-13.json"
+    write_json(current_path, current)
+    write_json(duplicate_path, duplicate)
+    write_json(older_path, older)
+
+    reports = unique_report_paths_by_content([current_path, duplicate_path, older_path])
+
+    assert reports == [current_path, older_path]
 
 
 def test_index_limits_recent_history_and_archive_keeps_all_reports() -> None:

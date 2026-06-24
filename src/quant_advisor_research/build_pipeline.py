@@ -8,7 +8,6 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 from urllib.parse import quote
 from urllib.request import urlopen
 
@@ -22,7 +21,7 @@ from .market_confirmation import (
     write_market_confirmation_csv,
 )
 from .monthly_review import build_monthly_review, render_monthly_review_markdown
-from .publisher import publish_reports
+from .publisher import publish_reports, unique_report_paths_by_content
 from .recommendation_review import build_recommendation_review, render_recommendation_review_markdown
 
 
@@ -49,6 +48,12 @@ class BuildPipelineResult:
 
 def parse_date(value: str) -> dt.date:
     return dt.date.fromisoformat(value.strip())
+
+
+def default_weekly_as_of(today: dt.date | None = None) -> dt.date:
+    current = today or dt.datetime.now(dt.UTC).date()
+    days_since_saturday = (current.weekday() - 5) % 7
+    return current - dt.timedelta(days=days_since_saturday)
 
 
 def existing_optional_path(value: str | Path | None) -> Path | None:
@@ -280,6 +285,7 @@ def build_advisory_artifacts(
         report_paths = [report_json, *recovered_report_paths]
     else:
         report_paths = [report_json]
+    report_paths = unique_report_paths_by_content(report_paths)
 
     recommendation_review_json: Path | None = None
     recommendation_review_md: Path | None = None

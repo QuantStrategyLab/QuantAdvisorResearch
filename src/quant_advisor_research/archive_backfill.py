@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .build_pipeline import DEFAULT_FEED_TITLE, DEFAULT_SITE_URL, copy_if_different
-from .publisher import publish_reports
+from .publisher import publish_reports, unique_report_paths_by_content
 
 
 REPORT_JSON_PATTERN = re.compile(r"advisory_report_\d{4}-\d{2}-\d{2}\.json")
@@ -58,6 +58,7 @@ def backfill_site_archive(
 ) -> list[Path]:
     if not report_paths:
         raise ValueError("No advisory_report_YYYY-MM-DD.json files found for backfill.")
+    report_paths = unique_report_paths_by_content(report_paths)
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     written = publish_reports(report_paths, output, site_url=site_url, feed_title=feed_title)
