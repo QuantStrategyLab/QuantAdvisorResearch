@@ -1,5 +1,7 @@
 # Intelligent Advisory Notification Format
 
+[简体中文](notification_format.zh-CN.md)
+
 ## Implemented Channels
 
 - GitHub Pages: `.github/workflows/publish_advisory_site.yml` publishes HTML,
