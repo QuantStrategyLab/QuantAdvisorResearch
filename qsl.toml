@@ -1,0 +1,10 @@
+[qsl]
+repo = "QuantAdvisorResearch"
+tier = "research"
+ring = 2
+allow_legacy = false
+artifact_contract = "docs/advisory_contract.md"
+snapshot_contract = "docs/architecture.md"
+
+[qsl.compat]
+bundle = "2026.07.0"
