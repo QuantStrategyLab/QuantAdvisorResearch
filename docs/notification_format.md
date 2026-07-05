@@ -22,6 +22,9 @@ candidates stay in JSON/Markdown audit material and are not included in the
 default notification summary. Notifications must not show orders, target
 weights, target share quantities, account suitability, or any account-specific
 allocation advice.
+The notification payload is advisory background evidence only; it is not
+AiGateway online service health, and it must not be treated as an automatic
+trading or auto-approval signal.
 
 ## Telegram Summary Shape
 
