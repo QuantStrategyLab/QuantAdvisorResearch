@@ -18,6 +18,9 @@ and broker execution separated:
 
 `QuantAdvisorResearch` does not merge with execution repositories and does not
 turn advisory research artifacts into target allocations or orders.
+Any generated report or notification here is background evidence for content or
+recommendation health, not AiGateway online service health, and it must not be
+used as an automatic trading or auto-approval basis.
 
 ## Data Flow
 
