@@ -1,5 +1,14 @@
 # QuantAdvisorResearch
 
+
+## QSL 架构角色
+
+- **层级**：`研究/证据`。
+- **职责**：研究型 advisory 发布系统。
+- **事实源/归属**：可追溯 advisory reports 和 web/RSS 证据摘要。
+- **消费对象**：公开 web/RSS 输入和 research signal context。
+- **禁止事项**：自动提交订单、allocation changes 或账户建议。
+
 [English README](README.md)
 
 > 投资有风险。本项目不构成投资建议，仅用于学习、研究和工程审阅。
