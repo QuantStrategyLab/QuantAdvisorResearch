@@ -1,5 +1,14 @@
 # QuantAdvisorResearch
 
+
+## QSL architecture role
+
+- **Layer**: `research`.
+- **Responsibility**: research-oriented advisory publishing system.
+- **Owns**: traceable advisory reports and web/RSS evidence summaries.
+- **Consumes**: public web/RSS inputs and research signal context.
+- **Must not**: submit orders, allocation changes, or account advice automatically.
+
 [Chinese README](README.zh-CN.md)
 
 > Investing involves risk. This project does not provide investment advice and is for education, research, and engineering review only.
