@@ -12,8 +12,8 @@ def test_qsl_metadata_has_compat_bundle() -> None:
         data = tomllib.load(f)
 
     qsl = data["qsl"]
-    assert qsl["tier"] == "research"
-    assert qsl["ring"] == 2
+    assert qsl["tier"] == "pipeline"
+    assert qsl["upgrade_ring"] == "ring_c"
     assert qsl.get("repo") == "QuantAdvisorResearch"
     compat = qsl["compat"]
     assert compat["bundle"] == "2026.07.1"

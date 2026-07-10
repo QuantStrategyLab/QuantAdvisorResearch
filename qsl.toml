@@ -1,7 +1,7 @@
 [qsl]
 repo = "QuantAdvisorResearch"
-tier = "research"
-ring = 2
+tier = "pipeline"
+upgrade_ring = "ring_c"
 allow_legacy = false
 artifact_contract = "docs/advisory_contract.md"
 snapshot_contract = "docs/architecture.md"
