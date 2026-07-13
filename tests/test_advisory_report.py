@@ -553,6 +553,24 @@ def test_entity_acceptance_allows_explicit_issuer_evidence() -> None:
     assert recommendation["entity_evidence"][0]["accepted"] is True
 
 
+def test_entity_acceptance_uses_relationship_type_for_company_semantics() -> None:
+    event = Event(
+        event_id="issuer-with-preserved-match-class",
+        event_date=dt.date(2026, 5, 29),
+        symbol="COIN",
+        event_type="public_mention",
+        direction="bullish",
+        confidence="medium",
+        source_url="https://www.coinbase.com/news/example",
+        notes="Issuer release.",
+        entity_match_type="named_entity_match",
+        match_evidence="Coinbase is named in the release.",
+        relationship_type="issuer",
+    )
+
+    assert accepted_entity_events([event]) == [event]
+
+
 def test_final_decision_sections_keep_action_semantics_and_overflow() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",

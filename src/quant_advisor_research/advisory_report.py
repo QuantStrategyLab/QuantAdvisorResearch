@@ -37,7 +37,7 @@ CONFIDENCE_WEIGHTS = {
     "low": 1,
 }
 
-COMPANY_LEVEL_ENTITY_TYPES = frozenset({"issuer", "direct_beneficiary"})
+COMPANY_LEVEL_RELATIONSHIP_TYPES = frozenset({"issuer", "direct_beneficiary"})
 
 AI_BIAS_WEIGHTS = {
     "positive": 3,
@@ -248,8 +248,7 @@ def load_events(path: str | Path, as_of: dt.date) -> list[Event]:
 
 def event_has_company_entity_acceptance(event: Event) -> bool:
     return (
-        event.entity_match_type in COMPANY_LEVEL_ENTITY_TYPES
-        and event.relationship_type in COMPANY_LEVEL_ENTITY_TYPES
+        event.relationship_type in COMPANY_LEVEL_RELATIONSHIP_TYPES
         and bool(event.match_evidence.strip())
     )
 
