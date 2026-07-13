@@ -52,13 +52,37 @@ def test_expired_ai_signal_is_excluded_from_long_context_and_warns(tmp_path: Pat
     assert report["summary"]["long_context_available"] is False
 
 
+def test_legacy_market_confirmation_without_quality_metadata_cannot_score(tmp_path: Path) -> None:
+    market_path = tmp_path / "legacy_market.csv"
+    market_path.write_text(
+        "symbol,as_of,return_5d,return_20d,return_63d,relative_return_20d,relative_return_63d,volume_zscore,drawdown_63d,volatility_21d,market_score,data_source,price_observation_count\n"
+        "MU,2026-05-30,0.03,0.12,0.28,0.07,0.13,1.2,-0.06,0.33,0.99,yahoo_chart,120\n",
+        encoding="utf-8",
+    )
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        market_confirmation_path=market_path,
+    )
+
+    assert report["final_decisions"]["recommendations"] == []
+
+
 def test_manifest_records_input_hash_and_upstream_metadata(tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
     markdown_path = tmp_path / "report.md"
     report_path.write_text("{}\n", encoding="utf-8")
     markdown_path.write_text("# report\n", encoding="utf-8")
     input_path = ROOT / "examples/political_events.example.csv"
-    report = {"as_of": "2026-05-30", "cadence": "weekly", "schema_version": "5", "mode": "model_recommendations"}
+    report = {
+        "as_of": "2026-05-30",
+        "cadence": "weekly",
+        "schema_version": "5",
+        "mode": "model_recommendations",
+        "source_artifacts": {"political_events": str(input_path)},
+    }
 
     manifest_path = write_report_manifest(
         report=report,
@@ -71,8 +95,11 @@ def test_manifest_records_input_hash_and_upstream_metadata(tmp_path: Path) -> No
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["upstream_repositories"]["QuantStrategyLab/PoliticalEventTrackingResearch"] == "abc123"
-    assert manifest["source_artifacts"]["political_events"]["sha256"]
-    assert manifest["source_artifacts"]["political_events"]["schema"].startswith("event_id,")
+    assert manifest["source_artifacts"]["political_events"] == str(input_path)
+    metadata = manifest["source_artifacts_metadata"]
+    assert metadata["schema_version"] == "1"
+    assert metadata["items"]["political_events"]["sha256"]
+    assert metadata["items"]["political_events"]["schema"].startswith("event_id,")
 
 
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:

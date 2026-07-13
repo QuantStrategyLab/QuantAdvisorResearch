@@ -410,6 +410,7 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
         current = confirmations.get(symbol)
         if current and current.as_of and row_as_of and row_as_of < current.as_of:
             continue
+        quality_metadata_present = "confirmation_quality" in row and "warnings" in row
         confirmations[symbol] = MarketConfirmation(
             symbol=symbol,
             as_of=row_as_of,
@@ -424,7 +425,9 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
             market_score=as_float(row.get("market_score")) if str(row.get("market_score", "")).strip() else None,
             data_source=str(row.get("data_source", "")),
             price_observation_count=int(as_float(row.get("price_observation_count"))),
-            confirmation_quality=str(row.get("confirmation_quality", "")),
+            confirmation_quality=(str(row.get("confirmation_quality", "")).strip() or "missing_quality_metadata")
+            if quality_metadata_present
+            else "missing_quality_metadata",
             warnings=str(row.get("warnings", "")),
         )
     return confirmations
@@ -1021,7 +1024,7 @@ def market_confirmation_score(market: MarketConfirmation | None) -> float | None
         return None
     if market.data_source == "theme_momentum_fallback":
         return None
-    if market.confirmation_quality == "anomalous" or "extreme_return_63d" in market.warnings or "stale_price" in market.warnings:
+    if market.confirmation_quality != "price_observed":
         return None
     if market.market_score is not None:
         return round(clamp(market.market_score, 0, 1), 3)

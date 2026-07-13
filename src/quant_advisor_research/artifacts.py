@@ -62,7 +62,7 @@ def write_report_manifest(
     if run_attempt:
         version_parts.append(f"attempt-{run_attempt}")
 
-    source_artifacts = {}
+    source_artifact_metadata = {}
     for name, raw_path in (input_paths or {}).items():
         if raw_path is None:
             continue
@@ -90,7 +90,7 @@ def write_report_manifest(
                 )
             except (OSError, json.JSONDecodeError):
                 metadata["schema"] = "invalid_json"
-        source_artifacts[name] = metadata
+        source_artifact_metadata[name] = metadata
 
     payload = {
         "manifest_type": "model_recommendation_report",
@@ -109,7 +109,11 @@ def write_report_manifest(
             "github_run_id": run_id or "",
             "github_run_attempt": run_attempt or "",
         },
-        "source_artifacts": source_artifacts or dict(report.get("source_artifacts") or {}),
+        "source_artifacts": dict(report.get("source_artifacts") or {}),
+        "source_artifacts_metadata": {
+            "schema_version": "1",
+            "items": source_artifact_metadata,
+        },
         "upstream_repositories": dict(upstream_repo_shas or {}),
         "summary": dict(report.get("summary") or {}),
         "artifacts": {
