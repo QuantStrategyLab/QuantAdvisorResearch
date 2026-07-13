@@ -202,7 +202,9 @@ def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_pat
     html = render_report_html(report)
 
     assert report["summary"]["source_mode"] == "operator_supplied"
-    assert report["summary"]["data_quality_warnings"] == []
+    assert report["summary"]["data_quality_warnings"] == [
+        "theme_momentum:compatibility_missing_expires_at"
+    ]
     assert "来源模式" not in html
     assert "Input artifacts include example fixture paths" not in html
 

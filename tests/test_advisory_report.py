@@ -90,6 +90,46 @@ def test_generated_at_offset_preserves_source_local_date(tmp_path: Path) -> None
     assert report["freshness"]["ai_signal"]["valid"] is True
 
 
+def test_legacy_theme_missing_only_expiry_is_compatible_with_warning(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/theme_momentum_snapshot.example.json").read_text(encoding="utf-8"))
+    payload.pop("expires_at", None)
+    path = tmp_path / "legacy_theme.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        theme_momentum_path=path,
+    )
+
+    assert report["freshness"]["theme_momentum"]["valid"] is True
+    assert report["freshness"]["theme_momentum"]["reason"] == "legacy_expiry_compatibility"
+    assert "theme_momentum:compatibility_missing_expires_at" in report["summary"]["data_quality_warnings"]
+
+
+@pytest.mark.parametrize("field,warning", [("as_of", "missing_as_of"), ("generated_at", "missing_generated_at")])
+def test_legacy_theme_missing_other_freshness_field_fails_closed(
+    tmp_path: Path, field: str, warning: str
+) -> None:
+    payload = json.loads((ROOT / "examples/theme_momentum_snapshot.example.json").read_text(encoding="utf-8"))
+    payload.pop("expires_at", None)
+    payload.pop(field, None)
+    path = tmp_path / f"legacy_theme_missing_{field}.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        theme_momentum_path=path,
+    )
+
+    assert report["freshness"]["theme_momentum"]["valid"] is False
+    assert f"theme_momentum:{warning}" in report["summary"]["data_quality_warnings"]
+    assert report["summary"]["theme_momentum_available"] is False
+
+
 def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",

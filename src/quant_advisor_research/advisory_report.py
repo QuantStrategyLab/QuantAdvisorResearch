@@ -291,11 +291,15 @@ def assess_context_freshness(
     name: str,
     report_as_of: dt.date,
     reference_time: dt.datetime,
+    allow_missing_expires_at_compatibility: bool = False,
 ) -> dict[str, Any]:
     if payload is None:
         return {"present": False, "valid": False, "reason": "not_provided"}
     missing = [key for key in ("as_of", "generated_at", "expires_at") if not str(payload.get(key) or "").strip()]
-    if missing:
+    legacy_expiry_compatibility = (
+        allow_missing_expires_at_compatibility and missing == ["expires_at"]
+    )
+    if missing and not legacy_expiry_compatibility:
         return {"present": True, "valid": False, "reason": f"missing_{missing[0]}"}
     source_as_of = parse_context_local_date(payload.get("as_of"))
     generated_local_date = parse_context_local_date(payload.get("generated_at"))
@@ -306,7 +310,7 @@ def assess_context_freshness(
     if generated_at is None or generated_local_date is None:
         return {"present": True, "valid": False, "reason": "invalid_generated_at"}
     expires_at = parse_context_datetime(payload.get("expires_at"), date_timezone=generated_timezone or dt.UTC)
-    if expires_at is None:
+    if expires_at is None and not legacy_expiry_compatibility:
         return {"present": True, "valid": False, "reason": "invalid_expires_at"}
     if source_as_of > report_as_of:
         return {"present": True, "valid": False, "reason": "as_of_in_future"}
@@ -314,9 +318,9 @@ def assess_context_freshness(
         return {"present": True, "valid": False, "reason": "generated_at_in_future"}
     if generated_local_date < source_as_of:
         return {"present": True, "valid": False, "reason": "generated_before_as_of"}
-    if expires_at < generated_at:
+    if expires_at is not None and expires_at < generated_at:
         return {"present": True, "valid": False, "reason": "expires_before_generated"}
-    if reference_time > expires_at:
+    if expires_at is not None and reference_time > expires_at:
         return {"present": True, "valid": False, "reason": "expired"}
     age_days = (report_as_of - source_as_of).days
     generated_age_days = (reference_time - generated_at).total_seconds() / 86400
@@ -326,13 +330,18 @@ def assess_context_freshness(
     elif generated_age_days > max_age_days:
         reason = "stale_generated_at"
     else:
-        return {
-            "present": True, "valid": True, "reason": "fresh", "as_of": source_as_of.isoformat(),
+        result = {
+            "present": True, "valid": True,
+            "reason": "legacy_expiry_compatibility" if legacy_expiry_compatibility else "fresh",
+            "as_of": source_as_of.isoformat(),
             "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
-            "expires_at": expires_at.isoformat().replace("+00:00", "Z"),
+            "expires_at": expires_at.isoformat().replace("+00:00", "Z") if expires_at else "",
             "age_days": age_days, "generated_age_days": round(generated_age_days, 3),
             "max_age_days": max_age_days,
         }
+        if legacy_expiry_compatibility:
+            result["compatibility_warning"] = "missing_expires_at"
+        return result
     return {
         "present": True, "valid": False, "reason": reason, "age_days": age_days,
         "generated_age_days": round(generated_age_days, 3), "max_age_days": max_age_days,
@@ -1599,21 +1608,27 @@ def build_advisory_report(
     raw_ai_signal = load_ai_signal(ai_signal_path)
     raw_theme_momentum = load_theme_momentum(theme_momentum_path)
     ai_freshness = assess_context_freshness(raw_ai_signal, name="ai_signal", report_as_of=as_of_date, reference_time=reference_time)
-    theme_freshness = assess_context_freshness(raw_theme_momentum, name="theme_momentum", report_as_of=as_of_date, reference_time=reference_time)
+    theme_freshness = assess_context_freshness(
+        raw_theme_momentum,
+        name="theme_momentum",
+        report_as_of=as_of_date,
+        reference_time=reference_time,
+        allow_missing_expires_at_compatibility=True,
+    )
     freshness = {"ai_signal": ai_freshness, "theme_momentum": theme_freshness}
     freshness_warnings = [
         f"{name}:{item['reason']}"
         for name, item in freshness.items()
         if not item.get("valid")
         and item.get("present")
-        and not (name == "theme_momentum" and raw_theme_momentum and "expires_at" not in raw_theme_momentum)
     ]
-    ai_signal = raw_ai_signal if ai_freshness.get("valid") else None
-    theme_momentum = (
-        raw_theme_momentum
-        if theme_freshness.get("valid") or (raw_theme_momentum and "expires_at" not in raw_theme_momentum)
-        else None
+    freshness_warnings.extend(
+        f"{name}:compatibility_{item['compatibility_warning']}"
+        for name, item in freshness.items()
+        if item.get("compatibility_warning")
     )
+    ai_signal = raw_ai_signal if ai_freshness.get("valid") else None
+    theme_momentum = raw_theme_momentum if theme_freshness.get("valid") else None
     market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
