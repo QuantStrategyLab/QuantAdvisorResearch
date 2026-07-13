@@ -2,12 +2,21 @@
 
 ## Report
 
-Required top-level fields:
+The current producer contract is `model_recommendations.v6` with `schema_version: "6"`.
+Validators and consumers dual-read legacy v5 reports, but a v6 report is never silently
+validated as v5. Legacy v5 reports may omit the v6 time fields; if `contract_version` is
+present it must be `model_recommendations.v5`.
+
+Required v6 top-level fields:
 
 ```text
-schema_version: "5"
+schema_version: "6"
+contract_version: "model_recommendations.v6"
 as_of: ISO date
+reference_time: timezone-aware ISO datetime
 generated_at: ISO datetime
+expires_at: timezone-aware ISO datetime (`generated_at` + 7 days)
+freshness: object with `ai_signal` and `theme_momentum`
 mode: "model_recommendations"
 cadence: "daily" | "weekly" | "monthly"
 audience_scope: "non_personalized_model_research"
@@ -18,6 +27,28 @@ theme_first_candidates: list, optional
 final_decisions: object, optional
 policy: object
 ```
+
+### Time and freshness semantics
+
+- `as_of` is the strict information cutoff. Every context `source_as_of` must be no later
+  than report `as_of`.
+- `reference_time` is the deterministic cutoff at the end of `as_of` in UTC. Context
+  `generated_at` must be no later than both `reference_time` and the report build
+  `generated_at`.
+- Report `generated_at` is the actual injectable build/publish time and preserves
+  subsecond precision. `expires_at` is exactly seven days later.
+- A date-only context `expires_at` is interpreted as local end-of-day in the timezone of
+  that context's original `generated_at`, then converted to a UTC instant. It is compared
+  with the UTC `reference_time`; if that instant has passed at the cutoff, the context is
+  correctly expired. This is not a local-date-only comparison.
+- v6 freshness entries must include `present`, `valid`, and a non-empty `reason` for both
+  expected contexts. Valid entries require `as_of`, `generated_at`, and `expires_at`.
+  The only exception is an explicitly marked `legacy_expiry_compatibility` entry with
+  `compatibility_warning: missing_expires_at`; all other time checks still apply.
+
+Publisher content fingerprints normalize schema/contract version and volatile time/freshness
+metadata, so equivalent v5/v6 advisory content deduplicates without changing report filenames,
+archive ordering, or RSS publication time.
 
 ## Policy
 
@@ -270,9 +301,9 @@ Required manifest fields:
 ```text
 manifest_type = model_recommendation_report
 artifact_type = model_recommendations
-contract_version = model_recommendations.v5
-schema_version = 5
-version = <as_of>-<cadence>-schema-5-<run-or-sha>
+contract_version = model_recommendations.v6
+schema_version = 6
+version = <as_of>-<cadence>-schema-6-<run-or-sha>
 source_project = QuantAdvisorResearch
 producer.repository
 producer.git_sha

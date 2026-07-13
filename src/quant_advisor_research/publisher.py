@@ -61,6 +61,8 @@ def load_report(path: str | Path) -> dict[str, Any]:
 
 def report_content_fingerprint(report: dict[str, Any]) -> str:
     ignored_top_level_keys = {
+        "schema_version",
+        "contract_version",
         "as_of",
         "generated_at",
         "reference_time",

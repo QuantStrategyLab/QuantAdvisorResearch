@@ -29,6 +29,20 @@ def build_sample_report() -> dict:
     )
 
 
+def test_v5_and_v6_same_content_share_fingerprint() -> None:
+    v6 = build_sample_report()
+    v5 = deepcopy(v6)
+    v5["schema_version"] = "5"
+    v5["contract_version"] = "model_recommendations.v5"
+    v5.pop("reference_time")
+    v5.pop("expires_at")
+    v5.pop("freshness")
+
+    from quant_advisor_research.publisher import report_content_fingerprint
+
+    assert report_content_fingerprint(v5) == report_content_fingerprint(v6)
+
+
 def test_render_report_html_is_direct_public_recommendation_page() -> None:
     html = render_report_html(build_sample_report())
 

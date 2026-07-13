@@ -114,6 +114,74 @@ def test_v6_freshness_entries_are_complete_and_typed(mutation) -> None:
     with pytest.raises(AdvisoryValidationError):
         validate_advisory_report(report)
 
+
+def test_v6_validator_rejects_expired_report_and_invalid_freshness_time_fields() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+    )
+    report["expires_at"] = "2026-05-30T11:59:59Z"
+    with pytest.raises(AdvisoryValidationError, match="expires_at"):
+        validate_advisory_report(report)
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+    )
+    report["freshness"]["ai_signal"].pop("as_of")
+    with pytest.raises(AdvisoryValidationError, match="time fields"):
+        validate_advisory_report(report)
+
+
+def test_v6_validator_allows_only_explicit_legacy_expiry_marker() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    entry = report["freshness"]["theme_momentum"]
+    entry["reason"] = "legacy_expiry_compatibility"
+    entry["compatibility_warning"] = "missing_expires_at"
+    entry.pop("expires_at", None)
+    validate_advisory_report(report)
+
+
+def test_date_only_expiry_uses_source_timezone_and_utc_cutoff(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update({"as_of": "2026-05-30", "generated_at": "2026-05-30T00:30:00+08:00", "expires_at": "2026-06-30"})
+    path = tmp_path / "local_expiry.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=path,
+    )
+    assert report["freshness"]["ai_signal"]["expires_at"] == "2026-06-30T15:59:59Z"
+
+    payload["expires_at"] = "2026-05-30"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=path,
+    )
+    assert report["freshness"]["ai_signal"]["reason"] == "expired"
+
+
+def test_injected_build_time_cannot_publish_already_expired_report() -> None:
+    with pytest.raises(AdvisoryValidationError, match="expires_at"):
+        build_advisory_report(
+            as_of="2026-05-30", cadence="weekly", generated_at="2026-05-20T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        )
+
     report = build_advisory_report(
         as_of="2026-05-30", cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",

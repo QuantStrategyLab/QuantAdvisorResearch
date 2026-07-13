@@ -13,6 +13,7 @@ ALLOWED_CADENCES = frozenset({"daily", "weekly", "monthly"})
 SOURCE_PROJECT = "QuantAdvisorResearch"
 REPORT_CONTRACT_VERSION = "model_recommendations.v6"
 V5_REPORT_CONTRACT_VERSION = "model_recommendations.v5"
+REPORT_EXPIRY_DAYS = 7
 ALLOWED_RECOMMENDATION_RATINGS = frozenset({"recommend", "watch", "verify_source", "defer", "monitor"})
 ALLOWED_RECOMMENDATION_TIERS = frozenset({"tier_1", "tier_2", "watchlist", "source_check", "defer", "monitor"})
 ALLOWED_HORIZONS = frozenset({"short", "medium", "long", "not_applicable"})
@@ -88,6 +89,12 @@ def _require_timezone_aware_iso_datetime(value: Any, name: str) -> None:
         raise AdvisoryValidationError(f"{name} must be timezone-aware")
 
 
+def _parse_timezone_aware_iso_datetime(value: Any, name: str) -> dt.datetime:
+    _require_timezone_aware_iso_datetime(value, name)
+    text = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return dt.datetime.fromisoformat(text)
+
+
 def _require_number_0_1(value: Any, name: str) -> None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise AdvisoryValidationError(f"{name} must be numeric")
@@ -132,6 +139,13 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         _require_timezone_aware_iso_datetime(payload["generated_at"], "generated_at")
         _require_timezone_aware_iso_datetime(payload["reference_time"], "reference_time")
         _require_timezone_aware_iso_datetime(payload["expires_at"], "expires_at")
+        generated_at = _parse_timezone_aware_iso_datetime(payload["generated_at"], "generated_at")
+        reference_time = _parse_timezone_aware_iso_datetime(payload["reference_time"], "reference_time")
+        expires_at = _parse_timezone_aware_iso_datetime(payload["expires_at"], "expires_at")
+        if expires_at < reference_time:
+            raise AdvisoryValidationError("expires_at must not precede reference_time")
+        if expires_at != generated_at + dt.timedelta(days=REPORT_EXPIRY_DAYS):
+            raise AdvisoryValidationError("expires_at must equal generated_at plus REPORT_EXPIRY_DAYS")
         freshness = _require_mapping(payload["freshness"], "freshness")
         expected_freshness = {"ai_signal", "theme_momentum"}
         missing_freshness = expected_freshness - set(freshness)
@@ -148,11 +162,16 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
             reason = item.get("reason")
             if not isinstance(reason, str) or not reason.strip():
                 raise AdvisoryValidationError(f"freshness[{name}].reason must be non-empty")
+            legacy_expiry = item.get("reason") == "legacy_expiry_compatibility" and item.get("compatibility_warning") == "missing_expires_at"
+            if item.get("valid") and item.get("as_of"):
+                _require_iso_date(item["as_of"], f"freshness[{name}].as_of")
             if item.get("valid") and item.get("generated_at"):
                 _require_timezone_aware_iso_datetime(item["generated_at"], f"freshness[{name}].generated_at")
             if item.get("valid") and item.get("expires_at"):
                 _require_timezone_aware_iso_datetime(item["expires_at"], f"freshness[{name}].expires_at")
-            if item.get("valid") and not all(item.get(key) for key in ("as_of", "generated_at", "expires_at")):
+            if item.get("valid") and not item.get("as_of"):
+                raise AdvisoryValidationError(f"freshness[{name}] valid entry missing time fields")
+            if item.get("valid") and (not item.get("generated_at") or (not item.get("expires_at") and not legacy_expiry)):
                 raise AdvisoryValidationError(f"freshness[{name}] valid entry missing time fields")
     else:
         _require_iso_datetime(payload["generated_at"], "generated_at")
