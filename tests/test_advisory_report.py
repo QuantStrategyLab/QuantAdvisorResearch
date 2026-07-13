@@ -130,6 +130,23 @@ def test_legacy_theme_missing_other_freshness_field_fails_closed(
     assert report["summary"]["theme_momentum_available"] is False
 
 
+def test_context_generated_after_report_build_fails_closed(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update({"as_of": "2026-05-30", "generated_at": "2026-05-31T00:00:00Z", "expires_at": "2026-06-30"})
+    path = tmp_path / "future_source_publication.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is False
+    assert "ai_signal:generated_after_report_build" in report["summary"]["data_quality_warnings"]
+
+
 def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",

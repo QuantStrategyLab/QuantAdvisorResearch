@@ -291,6 +291,7 @@ def assess_context_freshness(
     name: str,
     report_as_of: dt.date,
     reference_time: dt.datetime,
+    report_generated_at: dt.datetime,
     allow_missing_expires_at_compatibility: bool = False,
 ) -> dict[str, Any]:
     if payload is None:
@@ -316,6 +317,8 @@ def assess_context_freshness(
         return {"present": True, "valid": False, "reason": "as_of_in_future"}
     if generated_at > reference_time + dt.timedelta(days=REFERENCE_POST_AS_OF_SKEW_DAYS):
         return {"present": True, "valid": False, "reason": "generated_at_in_future"}
+    if generated_at > report_generated_at:
+        return {"present": True, "valid": False, "reason": "generated_after_report_build"}
     if generated_local_date < source_as_of:
         return {"present": True, "valid": False, "reason": "generated_before_as_of"}
     if expires_at is not None and expires_at < generated_at:
@@ -1607,12 +1610,19 @@ def build_advisory_report(
     events = load_events(political_events_path, as_of_date)
     raw_ai_signal = load_ai_signal(ai_signal_path)
     raw_theme_momentum = load_theme_momentum(theme_momentum_path)
-    ai_freshness = assess_context_freshness(raw_ai_signal, name="ai_signal", report_as_of=as_of_date, reference_time=reference_time)
+    ai_freshness = assess_context_freshness(
+        raw_ai_signal,
+        name="ai_signal",
+        report_as_of=as_of_date,
+        reference_time=reference_time,
+        report_generated_at=build_time,
+    )
     theme_freshness = assess_context_freshness(
         raw_theme_momentum,
         name="theme_momentum",
         report_as_of=as_of_date,
         reference_time=reference_time,
+        report_generated_at=build_time,
         allow_missing_expires_at_compatibility=True,
     )
     freshness = {"ai_signal": ai_freshness, "theme_momentum": theme_freshness}
