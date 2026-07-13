@@ -211,6 +211,9 @@ class MarketConfirmation:
     price_observation_count: int = 0
     confirmation_quality: str = ""
     warnings: str = ""
+    compatibility_used: bool = False
+    compatibility_reason: str = ""
+    compatibility_provenance: str = ""
 
 
 def parse_date(value: str) -> dt.date:
@@ -316,13 +319,23 @@ def apply_input_freshness(
             warnings.append("theme_momentum_invalid_theme_ranks")
             theme_momentum = None
             return ai_signal, theme_momentum, warnings
-        if any(
-            not isinstance(theme, dict) or not isinstance(theme.get("top_symbols"), list)
-            for theme in theme_ranks
-        ):
+        if any(not isinstance(theme, dict) or not isinstance(theme.get("top_symbols"), list) for theme in theme_ranks):
             warnings.append("theme_momentum_invalid_top_symbols")
             theme_momentum = None
             return ai_signal, theme_momentum, warnings
+        sanitized_ranks: list[dict[str, Any]] = []
+        invalid_symbol_count = 0
+        for theme in theme_ranks:
+            symbols = []
+            for item in theme["top_symbols"]:
+                if isinstance(item, dict) and str(item.get("symbol", "")).strip():
+                    symbols.append(item)
+                else:
+                    invalid_symbol_count += 1
+            sanitized_ranks.append({**theme, "top_symbols": symbols})
+        if invalid_symbol_count:
+            warnings.append(f"theme_momentum_symbols_excluded:{invalid_symbol_count}")
+        theme_momentum = {**theme_momentum, "theme_ranks": sanitized_ranks}
         extreme = any(
             abs(as_float(item.get("return_3m"))) > 2.0
             for theme in theme_ranks
@@ -408,7 +421,9 @@ def optional_date(value: Any) -> dt.date | None:
     return parse_date(text)
 
 
-def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[str, MarketConfirmation]:
+def load_market_confirmation(
+    path: str | Path | None, as_of: dt.date, *, compatibility_mode: bool = False
+) -> dict[str, MarketConfirmation]:
     if path is None:
         return {}
     confirmations: dict[str, MarketConfirmation] = {}
@@ -423,6 +438,20 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
         if current and current.as_of and row_as_of and row_as_of < current.as_of:
             continue
         quality_metadata_present = "confirmation_quality" in row and "warnings" in row
+        compatibility_used = False
+        compatibility_reason = ""
+        compatibility_provenance = ""
+        reconstructed_quality = ""
+        if not quality_metadata_present and compatibility_mode:
+            compatibility_used = True
+            compatibility_reason = "legacy_csv_quality_reconstructed"
+            compatibility_provenance = "legacy_csv_fields:as_of,return_63d,data_source,price_age_days"
+            if row_as_of is None or (as_of - row_as_of).days > 7:
+                reconstructed_quality = "stale_price"
+            elif abs(as_float(row.get("return_63d"))) > 2.0:
+                reconstructed_quality = "anomalous"
+            else:
+                reconstructed_quality = "price_observed"
         confirmations[symbol] = MarketConfirmation(
             symbol=symbol,
             as_of=row_as_of,
@@ -439,8 +468,12 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
             price_observation_count=int(as_float(row.get("price_observation_count"))),
             confirmation_quality=(str(row.get("confirmation_quality", "")).strip() or "missing_quality_metadata")
             if quality_metadata_present
-            else "missing_quality_metadata",
-            warnings=str(row.get("warnings", "")),
+            else reconstructed_quality or "missing_quality_metadata",
+            warnings=str(row.get("warnings", ""))
+            or ("legacy_market_confirmation_compatibility_used" if compatibility_used else ""),
+            compatibility_used=compatibility_used,
+            compatibility_reason=compatibility_reason,
+            compatibility_provenance=compatibility_provenance,
         )
     return confirmations
 
@@ -1063,6 +1096,8 @@ def market_confirmation_score(market: MarketConfirmation | None) -> float | None
 def market_quality_warnings(confirmations: dict[str, MarketConfirmation]) -> list[str]:
     warnings: list[str] = []
     for symbol, market in sorted(confirmations.items()):
+        if market.compatibility_used:
+            warnings.append(f"market_confirmation_compatibility_used:{symbol}:{market.compatibility_reason}")
         if market.confirmation_quality == "price_observed":
             continue
         quality = market.confirmation_quality or "missing_quality_metadata"
@@ -1520,6 +1555,7 @@ def build_advisory_report(
     theme_momentum_path: str | Path | None = None,
     market_confirmation_path: str | Path | None = None,
     max_candidates: int = 12,
+    market_compatibility_mode: bool = False,
 ) -> dict[str, Any]:
     if cadence not in ALLOWED_CADENCES:
         raise ValueError(f"cadence must be one of: {', '.join(sorted(ALLOWED_CADENCES))}")
@@ -1531,7 +1567,9 @@ def build_advisory_report(
     ai_signal, theme_momentum, freshness_warnings = apply_input_freshness(
         ai_signal=ai_signal, theme_momentum=theme_momentum, as_of=as_of_date
     )
-    market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
+    market_confirmations = load_market_confirmation(
+        market_confirmation_path, as_of_date, compatibility_mode=market_compatibility_mode
+    )
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
         political_events_path,
@@ -1598,6 +1636,18 @@ def build_advisory_report(
             "top_theme_ids": [theme["theme_id"] for theme in theme_momentum_summary["top_themes"]],
             "theme_first_candidate_count": len(theme_first_candidates),
             "market_confirmation_count": len(market_confirmations),
+            "market_confirmation_compatibility_used": any(
+                item.compatibility_used for item in market_confirmations.values()
+            ),
+            "market_confirmation_compatibility": [
+                {
+                    "symbol": symbol,
+                    "reason": item.compatibility_reason,
+                    "provenance": item.compatibility_provenance,
+                }
+                for symbol, item in sorted(market_confirmations.items())
+                if item.compatibility_used
+            ],
             "long_context_available": bool(long_context_symbols),
             "long_context_symbol_count": len(long_context_symbols),
             "long_context_symbols": long_context_symbols[:12],
@@ -1749,6 +1799,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ai-signal", help="Saved AI shadow signal JSON.")
     parser.add_argument("--theme-momentum", help="Saved theme momentum snapshot JSON.")
     parser.add_argument("--market-confirmation", help="Optional point-in-time market confirmation CSV.")
+    parser.add_argument("--market-compatibility-mode", action="store_true", help="Explicit historical/replay mode for legacy market CSVs.")
     parser.add_argument("--max-items", "--max-candidates", dest="max_candidates", type=int, default=12)
     parser.add_argument("--output-json", required=True, help="Output JSON artifact path.")
     parser.add_argument("--output-md", required=True, help="Output Markdown report path.")
@@ -1766,6 +1817,7 @@ def main(argv: list[str] | None = None) -> None:
         ai_signal_path=args.ai_signal,
         theme_momentum_path=args.theme_momentum,
         market_confirmation_path=args.market_confirmation,
+        market_compatibility_mode=args.market_compatibility_mode,
         max_candidates=args.max_candidates,
     )
     write_json(args.output_json, report)

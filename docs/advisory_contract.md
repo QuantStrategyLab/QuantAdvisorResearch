@@ -277,6 +277,11 @@ workflows pass the checked-out commit SHA for each upstream repository in
 `upstream_repositories`; missing or stale context is excluded from scoring and
 reported in `summary.data_quality_warnings`.
 
+Legacy market-confirmation CSVs remain readable for audit but have `score=None`
+by default. Explicit historical/replay compatibility mode may reconstruct a
+quality gate from legacy fields and records `compatibility_used`, reason, and
+provenance; scheduled/live workflows never enable this mode.
+
 ## Source Mode
 
 `summary.source_mode` is:

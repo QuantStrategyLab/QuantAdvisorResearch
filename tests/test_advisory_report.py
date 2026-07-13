@@ -70,6 +70,17 @@ def test_legacy_market_confirmation_without_quality_metadata_cannot_score(tmp_pa
     assert report["final_decisions"]["recommendations"] == []
     assert any("market_confirmation_excluded:MU:missing_quality_metadata" in warning for warning in report["summary"]["data_quality_warnings"])
 
+    replay = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        market_confirmation_path=market_path,
+        market_compatibility_mode=True,
+    )
+    assert replay["summary"]["market_confirmation_compatibility_used"] is True
+    assert any("compatibility_used:MU" in warning for warning in replay["summary"]["data_quality_warnings"])
+
 
 def test_invalid_theme_top_symbols_fails_closed_with_warning(tmp_path: Path) -> None:
     theme_path = tmp_path / "invalid_theme.json"
@@ -96,6 +107,33 @@ def test_invalid_theme_top_symbols_fails_closed_with_warning(tmp_path: Path) -> 
 
     assert report["theme_momentum"]["available"] is False
     assert "theme_momentum_invalid_top_symbols" in report["summary"]["data_quality_warnings"]
+
+
+def test_invalid_theme_symbol_isolated_without_dropping_valid_symbol(tmp_path: Path) -> None:
+    theme_path = tmp_path / "mixed_theme.json"
+    theme_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "as_of": "2026-05-30",
+                "generated_at": "2026-05-30T00:00:00Z",
+                "mode": "theme_momentum_snapshot",
+                "policy": {"execution_allowed": False},
+                "theme_ranks": [{"theme_id": "ok", "top_symbols": [None, {"symbol": "MU", "momentum_score": 0.8}]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        theme_momentum_path=theme_path,
+    )
+
+    assert report["theme_momentum"]["top_themes"][0]["top_symbols"] == ["MU"]
+    assert "theme_momentum_symbols_excluded:1" in report["summary"]["data_quality_warnings"]
 
 
 def test_manifest_records_input_hash_and_upstream_metadata(tmp_path: Path) -> None:

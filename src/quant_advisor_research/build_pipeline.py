@@ -204,6 +204,7 @@ def build_advisory_artifacts(
     feed_title: str = DEFAULT_FEED_TITLE,
     recover_site_archive: bool = False,
     upstream_repo_shas: dict[str, str] | None = None,
+    market_compatibility_mode: bool = False,
 ) -> BuildPipelineResult:
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -242,6 +243,7 @@ def build_advisory_artifacts(
         theme_momentum_path=resolved_theme_momentum,
         market_confirmation_path=market_path,
         max_candidates=max_candidates,
+        market_compatibility_mode=market_compatibility_mode,
     )
     write_json(report_json, report)
     write_text(report_md, render_markdown(report))
@@ -348,6 +350,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ai-signal", help="Research signal context JSON.")
     parser.add_argument("--theme-momentum", help="Theme momentum snapshot JSON. Missing files are skipped.")
     parser.add_argument("--market-confirmation", help="Optional prebuilt market confirmation CSV.")
+    parser.add_argument("--market-compatibility-mode", action="store_true", help="Explicit historical/replay mode for legacy market CSVs.")
     parser.add_argument("--output-dir", required=True, help="Output artifact directory.")
     parser.add_argument("--max-items", "--max-candidates", dest="max_candidates", type=int, default=12)
     parser.add_argument("--market-benchmark", default="SPY")
@@ -399,6 +402,7 @@ def main(argv: list[str] | None = None) -> None:
         feed_title=args.feed_title,
         recover_site_archive=args.recover_site_archive,
         upstream_repo_shas={key: value for item in args.upstream_repo_sha for key, value in [item.split("=", 1)] if key and value},
+        market_compatibility_mode=args.market_compatibility_mode,
     )
     print(
         "advisory_artifacts_built "
