@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import statistics
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ HORIZON_LABELS_ZH = {
     "medium": "中线",
     "long": "长线",
 }
+MIN_MATURITY_TRADING_DAYS = {"short": 10, "medium": 10, "long": 252}
 
 
 def utc_now_iso() -> str:
@@ -61,13 +63,22 @@ def return_between(start: PriceBar, end: PriceBar) -> float:
     return round(end.close / start.close - 1, 6)
 
 
-def outcome_label(relative_return: float | None, *, elapsed_days: int, has_price_data: bool) -> str:
+def outcome_label(
+    relative_return: float | None,
+    *,
+    elapsed_days: int,
+    has_price_data: bool,
+    horizon: str,
+    trading_observations: int,
+) -> str:
     if elapsed_days <= 0:
         return "pending"
     if not has_price_data:
         return "insufficient_price_data"
     if relative_return is None:
         return "insufficient_price_data"
+    if trading_observations < MIN_MATURITY_TRADING_DAYS.get(horizon, MIN_MATURITY_TRADING_DAYS["medium"]):
+        return "in_progress"
     if relative_return >= 0.02:
         return "outperforming"
     if relative_return <= -0.02:
@@ -131,21 +142,39 @@ def build_review_item(
             relative_return = round(absolute_return - benchmark_return, 6)
 
     elapsed_days = (review_as_of - report_as_of).days
+    horizon = str(pick.get("primary_horizon", ""))
+    maturity_days = MIN_MATURITY_TRADING_DAYS.get(horizon, MIN_MATURITY_TRADING_DAYS["medium"])
+    if elapsed_days <= 0:
+        maturity_status = "pending"
+    elif not has_price_data:
+        maturity_status = "insufficient_price_data"
+    elif trading_observations < maturity_days:
+        maturity_status = "in_progress"
+    else:
+        maturity_status = "matured"
     return {
         "report_as_of": report_as_of.isoformat(),
         "review_as_of": review_as_of.isoformat(),
         "symbol": symbol,
         "name": str(pick.get("name", "")),
-        "primary_horizon": str(pick.get("primary_horizon", "")),
+        "primary_horizon": horizon,
         "primary_horizon_label": str(pick.get("primary_horizon_label", "")),
         "start_price_date": start_date,
         "end_price_date": end_date,
         "elapsed_calendar_days": elapsed_days,
         "trading_observations": trading_observations,
+        "maturity_required_trading_days": maturity_days,
+        "maturity_status": maturity_status,
         "absolute_return": absolute_return,
         "benchmark_return": benchmark_return,
         "relative_return": relative_return,
-        "outcome": outcome_label(relative_return, elapsed_days=elapsed_days, has_price_data=has_price_data),
+        "outcome": outcome_label(
+            relative_return,
+            elapsed_days=elapsed_days,
+            has_price_data=has_price_data,
+            horizon=horizon,
+            trading_observations=trading_observations,
+        ),
         "market_data_source": data_source if has_price_data else "",
         "combined_score": pick.get("combined_score"),
         "source_score": pick.get("source_score"),
@@ -157,24 +186,49 @@ def average(values: list[float]) -> float | None:
     return round(sum(values) / len(values), 6) if values else None
 
 
+def median(values: list[float]) -> float | None:
+    return round(float(statistics.median(values)), 6) if values else None
+
+
 def summarize_items(items: list[dict[str, Any]]) -> dict[str, Any]:
-    evaluated = [item for item in items if isinstance(item.get("relative_return"), (int, float))]
+    evaluated = [
+        item
+        for item in items
+        if item.get("maturity_status") == "matured" and isinstance(item.get("relative_return"), (int, float))
+    ]
     by_horizon: dict[str, dict[str, Any]] = {}
     for horizon in ("short", "medium", "long"):
         horizon_items = [item for item in items if item.get("primary_horizon") == horizon]
-        horizon_evaluated = [item for item in horizon_items if isinstance(item.get("relative_return"), (int, float))]
+        horizon_evaluated = [item for item in evaluated if item.get("primary_horizon") == horizon]
+        horizon_returns = [float(item["relative_return"]) for item in horizon_evaluated]
+        horizon_ranked = sorted(
+            [item for item in horizon_evaluated if item.get("outcome") == "outperforming"],
+            key=lambda item: (float(item.get("relative_return", 0)), str(item.get("symbol", ""))),
+            reverse=True,
+        )
         by_horizon[horizon] = {
             "label": HORIZON_LABELS_ZH[horizon],
             "item_count": len(horizon_items),
             "evaluated_count": len(horizon_evaluated),
+            "sample_size": len(horizon_evaluated),
             "pending_count": sum(1 for item in horizon_items if item.get("outcome") == "pending"),
+            "in_progress_count": sum(1 for item in horizon_items if item.get("outcome") == "in_progress"),
+            "matured_count": sum(1 for item in horizon_items if item.get("maturity_status") == "matured"),
             "insufficient_price_data_count": sum(
                 1 for item in horizon_items if item.get("outcome") == "insufficient_price_data"
             ),
-            "average_relative_return": average([float(item["relative_return"]) for item in horizon_evaluated]),
+            "average_relative_return": average(horizon_returns),
+            "median_relative_return": median(horizon_returns),
+            "hit_rate": round(
+                sum(1 for item in horizon_evaluated if item.get("outcome") == "outperforming") / len(horizon_evaluated),
+                6,
+            )
+            if horizon_evaluated
+            else None,
+            "top_outperformers": unique_symbols(horizon_ranked),
         }
     ranked = sorted(
-        evaluated,
+        [item for item in evaluated if item.get("outcome") == "outperforming"],
         key=lambda item: (float(item.get("relative_return", 0)), str(item.get("symbol", ""))),
         reverse=True,
     )
@@ -183,10 +237,22 @@ def summarize_items(items: list[dict[str, Any]]) -> dict[str, Any]:
         "evaluated_count": len(evaluated),
         "pending_count": sum(1 for item in items if item.get("outcome") == "pending"),
         "insufficient_price_data_count": sum(1 for item in items if item.get("outcome") == "insufficient_price_data"),
-        "average_relative_return": average([float(item["relative_return"]) for item in evaluated]),
+        # Do not pool short-, medium-, and long-horizon performance into one statistic.
+        "average_relative_return": None,
+        "median_relative_return": None,
+        "hit_rate": None,
         "by_horizon": by_horizon,
-        "top_outperformers": [item["symbol"] for item in ranked[:5]],
+        "top_outperformers": unique_symbols(ranked)[:5],
     }
+
+
+def unique_symbols(items: list[dict[str, Any]]) -> list[str]:
+    symbols: list[str] = []
+    for item in items:
+        symbol = str(item.get("symbol", ""))
+        if symbol and symbol not in symbols:
+            symbols.append(symbol)
+    return symbols[:5]
 
 
 def build_recommendation_review(
@@ -245,7 +311,7 @@ def build_recommendation_review(
             )
 
     return {
-        "schema_version": "1",
+        "schema_version": "2",
         "mode": "recommendation_review",
         "as_of": as_of.isoformat(),
         "generated_at": utc_now_iso(),
@@ -274,9 +340,9 @@ def render_recommendation_review_markdown(review: dict[str, Any]) -> str:
             f"- 复盘条目：{summary.get('item_count', 0)}",
             f"- 已可评估：{summary.get('evaluated_count', 0)}",
             f"- 待观察：{summary.get('pending_count', 0)}",
+            f"- 进行中：{sum(item.get('in_progress_count', 0) for item in summary.get('by_horizon', {}).values())}",
             f"- 缺少价格数据：{summary.get('insufficient_price_data_count', 0)}",
-            f"- 平均相对收益：{display_percent(summary.get('average_relative_return'))}",
-            f"- 领先标的：{', '.join(summary.get('top_outperformers', [])) or '暂无'}",
+            "- 不同持有期不合并计算平均收益；以下按周期分别统计。",
             "",
             "## 周期分布",
             "",
@@ -286,7 +352,9 @@ def render_recommendation_review_markdown(review: dict[str, Any]) -> str:
         item = summary.get("by_horizon", {}).get(horizon, {})
         lines.append(
             f"- {item.get('label', horizon)}：{item.get('evaluated_count', 0)}/{item.get('item_count', 0)} 已评估，"
-            f"平均相对收益 {display_percent(item.get('average_relative_return'))}"
+            f"样本量 {item.get('sample_size', 0)}，平均 {display_percent(item.get('average_relative_return'))}，"
+            f"中位数 {display_percent(item.get('median_relative_return'))}，命中率 {display_percent(item.get('hit_rate'))}，"
+            f"领先标的 {', '.join(item.get('top_outperformers', [])) or '暂无'}"
         )
     warnings = review.get("data_quality_warnings", [])
     if warnings:
@@ -302,6 +370,8 @@ def render_recommendation_review_markdown(review: dict[str, Any]) -> str:
                 f"- 价格区间：{item.get('start_price_date') or '无'} 到 {item.get('end_price_date') or '无'}",
                 f"- 绝对收益：{display_percent(item.get('absolute_return'))}",
                 f"- 相对 {review.get('benchmark')}：{display_percent(item.get('relative_return'))}",
+                f"- 成熟度：{item.get('maturity_status')}（需要 {item.get('maturity_required_trading_days', 0)} 个交易日，"
+                f"当前 {item.get('trading_observations', 0)} 个）",
                 f"- 状态：{item.get('outcome')}",
                 "",
             ]

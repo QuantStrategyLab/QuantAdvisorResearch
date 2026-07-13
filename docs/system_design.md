@@ -116,8 +116,13 @@ price source without turning the repository into a paid market-data store.
 
 Recommendation follow-up review is a separate artifact. It reads past final
 recommendations, cached prices, and a benchmark, then reports absolute and
-relative returns by horizon. It is used for research accountability and data
-quality checks; it does not create new recommendations or execution targets.
+relative returns by horizon. Maturity is measured in trading observations:
+short and medium horizons require at least 10 trading days, while long requires
+252. Before maturity, an item remains `pending` or `in_progress` and cannot be
+labeled `outperforming` or `lagging`. Summary metrics (sample size, mean,
+median, and hit rate) stay within each horizon, and top symbols are
+de-duplicated. It is used for research accountability and data quality checks;
+it does not create new recommendations or execution targets.
 
 A separate no-network smoke command validates the three-repository contract:
 
