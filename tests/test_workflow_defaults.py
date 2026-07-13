@@ -14,6 +14,8 @@ def test_public_workflows_default_to_actions_artifact_inputs() -> None:
         assert "steps.upstream.outputs.political_events" in text
         assert "steps.upstream.outputs.political_watchlist" in text
         assert "steps.upstream.outputs.source_lineage" in text
+        assert "github.event.inputs.political_events_run_id" in text
+        assert "github.event.inputs.theme_momentum_run_id" in text
         assert "--source-lineage" in text
         assert "examples/political_events.example.csv" not in text
         assert "examples/political_watchlist.example.csv" not in text
@@ -38,6 +40,8 @@ def test_cross_repo_smoke_workflow_uses_live_artifacts_and_no_network_market_fal
     assert "steps.upstream.outputs.political_watchlist" in text
     assert "steps.upstream.outputs.theme_momentum" in text
     assert "steps.upstream.outputs.source_lineage" in text
+    assert "github.event.inputs.political_events_run_id" in text
+    assert "github.event.inputs.theme_momentum_run_id" in text
     assert "scripts/run_cross_repo_smoke.py" in text
 
 
@@ -46,6 +50,8 @@ def test_upstream_artifact_action_binds_actions_identity_and_downloaded_hash() -
 
     assert "${RUNNER_TEMP}" in text
     assert "gh run download" in text
+    assert "event=schedule" in text
+    assert "workflow_dispatch" in text
     assert "workflow_run_id" in text
     assert "workflow_head_sha" in text
     assert "artifact_id" in text

@@ -109,7 +109,8 @@ Workflows should call this command instead of duplicating shell logic for each
 publication mode.
 
 Scheduled builds download the upstream event, watchlist, and theme inputs from
-successful GitHub Actions artifacts in a runner temporary directory. The report
+successful scheduled GitHub Actions artifacts in a runner temporary directory;
+manual backfills require explicit validated upstream run IDs. The report
 manifest binds the upstream repository, workflow run, head SHA, artifact identity,
 file name, and downloaded SHA-256. Inputs without this lineage are not enabled by
 the scheduled workflow.

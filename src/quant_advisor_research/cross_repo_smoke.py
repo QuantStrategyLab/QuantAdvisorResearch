@@ -49,7 +49,7 @@ def run_cross_repo_smoke(
     political_watchlist: str | Path,
     ai_signal: str | Path | None,
     theme_momentum: str | Path | None,
-    source_lineage: str | Path | None,
+    source_lineage: str | Path | None = None,
     work_dir: str | Path | None,
     site_url: str,
 ) -> dict[str, Any]:

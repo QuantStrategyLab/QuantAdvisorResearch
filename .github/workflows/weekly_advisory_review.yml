@@ -7,6 +7,14 @@ on:
         description: "Report date. Defaults to current UTC date when empty."
         required: false
         type: string
+      political_events_run_id:
+        description: "Optional explicit successful PERT Source Event Pipeline run on main. Empty uses the latest successful schedule."
+        required: false
+        type: string
+      theme_momentum_run_id:
+        description: "Optional explicit successful RSCP Theme Momentum Snapshot run on main. Empty uses the latest successful schedule."
+        required: false
+        type: string
       market_confirmation_path:
         description: "Optional market confirmation CSV path inside advisor repository. Empty disables this input."
         required: false
@@ -46,6 +54,8 @@ jobs:
         uses: ./advisor/.github/actions/download-upstream-artifacts
         with:
           token: ${{ secrets.QSL_REPO_SYNC_TOKEN }}
+          political_events_run_id: ${{ github.event.inputs.political_events_run_id || '' }}
+          theme_momentum_run_id: ${{ github.event.inputs.theme_momentum_run_id || '' }}
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"

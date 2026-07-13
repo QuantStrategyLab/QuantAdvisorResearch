@@ -293,7 +293,8 @@ generated_at
 ```
 
 Scheduled workflows populate `source_lineage` only from files downloaded from
-successful upstream GitHub Actions runs into `RUNNER_TEMP`. Manifest generation
+successful scheduled upstream GitHub Actions runs into `RUNNER_TEMP`; manual
+backfills must provide an explicit validated upstream run ID. Manifest generation
 recomputes each downloaded file hash and fails if it differs from the recorded
 lineage. Optional inputs without an Actions artifact are left unavailable rather
 than being accepted from an unverified checkout.
