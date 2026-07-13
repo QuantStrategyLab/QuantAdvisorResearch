@@ -25,6 +25,71 @@ from quant_advisor_research.contracts import AdvisoryValidationError, validate_a
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_report_time_contract_uses_injected_build_time() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        generated_at="2026-06-01T12:34:56Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+
+    assert report["reference_time"] == "2026-05-30T23:59:59Z"
+    assert report["generated_at"] == "2026-06-01T12:34:56Z"
+    assert report["expires_at"] == "2026-06-08T12:34:56Z"
+
+
+def test_future_context_as_of_is_rejected_against_report_cutoff(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update({"as_of": "2026-06-01", "generated_at": "2026-06-01T12:00:00Z", "expires_at": "2026-06-30"})
+    path = tmp_path / "future.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is False
+    assert "ai_signal:as_of_in_future" in report["summary"]["data_quality_warnings"]
+
+
+def test_date_only_expiry_uses_generated_at_local_timezone(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update({"as_of": "2026-05-30", "generated_at": "2026-05-30T00:30:00+08:00", "expires_at": "2026-06-30"})
+    path = tmp_path / "local_expiry.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=path,
+    )
+
+    freshness = report["freshness"]["ai_signal"]
+    assert freshness["valid"] is True
+    assert freshness["expires_at"] == "2026-06-30T15:59:59Z"
+
+
+def test_generated_at_offset_preserves_source_local_date(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update({"as_of": "2026-05-30", "generated_at": "2026-05-30T00:30:00+08:00", "expires_at": "2026-06-30"})
+    path = tmp_path / "offset.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is True
+
+
 def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",

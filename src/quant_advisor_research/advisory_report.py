@@ -55,6 +55,9 @@ HORIZON_WINDOWS = {
 }
 SHORT_PRIMARY_MIN_SCORE_EDGE = 0.05
 THEME_MOMENTUM_ARTIFACT_TYPE = "medium_horizon_theme_context"
+REPORT_EXPIRY_DAYS = 7
+REFERENCE_POST_AS_OF_SKEW_DAYS = 2
+CONTEXT_FRESHNESS_MAX_AGE_DAYS = {"ai_signal": 7, "theme_momentum": 14}
 
 CADENCE_LABELS_ZH = {
     "daily": "日度",
@@ -220,6 +223,120 @@ def parse_date(value: str) -> dt.date:
 
 def utc_now_iso() -> str:
     return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def normalize_build_datetime(value: dt.datetime | str | None) -> dt.datetime:
+    if value is None:
+        return dt.datetime.now(dt.UTC).replace(microsecond=0)
+    if isinstance(value, dt.datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        parsed = dt.datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
+    if parsed.tzinfo is None:
+        raise ValueError("generated_at must be timezone-aware")
+    return parsed.astimezone(dt.UTC).replace(microsecond=0)
+
+
+def deterministic_reference_time(as_of: dt.date) -> dt.datetime:
+    return dt.datetime.combine(as_of, dt.time(23, 59, 59), tzinfo=dt.UTC)
+
+
+def parse_context_timezone(value: Any) -> dt.tzinfo | None:
+    text = str(value or "").strip()
+    if not text or ("T" not in text and " " not in text):
+        return None
+    try:
+        normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+        parsed = dt.datetime.fromisoformat(normalized)
+        return parsed.tzinfo
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_context_datetime(value: Any, *, date_timezone: dt.tzinfo | None = None) -> dt.datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        if "T" not in text and " " not in text:
+            timezone = date_timezone or dt.UTC
+            return dt.datetime.combine(dt.date.fromisoformat(text), dt.time(23, 59, 59), tzinfo=timezone).astimezone(dt.UTC)
+        normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+        parsed = dt.datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(dt.UTC)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_context_local_date(value: Any) -> dt.date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        if "T" not in text and " " not in text:
+            return dt.date.fromisoformat(text)
+        normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+        parsed = dt.datetime.fromisoformat(normalized)
+        return parsed.date() if parsed.tzinfo is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def assess_context_freshness(
+    payload: dict[str, Any] | None,
+    *,
+    name: str,
+    report_as_of: dt.date,
+    reference_time: dt.datetime,
+) -> dict[str, Any]:
+    if payload is None:
+        return {"present": False, "valid": False, "reason": "not_provided"}
+    missing = [key for key in ("as_of", "generated_at", "expires_at") if not str(payload.get(key) or "").strip()]
+    if missing:
+        return {"present": True, "valid": False, "reason": f"missing_{missing[0]}"}
+    source_as_of = parse_context_local_date(payload.get("as_of"))
+    generated_local_date = parse_context_local_date(payload.get("generated_at"))
+    generated_at = parse_context_datetime(payload.get("generated_at"))
+    generated_timezone = parse_context_timezone(payload.get("generated_at"))
+    if source_as_of is None:
+        return {"present": True, "valid": False, "reason": "invalid_as_of"}
+    if generated_at is None or generated_local_date is None:
+        return {"present": True, "valid": False, "reason": "invalid_generated_at"}
+    expires_at = parse_context_datetime(payload.get("expires_at"), date_timezone=generated_timezone or dt.UTC)
+    if expires_at is None:
+        return {"present": True, "valid": False, "reason": "invalid_expires_at"}
+    if source_as_of > report_as_of:
+        return {"present": True, "valid": False, "reason": "as_of_in_future"}
+    if generated_at > reference_time + dt.timedelta(days=REFERENCE_POST_AS_OF_SKEW_DAYS):
+        return {"present": True, "valid": False, "reason": "generated_at_in_future"}
+    if generated_local_date < source_as_of:
+        return {"present": True, "valid": False, "reason": "generated_before_as_of"}
+    if expires_at < generated_at:
+        return {"present": True, "valid": False, "reason": "expires_before_generated"}
+    if reference_time > expires_at:
+        return {"present": True, "valid": False, "reason": "expired"}
+    age_days = (report_as_of - source_as_of).days
+    generated_age_days = (reference_time - generated_at).total_seconds() / 86400
+    max_age_days = CONTEXT_FRESHNESS_MAX_AGE_DAYS[name]
+    if age_days > max_age_days:
+        reason = "stale_as_of"
+    elif generated_age_days > max_age_days:
+        reason = "stale_generated_at"
+    else:
+        return {
+            "present": True, "valid": True, "reason": "fresh", "as_of": source_as_of.isoformat(),
+            "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
+            "expires_at": expires_at.isoformat().replace("+00:00", "Z"),
+            "age_days": age_days, "generated_age_days": round(generated_age_days, 3),
+            "max_age_days": max_age_days,
+        }
+    return {
+        "present": True, "valid": False, "reason": reason, "age_days": age_days,
+        "generated_age_days": round(generated_age_days, 3), "max_age_days": max_age_days,
+    }
 
 
 def load_events(path: str | Path, as_of: dt.date) -> list[Event]:
@@ -1470,14 +1587,33 @@ def build_advisory_report(
     theme_momentum_path: str | Path | None = None,
     market_confirmation_path: str | Path | None = None,
     max_candidates: int = 12,
+    generated_at: dt.datetime | str | None = None,
 ) -> dict[str, Any]:
     if cadence not in ALLOWED_CADENCES:
         raise ValueError(f"cadence must be one of: {', '.join(sorted(ALLOWED_CADENCES))}")
     as_of_date = parse_date(as_of)
+    build_time = normalize_build_datetime(generated_at)
+    reference_time = deterministic_reference_time(as_of_date)
     watchlist = load_watchlist(political_watchlist_path)
     events = load_events(political_events_path, as_of_date)
-    ai_signal = load_ai_signal(ai_signal_path)
-    theme_momentum = load_theme_momentum(theme_momentum_path)
+    raw_ai_signal = load_ai_signal(ai_signal_path)
+    raw_theme_momentum = load_theme_momentum(theme_momentum_path)
+    ai_freshness = assess_context_freshness(raw_ai_signal, name="ai_signal", report_as_of=as_of_date, reference_time=reference_time)
+    theme_freshness = assess_context_freshness(raw_theme_momentum, name="theme_momentum", report_as_of=as_of_date, reference_time=reference_time)
+    freshness = {"ai_signal": ai_freshness, "theme_momentum": theme_freshness}
+    freshness_warnings = [
+        f"{name}:{item['reason']}"
+        for name, item in freshness.items()
+        if not item.get("valid")
+        and item.get("present")
+        and not (name == "theme_momentum" and raw_theme_momentum and "expires_at" not in raw_theme_momentum)
+    ]
+    ai_signal = raw_ai_signal if ai_freshness.get("valid") else None
+    theme_momentum = (
+        raw_theme_momentum
+        if theme_freshness.get("valid") or (raw_theme_momentum and "expires_at" not in raw_theme_momentum)
+        else None
+    )
     market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
@@ -1517,7 +1653,10 @@ def build_advisory_report(
     report = {
         "schema_version": "5",
         "as_of": as_of_date.isoformat(),
-        "generated_at": utc_now_iso(),
+        "reference_time": reference_time.isoformat().replace("+00:00", "Z"),
+        "generated_at": build_time.isoformat().replace("+00:00", "Z"),
+        "expires_at": (build_time + dt.timedelta(days=REPORT_EXPIRY_DAYS)).isoformat().replace("+00:00", "Z"),
+        "freshness": freshness,
         "mode": "model_recommendations",
         "cadence": cadence,
         "audience_scope": "non_personalized_model_research",
@@ -1540,7 +1679,7 @@ def build_advisory_report(
             "ai_regime": ai_signal.get("regime", "not_available") if ai_signal else "not_available",
             "ai_confidence": ai_signal.get("confidence", 0.0) if ai_signal else 0.0,
             "source_mode": source_mode,
-            "data_quality_warnings": data_quality_warnings,
+            "data_quality_warnings": data_quality_warnings + freshness_warnings,
             "theme_momentum_available": theme_momentum_summary["available"],
             "theme_momentum_artifact_type": theme_momentum_summary.get("artifact_type", ""),
             "theme_momentum_horizon": theme_momentum_summary.get("horizon", ""),
