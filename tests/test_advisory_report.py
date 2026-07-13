@@ -20,9 +20,65 @@ from quant_advisor_research.advisory_report import (
 )
 from quant_advisor_research.artifacts import write_report_manifest
 from quant_advisor_research.contracts import AdvisoryValidationError, validate_advisory_report
+from quant_advisor_research.publisher import report_content_fingerprint
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_v6_report_time_contract_preserves_precision_and_fields() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00.123456Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+
+    assert report["schema_version"] == "6"
+    assert report["contract_version"] == "model_recommendations.v6"
+    assert report["reference_time"] == "2026-05-30T23:59:59Z"
+    assert report["generated_at"] == "2026-05-30T12:00:00.123456Z"
+    assert report["expires_at"] == "2026-06-06T12:00:00.123456Z"
+    validate_advisory_report(report)
+
+
+def test_v5_fixture_remains_dual_read_compatible() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report["schema_version"] = "5"
+    report.pop("contract_version")
+    report.pop("reference_time")
+    report.pop("expires_at")
+    report.pop("freshness")
+    validate_advisory_report(report)
+
+
+def test_v6_requires_explicit_time_contract_and_timezone() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report.pop("reference_time")
+    with pytest.raises(AdvisoryValidationError, match="reference_time"):
+        validate_advisory_report(report)
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report["generated_at"] = "2026-05-30T12:00:00"
+    with pytest.raises(AdvisoryValidationError, match="timezone-aware"):
+        validate_advisory_report(report)
+
+
+def test_time_metadata_is_normalized_for_content_fingerprint() -> None:
+    first = {"schema_version": "6", "as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00.1Z", "reference_time": "2026-05-30T23:59:59Z", "expires_at": "2026-06-06T12:00:00.1Z", "freshness": {"ai_signal": {"generated_at": "2026-05-30T12:00:00Z"}}, "recommendations": []}
+    second = {**first, "generated_at": "2026-05-30T13:00:00.9Z", "expires_at": "2026-06-06T13:00:00.9Z", "freshness": {"ai_signal": {"generated_at": "2026-05-30T13:00:00Z"}}}
+    assert report_content_fingerprint(first) == report_content_fingerprint(second)
 
 
 def test_build_advisory_report_blocks_execution_and_allocation() -> None:
@@ -250,8 +306,8 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["manifest_type"] == "model_recommendation_report"
-    assert manifest["contract_version"] == "model_recommendations.v5"
-    assert manifest["version"] == "2026-05-30-weekly-schema-5-run-123-attempt-2"
+    assert manifest["contract_version"] == "model_recommendations.v6"
+    assert manifest["version"] == "2026-05-30-weekly-schema-6-run-123-attempt-2"
     assert manifest["producer"]["git_sha"] == "abcdef1234567890"
     assert manifest["artifacts"]["json"]["sha256"]
     assert manifest["artifacts"]["markdown"]["sha256"]
