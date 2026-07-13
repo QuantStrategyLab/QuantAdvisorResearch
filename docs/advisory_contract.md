@@ -226,7 +226,7 @@ Recommendation follow-up reviews are separate audit artifacts generated from
 past final recommendations and cached point-in-time prices:
 
 ```text
-schema_version = 1
+schema_version = 2
 mode = recommendation_review
 as_of
 generated_at
@@ -240,12 +240,15 @@ policy
 
 Each `review_items[]` row carries the original report date, review date, symbol,
 primary horizon, price interval, absolute return, benchmark return,
-benchmark-relative return, outcome label, market data source, and original
-selection scores when present.
+benchmark-relative return, trading-observation count, maturity status, outcome
+label, market data source, and original selection scores when present. The
+minimum maturity is 10 trading days for short/medium and 252 trading days for
+long. Summary performance metrics are reported separately for each horizon.
 
 Allowed outcome labels:
 
 - `pending`
+- `in_progress`
 - `insufficient_price_data`
 - `outperforming`
 - `inline`
