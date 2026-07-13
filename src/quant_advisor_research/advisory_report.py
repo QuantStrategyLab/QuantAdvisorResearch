@@ -225,7 +225,7 @@ def utc_now_iso() -> str:
 
 def normalize_reference_time(value: str | None, as_of: dt.date) -> dt.datetime:
     if value is None:
-        return dt.datetime.combine(as_of, dt.time.min, tzinfo=dt.UTC)
+        return dt.datetime.combine(as_of, dt.time(23, 59, 59), tzinfo=dt.UTC)
     normalized = value.strip()
     if normalized.endswith("Z"):
         normalized = normalized[:-1] + "+00:00"
@@ -266,12 +266,21 @@ def validate_upstream_freshness(
         raise FreshnessError(f"{name} stale: as_of={artifact_as_of.isoformat()}")
     expires_at = payload.get("expires_at")
     if expires_at:
-        try:
-            expires_date = parse_date(str(expires_at)[:10])
-        except ValueError as exc:
-            raise FreshnessError(f"{name} invalid: expires_at") from exc
-        if reference_time.date() > expires_date:
-            raise FreshnessError(f"{name} expired: expires_at={expires_date.isoformat()}")
+        expiry_text = str(expires_at).strip()
+        if len(expiry_text) == 10:
+            try:
+                expires_date = parse_date(expiry_text)
+            except ValueError as exc:
+                raise FreshnessError(f"{name} invalid: expires_at") from exc
+            if reference_time.date() > expires_date:
+                raise FreshnessError(f"{name} expired: expires_at={expires_date.isoformat()}")
+        else:
+            try:
+                expires_at_datetime = normalize_reference_time(expiry_text, artifact_as_of)
+            except FreshnessError as exc:
+                raise FreshnessError(f"{name} invalid: expires_at timezone") from exc
+            if reference_time >= expires_at_datetime:
+                raise FreshnessError(f"{name} expired: expires_at={expiry_text}")
     return {
         "status": "fresh",
         "as_of": artifact_as_of.isoformat(),
@@ -429,6 +438,42 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
             price_observation_count=int(as_float(row.get("price_observation_count"))),
         )
     return confirmations
+
+
+def validate_market_confirmation_freshness(
+    path: str | Path,
+    *,
+    as_of: dt.date,
+    reference_time: dt.datetime,
+) -> dict[str, Any]:
+    rows = read_csv_rows(path)
+    valid_rows = [row for row in rows if str(row.get("symbol", "")).strip()]
+    if not valid_rows:
+        raise FreshnessError("market_confirmation invalid: no valid rows")
+    dates: list[dt.date] = []
+    symbols: set[str] = set()
+    for row in valid_rows:
+        symbol = str(row.get("symbol", "")).upper().strip()
+        raw_as_of = str(row.get("as_of", "")).strip()
+        if not raw_as_of:
+            raise FreshnessError(f"market_confirmation invalid: missing as_of for {symbol}")
+        try:
+            row_as_of = parse_date(raw_as_of)
+        except ValueError as exc:
+            raise FreshnessError(f"market_confirmation invalid: as_of for {symbol}") from exc
+        if row_as_of > as_of or row_as_of > reference_time.date():
+            raise FreshnessError(f"market_confirmation future: as_of={row_as_of.isoformat()}")
+        if (as_of - row_as_of).days > UPSTREAM_MAX_LAG_DAYS:
+            raise FreshnessError(f"market_confirmation stale: as_of={row_as_of.isoformat()}")
+        dates.append(row_as_of)
+        symbols.add(symbol)
+    return {
+        "status": "fresh",
+        "row_count": len(valid_rows),
+        "symbol_count": len(symbols),
+        "as_of_min": min(dates).isoformat(),
+        "as_of_max": max(dates).isoformat(),
+    }
 
 
 def display_number(value: Any, *, digits: int = 2) -> str:
@@ -1500,6 +1545,15 @@ def build_advisory_report(
     events = load_events(political_events_path, as_of_date)
     ai_signal = load_ai_signal(ai_signal_path)
     theme_momentum = load_theme_momentum(theme_momentum_path)
+    market_freshness = (
+        validate_market_confirmation_freshness(
+            market_confirmation_path,
+            as_of=as_of_date,
+            reference_time=reference_datetime,
+        )
+        if market_confirmation_path
+        else None
+    )
     market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
     freshness_inputs: dict[str, Any] = {}
     if ai_signal is not None:
@@ -1510,6 +1564,8 @@ def build_advisory_report(
         freshness_inputs["theme_momentum"] = validate_upstream_freshness(
             "theme_momentum", theme_momentum, as_of=as_of_date, reference_time=reference_datetime
         )
+    if market_freshness is not None:
+        freshness_inputs["market_confirmation"] = market_freshness
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
         political_events_path,

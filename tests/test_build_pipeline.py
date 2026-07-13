@@ -102,6 +102,32 @@ def test_build_advisory_artifacts_builds_market_report_and_site(tmp_path: Path) 
     assert report["summary"]["top_recommended_symbols"]
 
 
+def test_missing_optional_theme_momentum_does_not_block_build(tmp_path: Path) -> None:
+    result = build_advisory_artifacts(
+        as_of=dt.date(2026, 5, 30),
+        cadence="weekly",
+        political_events_path=example_path("political_events.example.csv"),
+        political_watchlist_path=example_path("political_watchlist.example.csv"),
+        ai_signal_path=example_path("research_signal_context.example.json"),
+        theme_momentum_path=tmp_path / "missing-theme.json",
+        market_confirmation_path=example_path("market_confirmation.example.csv"),
+        output_dir=tmp_path / "artifacts",
+        max_candidates=12,
+        market_benchmark="SPY",
+        market_max_symbols=80,
+        market_request_pause_seconds=0,
+        market_proxy_list=None,
+        market_proxy_urls="",
+        market_proxy_pool_url="",
+        market_use_network=False,
+        market_cache_dir=None,
+        market_cache_max_age_days=14,
+    )
+
+    report = json.loads(result.report_json.read_text(encoding="utf-8"))
+    assert report["summary"]["theme_momentum_available"] is False
+
+
 def test_archive_backfill_discovers_dedupes_and_publishes_reports(tmp_path: Path) -> None:
     first = build_fixture_report(tmp_path / "artifacts-a", dt.date(2026, 5, 31))
     duplicate = build_fixture_report(tmp_path / "artifacts-b", dt.date(2026, 5, 31))

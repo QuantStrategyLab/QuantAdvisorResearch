@@ -59,6 +59,82 @@ def test_report_freshness_metadata_uses_injected_reference_time() -> None:
     assert report["freshness_status"] == "fresh"
 
 
+def test_same_day_generated_at_is_not_future_with_compatibility_reference_time(tmp_path: Path) -> None:
+    ai_signal = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    ai_signal["as_of"] = "2026-05-30"
+    ai_signal["generated_at"] = "2026-05-30T23:00:00Z"
+    ai_path = tmp_path / "same_day_ai.json"
+    ai_path.write_text(json.dumps(ai_signal), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ai_path,
+    )
+
+    assert report["reference_time"] == "2026-05-30T23:59:59Z"
+
+
+def test_datetime_expiry_uses_timestamp_and_naive_datetime_fails_closed(tmp_path: Path) -> None:
+    base = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    base["as_of"] = "2026-05-30"
+    base["generated_at"] = "2026-05-30T01:00:00Z"
+    expired = dict(base, expires_at="2026-05-30T01:00:00Z")
+    expired_path = tmp_path / "expired.json"
+    expired_path.write_text(json.dumps(expired), encoding="utf-8")
+    with pytest.raises(FreshnessError, match="expired"):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            ai_signal_path=expired_path,
+        )
+
+    naive_path = tmp_path / "naive.json"
+    naive_path.write_text(json.dumps(dict(base, expires_at="2026-05-30T23:00:00")), encoding="utf-8")
+    with pytest.raises(FreshnessError, match="timezone"):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            ai_signal_path=naive_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("row_change", "error_match"),
+    [
+        ({"as_of": ""}, "missing as_of"),
+        ({"as_of": "2026-05-31"}, "future"),
+        ({"as_of": "2026-05-01"}, "stale"),
+    ],
+)
+def test_market_confirmation_freshness_fails_closed(tmp_path: Path, row_change: dict[str, str], error_match: str) -> None:
+    lines = (ROOT / "examples/market_confirmation.example.csv").read_text(encoding="utf-8").splitlines()
+    headers = lines[0].split(",")
+    values = lines[1].split(",")
+    row = dict(zip(headers, values))
+    row.update(row_change)
+    market_path = tmp_path / "market.csv"
+    market_path.write_text(",".join(headers) + "\n" + ",".join(row[key] for key in headers) + "\n", encoding="utf-8")
+
+    with pytest.raises(FreshnessError, match=error_match):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            market_confirmation_path=market_path,
+        )
+
+
 def test_stale_upstream_artifact_fails_closed(tmp_path: Path) -> None:
     ai_signal = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
     ai_signal["as_of"] = "2026-05-01"
@@ -212,7 +288,7 @@ def test_render_markdown_keeps_public_report_direct() -> None:
     markdown = render_markdown(report)
 
     assert "# 智慧投顾研究周度复盘 - 2026-05-30" in markdown
-    assert "- 参考时间: `2026-05-30T00:00:00Z`" in markdown
+    assert "- 参考时间: `2026-05-30T23:59:59Z`" in markdown
     assert "- 数据新鲜度: `fresh`" in markdown
     assert "股票背景" in markdown
     assert "推荐理由" in markdown
@@ -450,6 +526,13 @@ def test_market_confirmation_is_optional_audit_input_not_public_copy() -> None:
     pick = report["final_decisions"]["recommendations"][0]
     assert report["source_artifacts"]["market_confirmation"].endswith("market_confirmation.example.csv")
     assert report["summary"]["market_confirmation_count"] == 5
+    assert report["freshness"]["inputs"]["market_confirmation"] == {
+        "status": "fresh",
+        "row_count": 5,
+        "symbol_count": 5,
+        "as_of_min": "2026-05-30",
+        "as_of_max": "2026-05-30",
+    }
     assert "market_confirmation" in pick["horizon_scores"]["medium"]["drivers"]
     assert "market_confirmation" in pick["supporting_context"]["medium"]
     assert set(pick["horizon_actions"]) == {"short", "medium", "long"}

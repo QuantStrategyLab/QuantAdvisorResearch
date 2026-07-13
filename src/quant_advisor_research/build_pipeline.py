@@ -207,7 +207,7 @@ def build_advisory_artifacts(
 ) -> BuildPipelineResult:
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    resolved_theme_momentum = required_path(theme_momentum_path, label="theme momentum") if theme_momentum_path else None
+    resolved_theme_momentum = existing_optional_path(theme_momentum_path)
     resolved_ai_signal = required_path(ai_signal_path, label="ai signal") if ai_signal_path else None
 
     market_path = existing_optional_path(market_confirmation_path)

@@ -60,7 +60,15 @@ def load_report(path: str | Path) -> dict[str, Any]:
 
 
 def report_content_fingerprint(report: dict[str, Any]) -> str:
-    ignored_top_level_keys = {"as_of", "generated_at", "source_artifacts"}
+    ignored_top_level_keys = {
+        "as_of",
+        "generated_at",
+        "reference_time",
+        "expires_at",
+        "freshness_status",
+        "freshness",
+        "source_artifacts",
+    }
     normalized = {key: value for key, value in report.items() if key not in ignored_top_level_keys}
     return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 

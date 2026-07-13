@@ -5,6 +5,7 @@ from pathlib import Path
 
 from quant_advisor_research.advisory_report import build_advisory_report, write_json
 from quant_advisor_research.publisher import (
+    report_content_fingerprint,
     publish_reports,
     render_archive_html,
     render_feed_xml,
@@ -151,6 +152,17 @@ def test_unique_report_paths_by_content_keeps_first_duplicate_report(tmp_path: P
     reports = unique_report_paths_by_content([current_path, duplicate_path, older_path])
 
     assert reports == [current_path, older_path]
+
+
+def test_report_fingerprint_ignores_freshness_runtime_metadata() -> None:
+    base = build_sample_report()
+    rerun = deepcopy(base)
+    rerun["reference_time"] = "2026-06-20T23:59:59Z"
+    rerun["expires_at"] = "2026-06-27T23:59:59Z"
+    rerun["freshness_status"] = "fresh"
+    rerun["freshness"] = {"status": "fresh", "inputs": {"ai_signal": {"generated_at": "later"}}}
+
+    assert report_content_fingerprint(base) == report_content_fingerprint(rerun)
 
 
 def test_index_limits_recent_history_and_archive_keeps_all_reports() -> None:
