@@ -9,6 +9,17 @@ from typing import Any, Mapping
 from .contracts import REPORT_CONTRACT_VERSION, SOURCE_PROJECT
 
 
+SOURCE_LINEAGE_FIELDS = (
+    "repository",
+    "workflow_run_id",
+    "workflow_head_sha",
+    "artifact_id",
+    "artifact_name",
+    "file_name",
+    "sha256",
+)
+
+
 def sha256_file(path: str | Path) -> str:
     hasher = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -27,6 +38,33 @@ def write_json(path: str | Path, payload: Mapping[str, Any]) -> Path:
     return output_path
 
 
+def verified_source_lineage(
+    report: Mapping[str, Any], source_lineage: Mapping[str, Any] | None
+) -> dict[str, dict[str, str]]:
+    if not source_lineage:
+        return {}
+    source_artifacts = report.get("source_artifacts")
+    if not isinstance(source_artifacts, Mapping):
+        raise ValueError("source lineage requires report source_artifacts")
+
+    verified: dict[str, dict[str, str]] = {}
+    for source_name, raw_entry in source_lineage.items():
+        if not isinstance(source_name, str) or not isinstance(raw_entry, Mapping):
+            raise ValueError("source lineage entries must be named objects")
+        source_path = source_artifacts.get(source_name)
+        if not isinstance(source_path, str) or not source_path:
+            raise ValueError(f"source lineage has no matching report input: {source_name}")
+        entry = {field: str(raw_entry.get(field) or "") for field in SOURCE_LINEAGE_FIELDS}
+        missing = [field for field, value in entry.items() if not value]
+        if missing:
+            raise ValueError(f"source lineage missing fields for {source_name}: {','.join(missing)}")
+        actual_sha256 = sha256_file(source_path)
+        if entry["sha256"] != actual_sha256:
+            raise ValueError(f"source lineage sha256 mismatch for {source_name}")
+        verified[source_name] = entry
+    return verified
+
+
 def write_report_manifest(
     *,
     report: Mapping[str, Any],
@@ -37,6 +75,7 @@ def write_report_manifest(
     git_sha: str | None = None,
     run_id: str | None = None,
     run_attempt: str | None = None,
+    source_lineage: Mapping[str, Any] | None = None,
 ) -> Path:
     resolved_report = Path(report_path)
     resolved_markdown = Path(markdown_path)
@@ -77,6 +116,7 @@ def write_report_manifest(
             "github_run_attempt": run_attempt or "",
         },
         "source_artifacts": dict(report.get("source_artifacts") or {}),
+        "source_lineage": verified_source_lineage(report, source_lineage),
         "summary": dict(report.get("summary") or {}),
         "artifacts": {
             "json": {

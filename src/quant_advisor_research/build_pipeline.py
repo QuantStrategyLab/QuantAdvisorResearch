@@ -8,6 +8,7 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 from urllib.request import urlopen
 
@@ -203,6 +204,7 @@ def build_advisory_artifacts(
     site_url: str = DEFAULT_SITE_URL,
     feed_title: str = DEFAULT_FEED_TITLE,
     recover_site_archive: bool = False,
+    source_lineage_path: str | Path | None = None,
 ) -> BuildPipelineResult:
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -244,6 +246,12 @@ def build_advisory_artifacts(
     )
     write_json(report_json, report)
     write_text(report_md, render_markdown(report))
+    source_lineage: dict[str, Any] = {}
+    if source_lineage_path:
+        loaded_lineage = json.loads(Path(source_lineage_path).read_text(encoding="utf-8"))
+        if not isinstance(loaded_lineage, dict):
+            raise ValueError("source lineage must be a JSON object")
+        source_lineage = loaded_lineage
     write_report_manifest(
         report=report,
         report_path=report_json,
@@ -253,6 +261,7 @@ def build_advisory_artifacts(
         git_sha=os.environ.get("GITHUB_SHA"),
         run_id=os.environ.get("GITHUB_RUN_ID"),
         run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"),
+        source_lineage=source_lineage,
     )
 
     monthly_review_json: Path | None = None
@@ -357,6 +366,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--site-url", default=DEFAULT_SITE_URL)
     parser.add_argument("--feed-title", default=DEFAULT_FEED_TITLE)
     parser.add_argument("--recover-site-archive", action="store_true", help="Recover prior report JSONs from published site index.")
+    parser.add_argument("--source-lineage", help="Verified GitHub Actions source lineage JSON.")
     return parser
 
 
@@ -388,6 +398,7 @@ def main(argv: list[str] | None = None) -> None:
         site_url=args.site_url,
         feed_title=args.feed_title,
         recover_site_archive=args.recover_site_archive,
+        source_lineage_path=args.source_lineage,
     )
     print(
         "advisory_artifacts_built "

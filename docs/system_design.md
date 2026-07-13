@@ -108,6 +108,12 @@ optional static-site rendering, and optional published-site archive recovery.
 Workflows should call this command instead of duplicating shell logic for each
 publication mode.
 
+Scheduled builds download the upstream event, watchlist, and theme inputs from
+successful GitHub Actions artifacts in a runner temporary directory. The report
+manifest binds the upstream repository, workflow run, head SHA, artifact identity,
+file name, and downloaded SHA-256. Inputs without this lineage are not enabled by
+the scheduled workflow.
+
 Market confirmation has a small price-cache adapter around the free Yahoo chart
 endpoint. Scheduled workflows restore and save `.cache/market-data` with GitHub
 Actions cache. This keeps the public report deterministic enough to publish when

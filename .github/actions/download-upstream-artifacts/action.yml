@@ -1,0 +1,120 @@
+name: Download verified upstream artifacts
+description: Download the latest successful upstream Actions artifacts and emit verified lineage.
+
+inputs:
+  token:
+    description: Token with Actions read access to the upstream repositories.
+    required: true
+
+outputs:
+  political_events:
+    value: ${{ steps.download.outputs.political_events }}
+  political_watchlist:
+    value: ${{ steps.download.outputs.political_watchlist }}
+  theme_momentum:
+    value: ${{ steps.download.outputs.theme_momentum }}
+  source_lineage:
+    value: ${{ steps.download.outputs.source_lineage }}
+
+runs:
+  using: composite
+  steps:
+    - id: download
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        root="$(mktemp -d "${RUNNER_TEMP}/qar-upstream.XXXXXX")"
+
+        resolve_artifact() {
+          local repo="$1" workflow="$2" artifact_name="$3" destination="$4"
+          local run_json run_id head_sha artifact_json artifact_id
+          run_json="$(gh api "repos/${repo}/actions/workflows/${workflow}/runs?branch=main&status=success&per_page=1")"
+          run_id="$(jq -r '.workflow_runs[0].id // empty' <<<"${run_json}")"
+          head_sha="$(jq -r '.workflow_runs[0].head_sha // empty' <<<"${run_json}")"
+          if [[ -z "${run_id}" || -z "${head_sha}" ]]; then
+            echo "No successful ${repo}/${workflow} run found" >&2
+            return 1
+          fi
+          artifact_json="$(gh api "repos/${repo}/actions/runs/${run_id}/artifacts" \
+            | jq -c --arg name "${artifact_name}" '.artifacts | map(select(.name == $name and (.expired | not))) | first // empty')"
+          artifact_id="$(jq -r '.id // empty' <<<"${artifact_json}")"
+          if [[ -z "${artifact_id}" ]]; then
+            echo "No active ${artifact_name} artifact found for ${repo} run ${run_id}" >&2
+            return 1
+          fi
+          mkdir -p "${destination}"
+          gh run download "${run_id}" --repo "${repo}" --name "${artifact_name}" --dir "${destination}" >/dev/null
+          printf '%s\t%s\t%s\n' "${run_id}" "${head_sha}" "${artifact_id}"
+        }
+
+        IFS=$'\t' read -r pert_run_id pert_head_sha pert_artifact_id < <(
+          resolve_artifact \
+            QuantStrategyLab/PoliticalEventTrackingResearch \
+            source_event_pipeline.yml \
+            source-event-pipeline \
+            "${root}/political-events"
+        )
+        IFS=$'\t' read -r theme_run_id theme_head_sha theme_artifact_id < <(
+          resolve_artifact \
+            QuantStrategyLab/ResearchSignalContextPipelines \
+            theme_momentum_snapshot.yml \
+            theme-momentum-snapshot \
+            "${root}/theme-momentum"
+        )
+
+        political_events="${root}/political-events/source_events.csv"
+        political_watchlist="${root}/political-events/source_tracker.csv"
+        theme_momentum="${root}/theme-momentum/theme_momentum_snapshot.json"
+        for path in "${political_events}" "${political_watchlist}" "${theme_momentum}"; do
+          [[ -f "${path}" ]] || { echo "Expected downloaded artifact file missing: ${path}" >&2; exit 1; }
+        done
+
+        source_lineage="${root}/source_lineage.json"
+        jq -n \
+          --arg pert_run_id "${pert_run_id}" \
+          --arg pert_head_sha "${pert_head_sha}" \
+          --arg pert_artifact_id "${pert_artifact_id}" \
+          --arg events_sha256 "$(sha256sum "${political_events}" | cut -d' ' -f1)" \
+          --arg watchlist_sha256 "$(sha256sum "${political_watchlist}" | cut -d' ' -f1)" \
+          --arg theme_run_id "${theme_run_id}" \
+          --arg theme_head_sha "${theme_head_sha}" \
+          --arg theme_artifact_id "${theme_artifact_id}" \
+          --arg theme_sha256 "$(sha256sum "${theme_momentum}" | cut -d' ' -f1)" \
+          '{
+            political_events: {
+              repository: "QuantStrategyLab/PoliticalEventTrackingResearch",
+              workflow_run_id: $pert_run_id,
+              workflow_head_sha: $pert_head_sha,
+              artifact_id: $pert_artifact_id,
+              artifact_name: "source-event-pipeline",
+              file_name: "source_events.csv",
+              sha256: $events_sha256
+            },
+            political_watchlist: {
+              repository: "QuantStrategyLab/PoliticalEventTrackingResearch",
+              workflow_run_id: $pert_run_id,
+              workflow_head_sha: $pert_head_sha,
+              artifact_id: $pert_artifact_id,
+              artifact_name: "source-event-pipeline",
+              file_name: "source_tracker.csv",
+              sha256: $watchlist_sha256
+            },
+            theme_momentum: {
+              repository: "QuantStrategyLab/ResearchSignalContextPipelines",
+              workflow_run_id: $theme_run_id,
+              workflow_head_sha: $theme_head_sha,
+              artifact_id: $theme_artifact_id,
+              artifact_name: "theme-momentum-snapshot",
+              file_name: "theme_momentum_snapshot.json",
+              sha256: $theme_sha256
+            }
+          }' > "${source_lineage}"
+
+        {
+          echo "political_events=${political_events}"
+          echo "political_watchlist=${political_watchlist}"
+          echo "theme_momentum=${theme_momentum}"
+          echo "source_lineage=${source_lineage}"
+        } >> "${GITHUB_OUTPUT}"

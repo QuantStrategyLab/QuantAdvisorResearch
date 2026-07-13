@@ -47,8 +47,9 @@ def run_cross_repo_smoke(
     as_of: str,
     political_events: str | Path,
     political_watchlist: str | Path,
-    ai_signal: str | Path,
+    ai_signal: str | Path | None,
     theme_momentum: str | Path | None,
+    source_lineage: str | Path | None,
     work_dir: str | Path | None,
     site_url: str,
 ) -> dict[str, Any]:
@@ -84,6 +85,7 @@ def run_cross_repo_smoke(
         site_url=site_url,
         feed_title=DEFAULT_FEED_TITLE,
         recover_site_archive=False,
+        source_lineage_path=source_lineage,
     )
     report = json.loads(result.report_json.read_text(encoding="utf-8"))
     assert_report_shape(report)
@@ -106,8 +108,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--as-of", required=True)
     parser.add_argument("--political-events", required=True)
     parser.add_argument("--political-watchlist", required=True)
-    parser.add_argument("--ai-signal", required=True)
+    parser.add_argument("--ai-signal")
     parser.add_argument("--theme-momentum")
+    parser.add_argument("--source-lineage")
     parser.add_argument("--work-dir", help="Optional directory to keep smoke artifacts.")
     parser.add_argument("--site-url", default=DEFAULT_SITE_URL)
     return parser
@@ -121,6 +124,7 @@ def main(argv: list[str] | None = None) -> None:
         political_watchlist=args.political_watchlist,
         ai_signal=args.ai_signal,
         theme_momentum=args.theme_momentum,
+        source_lineage=args.source_lineage,
         work_dir=args.work_dir,
         site_url=args.site_url,
     )

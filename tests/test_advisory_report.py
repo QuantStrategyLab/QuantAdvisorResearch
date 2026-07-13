@@ -13,7 +13,7 @@ from quant_advisor_research.advisory_report import (
     primary_horizon_from_actions,
     render_markdown,
 )
-from quant_advisor_research.artifacts import write_report_manifest
+from quant_advisor_research.artifacts import sha256_file, write_report_manifest
 from quant_advisor_research.contracts import AdvisoryValidationError, validate_advisory_report
 
 
@@ -250,6 +250,80 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
     assert manifest["producer"]["git_sha"] == "abcdef1234567890"
     assert manifest["artifacts"]["json"]["sha256"]
     assert manifest["artifacts"]["markdown"]["sha256"]
+
+
+def test_report_manifest_records_verified_source_lineage(tmp_path: Path) -> None:
+    events_path = tmp_path / "source_events.csv"
+    events_path.write_text("event_id,event_date,symbol,event_type\n", encoding="utf-8")
+    report = {
+        "schema_version": "5",
+        "as_of": "2026-05-30",
+        "cadence": "weekly",
+        "mode": "model_recommendations",
+        "audience_scope": "non_personalized_model_research",
+        "source_artifacts": {"political_events": str(events_path)},
+        "summary": {},
+        "policy": {},
+    }
+    report_path = tmp_path / "advisory_report.json"
+    markdown_path = tmp_path / "advisory_report.md"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+    markdown_path.write_text("# Report\n", encoding="utf-8")
+
+    manifest_path = write_report_manifest(
+        report=report,
+        report_path=report_path,
+        markdown_path=markdown_path,
+        manifest_path=tmp_path / "manifest.json",
+        source_lineage={
+            "political_events": {
+                "repository": "QuantStrategyLab/PoliticalEventTrackingResearch",
+                "workflow_run_id": "28291739638",
+                "workflow_head_sha": "dacbd9ba726ed7b2c8ee3772723782258b54ba0c",
+                "artifact_id": "7925206614",
+                "artifact_name": "source-event-pipeline",
+                "file_name": "source_events.csv",
+                "sha256": sha256_file(events_path),
+            }
+        },
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["source_lineage"]["political_events"]["artifact_id"] == "7925206614"
+    assert manifest["source_lineage"]["political_events"]["sha256"] == sha256_file(events_path)
+
+
+def test_report_manifest_rejects_source_lineage_hash_mismatch(tmp_path: Path) -> None:
+    events_path = tmp_path / "source_events.csv"
+    events_path.write_text("event_id,event_date,symbol,event_type\n", encoding="utf-8")
+    report_path = tmp_path / "advisory_report.json"
+    markdown_path = tmp_path / "advisory_report.md"
+    report_path.write_text("{}\n", encoding="utf-8")
+    markdown_path.write_text("# Report\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="source lineage sha256 mismatch"):
+        write_report_manifest(
+            report={
+                "schema_version": "5",
+                "as_of": "2026-05-30",
+                "cadence": "weekly",
+                "source_artifacts": {"political_events": str(events_path)},
+            },
+            report_path=report_path,
+            markdown_path=markdown_path,
+            manifest_path=tmp_path / "manifest.json",
+            source_lineage={
+                "political_events": {
+                    "repository": "QuantStrategyLab/PoliticalEventTrackingResearch",
+                    "workflow_run_id": "28291739638",
+                    "workflow_head_sha": "dacbd9ba726ed7b2c8ee3772723782258b54ba0c",
+                    "artifact_id": "7925206614",
+                    "artifact_name": "source-event-pipeline",
+                    "file_name": "source_events.csv",
+                    "sha256": "0" * 64,
+                }
+            },
+        )
 
 
 def test_theme_bias_can_lift_static_watchlist_item_without_direct_symbol_bias(tmp_path: Path) -> None:

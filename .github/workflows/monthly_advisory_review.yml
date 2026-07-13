@@ -12,26 +12,6 @@ on:
         required: false
         default: ""
         type: string
-      political_events_path:
-        description: "Path inside PoliticalEventTrackingResearch."
-        required: false
-        default: "data/live/political_events.csv"
-        type: string
-      political_watchlist_path:
-        description: "Path inside PoliticalEventTrackingResearch."
-        required: false
-        default: "data/live/political_watchlist.csv"
-        type: string
-      ai_signal_path:
-        description: "Path inside ResearchSignalContextPipelines."
-        required: false
-        default: "data/output/latest_signal.json"
-        type: string
-      theme_momentum_path:
-        description: "Optional path inside ResearchSignalContextPipelines. Empty disables theme momentum context."
-        required: false
-        default: "data/output/theme_momentum_snapshot.json"
-        type: string
       market_confirmation_path:
         description: "Optional market confirmation CSV path inside advisor repository. Empty disables this input."
         required: false
@@ -66,16 +46,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           path: advisor
-      - name: Checkout political event repository
-        uses: actions/checkout@v6
+      - name: Download verified upstream artifacts
+        id: upstream
+        uses: ./advisor/.github/actions/download-upstream-artifacts
         with:
-          repository: QuantStrategyLab/PoliticalEventTrackingResearch
-          path: political-events
-      - name: Checkout signal context repository
-        uses: actions/checkout@v6
-        with:
-          repository: QuantStrategyLab/ResearchSignalContextPipelines
-          path: research-signal-context
+          token: ${{ secrets.QSL_REPO_SYNC_TOKEN }}
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
@@ -95,10 +70,10 @@ jobs:
         env:
           INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
           PREVIOUS_REPORT_PATH: ${{ github.event.inputs.previous_report_path || '' }}
-          POLITICAL_EVENTS_PATH: ${{ github.event.inputs.political_events_path || 'data/live/political_events.csv' }}
-          POLITICAL_WATCHLIST_PATH: ${{ github.event.inputs.political_watchlist_path || 'data/live/political_watchlist.csv' }}
-          AI_SIGNAL_PATH: ${{ github.event.inputs.ai_signal_path || 'data/output/latest_signal.json' }}
-          THEME_MOMENTUM_PATH: ${{ github.event.inputs.theme_momentum_path || 'data/output/theme_momentum_snapshot.json' }}
+          POLITICAL_EVENTS_PATH: ${{ steps.upstream.outputs.political_events }}
+          POLITICAL_WATCHLIST_PATH: ${{ steps.upstream.outputs.political_watchlist }}
+          THEME_MOMENTUM_PATH: ${{ steps.upstream.outputs.theme_momentum }}
+          SOURCE_LINEAGE_PATH: ${{ steps.upstream.outputs.source_lineage }}
           MARKET_CONFIRMATION_PATH: ${{ github.event.inputs.market_confirmation_path || '' }}
           MARKET_DATA_PROXY_URLS: ${{ github.event.inputs.market_data_proxy_urls || vars.MARKET_DATA_PROXY_URLS || '' }}
           MARKET_DATA_PROXY_POOL_URL: ${{ github.event.inputs.market_data_proxy_pool_url || vars.MARKET_DATA_PROXY_POOL_URL || '' }}
@@ -109,17 +84,15 @@ jobs:
           ARGS=(
             --as-of "${AS_OF}"
             --cadence monthly
-            --political-events "../political-events/${POLITICAL_EVENTS_PATH}"
-            --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}"
-            --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}"
+            --political-events "${POLITICAL_EVENTS_PATH}"
+            --political-watchlist "${POLITICAL_WATCHLIST_PATH}"
+            --theme-momentum "${THEME_MOMENTUM_PATH}"
+            --source-lineage "${SOURCE_LINEAGE_PATH}"
             --output-dir data/output/monthly_advisory_review
             --monthly-review
             --market-cache-dir .cache/market-data
             --recommendation-review
           )
-          if [ -n "${THEME_MOMENTUM_PATH}" ]; then
-            ARGS+=(--theme-momentum "../research-signal-context/${THEME_MOMENTUM_PATH}")
-          fi
           if [ -n "${MARKET_CONFIRMATION_PATH}" ]; then
             ARGS+=(--market-confirmation "${MARKET_CONFIRMATION_PATH}")
           fi

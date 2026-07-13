@@ -278,12 +278,25 @@ producer.repository
 producer.git_sha
 producer.github_run_id
 source_artifacts
+source_lineage.<source>.repository
+source_lineage.<source>.workflow_run_id
+source_lineage.<source>.workflow_head_sha
+source_lineage.<source>.artifact_id
+source_lineage.<source>.artifact_name
+source_lineage.<source>.file_name
+source_lineage.<source>.sha256
 summary
 artifacts.json.sha256
 artifacts.markdown.sha256
 policy
 generated_at
 ```
+
+Scheduled workflows populate `source_lineage` only from files downloaded from
+successful upstream GitHub Actions runs into `RUNNER_TEMP`. Manifest generation
+recomputes each downloaded file hash and fails if it differs from the recorded
+lineage. Optional inputs without an Actions artifact are left unavailable rather
+than being accepted from an unverified checkout.
 
 ## Source Mode
 

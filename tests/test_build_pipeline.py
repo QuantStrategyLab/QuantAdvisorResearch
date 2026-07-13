@@ -118,6 +118,7 @@ def test_cross_repo_smoke_uses_fixture_artifacts_without_network(tmp_path: Path)
         political_watchlist=example_path("political_watchlist.example.csv"),
         ai_signal=example_path("research_signal_context.example.json"),
         theme_momentum=example_path("theme_momentum_snapshot.example.json"),
+        source_lineage=None,
         work_dir=tmp_path / "smoke",
         site_url="https://example.invalid/advisor",
     )
