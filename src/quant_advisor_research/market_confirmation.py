@@ -50,6 +50,7 @@ EXCLUDED_SYMBOLS = {
     "XLE",
     "XLK",
 }
+EXTREME_RETURN_63D_THRESHOLD = 2.0
 
 
 @dataclass(frozen=True)
@@ -295,7 +296,12 @@ def compute_market_confirmation(
         volatility_21d=volatility_21d,
     )
     price_age_days = max(((requested_as_of or bars[-1].date) - bars[-1].date).days, 0)
-    confirmation_quality = "price_observed" if price_age_days <= 7 else "stale_price"
+    warnings = [item for item in (warning.split(";") if warning else []) if item]
+    if abs(return_63d) > EXTREME_RETURN_63D_THRESHOLD:
+        warnings.append("extreme_return_63d")
+    if price_age_days > 7:
+        warnings.append("stale_price")
+    confirmation_quality = "anomalous" if "extreme_return_63d" in warnings else "price_observed" if price_age_days <= 7 else "stale_price"
     return MarketConfirmationRow(
         symbol=symbol.upper(),
         as_of=bars[-1].date,
@@ -312,7 +318,7 @@ def compute_market_confirmation(
         price_observation_count=len(bars),
         price_age_days=price_age_days,
         confirmation_quality=confirmation_quality,
-        warnings=warning,
+        warnings=";".join(dict.fromkeys(warnings)),
     )
 
 

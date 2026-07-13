@@ -58,6 +58,18 @@ def test_compute_market_confirmation_uses_relative_strength_volume_drawdown_and_
     assert row.confirmation_quality == "price_observed"
 
 
+def test_extreme_return_is_marked_as_data_quality_anomaly() -> None:
+    start = dt.date(2026, 1, 1)
+    symbol_bars = make_bars(start, [100.0] * 69 + [350.0])
+    benchmark_bars = make_bars(start, [100.0] * 70)
+
+    row = compute_market_confirmation("MU", symbol_bars, benchmark_bars, data_source="unit_test")
+
+    assert row is not None
+    assert row.confirmation_quality == "anomalous"
+    assert "extreme_return_63d" in row.warnings
+
+
 def test_market_confirmation_falls_back_to_theme_momentum_without_network(tmp_path: Path) -> None:
     theme_payload = {
         "as_of": "2026-05-29",

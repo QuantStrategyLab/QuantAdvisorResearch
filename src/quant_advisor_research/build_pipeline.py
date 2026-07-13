@@ -203,6 +203,7 @@ def build_advisory_artifacts(
     site_url: str = DEFAULT_SITE_URL,
     feed_title: str = DEFAULT_FEED_TITLE,
     recover_site_archive: bool = False,
+    upstream_repo_shas: dict[str, str] | None = None,
 ) -> BuildPipelineResult:
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -253,6 +254,14 @@ def build_advisory_artifacts(
         git_sha=os.environ.get("GITHUB_SHA"),
         run_id=os.environ.get("GITHUB_RUN_ID"),
         run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"),
+        upstream_repo_shas=upstream_repo_shas,
+        input_paths={
+            "political_events": political_events_path,
+            "political_watchlist": political_watchlist_path,
+            "ai_signal": resolved_ai_signal,
+            "theme_momentum": resolved_theme_momentum,
+            "market_confirmation": market_path,
+        },
     )
 
     monthly_review_json: Path | None = None
@@ -357,6 +366,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--site-url", default=DEFAULT_SITE_URL)
     parser.add_argument("--feed-title", default=DEFAULT_FEED_TITLE)
     parser.add_argument("--recover-site-archive", action="store_true", help="Recover prior report JSONs from published site index.")
+    parser.add_argument("--upstream-repo-sha", action="append", default=[], metavar="REPO=SHA")
     return parser
 
 
@@ -388,6 +398,7 @@ def main(argv: list[str] | None = None) -> None:
         site_url=args.site_url,
         feed_title=args.feed_title,
         recover_site_archive=args.recover_site_archive,
+        upstream_repo_shas={key: value for item in args.upstream_repo_sha for key, value in [item.split("=", 1)] if key and value},
     )
     print(
         "advisory_artifacts_built "

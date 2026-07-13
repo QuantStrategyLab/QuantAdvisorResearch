@@ -270,6 +270,12 @@ policy
 generated_at
 ```
 
+`source_artifacts` also records each existing input's SHA-256, point-in-time
+`as_of`/`generated_at`/`expires_at`, and schema/header metadata. Scheduled
+workflows pass the checked-out commit SHA for each upstream repository in
+`upstream_repositories`; missing or stale context is excluded from scoring and
+reported in `summary.data_quality_warnings`.
+
 ## Source Mode
 
 `summary.source_mode` is:

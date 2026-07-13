@@ -53,6 +53,8 @@ HORIZON_WINDOWS = {
 }
 SHORT_PRIMARY_MIN_SCORE_EDGE = 0.05
 THEME_MOMENTUM_ARTIFACT_TYPE = "medium_horizon_theme_context"
+AI_SIGNAL_MAX_AGE_DAYS = 31
+THEME_MOMENTUM_MAX_AGE_DAYS = 7
 
 CADENCE_LABELS_ZH = {
     "daily": "日度",
@@ -207,6 +209,8 @@ class MarketConfirmation:
     market_score: float | None = None
     data_source: str = ""
     price_observation_count: int = 0
+    confirmation_quality: str = ""
+    warnings: str = ""
 
 
 def parse_date(value: str) -> dt.date:
@@ -263,6 +267,62 @@ def load_ai_signal(path: str | Path | None) -> dict[str, Any] | None:
     if payload.get("policy", {}).get("execution_allowed") is not False:
         raise ValueError("AI signal input must not allow execution.")
     return payload
+
+
+def input_freshness(payload: dict[str, Any], *, name: str, as_of: dt.date, max_age_days: int) -> tuple[bool, str | None]:
+    try:
+        artifact_as_of = parse_date(str(payload.get("as_of", "")))
+    except ValueError:
+        return False, f"{name}_missing_or_invalid_as_of"
+    if artifact_as_of > as_of:
+        return False, f"{name}_as_of_in_future"
+    if (as_of - artifact_as_of).days > max_age_days:
+        return False, f"{name}_stale"
+    generated_at = str(payload.get("generated_at", "")).strip()
+    if generated_at:
+        try:
+            dt.datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        except ValueError:
+            return False, f"{name}_invalid_generated_at"
+    expires_at = str(payload.get("expires_at", "")).strip()
+    if expires_at:
+        try:
+            if parse_date(expires_at[:10]) < as_of:
+                return False, f"{name}_expired"
+        except ValueError:
+            return False, f"{name}_invalid_expires_at"
+    return True, None
+
+
+def apply_input_freshness(
+    *, ai_signal: dict[str, Any] | None, theme_momentum: dict[str, Any] | None, as_of: dt.date
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, list[str]]:
+    warnings: list[str] = []
+    if ai_signal:
+        valid, warning = input_freshness(ai_signal, name="ai_signal", as_of=as_of, max_age_days=AI_SIGNAL_MAX_AGE_DAYS)
+        if not valid:
+            warnings.append(warning or "ai_signal_not_fresh")
+            ai_signal = None
+    if theme_momentum:
+        valid, warning = input_freshness(
+            theme_momentum, name="theme_momentum", as_of=as_of, max_age_days=THEME_MOMENTUM_MAX_AGE_DAYS
+        )
+        if not valid:
+            warnings.append(warning or "theme_momentum_not_fresh")
+            theme_momentum = None
+            return ai_signal, theme_momentum, warnings
+        extreme = any(
+            abs(as_float(item.get("return_3m"))) > 2.0
+            for theme in theme_momentum.get("theme_ranks", [])
+            if isinstance(theme, dict)
+            for item in theme.get("top_symbols", [])
+            if isinstance(item, dict)
+        )
+        if extreme:
+            warnings.append("theme_momentum_extreme_return_3m")
+            theme_momentum = None
+            return ai_signal, theme_momentum, warnings
+    return ai_signal, theme_momentum, warnings
 
 
 
@@ -364,6 +424,8 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
             market_score=as_float(row.get("market_score")) if str(row.get("market_score", "")).strip() else None,
             data_source=str(row.get("data_source", "")),
             price_observation_count=int(as_float(row.get("price_observation_count"))),
+            confirmation_quality=str(row.get("confirmation_quality", "")),
+            warnings=str(row.get("warnings", "")),
         )
     return confirmations
 
@@ -959,6 +1021,8 @@ def market_confirmation_score(market: MarketConfirmation | None) -> float | None
         return None
     if market.data_source == "theme_momentum_fallback":
         return None
+    if market.confirmation_quality == "anomalous" or "extreme_return_63d" in market.warnings or "stale_price" in market.warnings:
+        return None
     if market.market_score is not None:
         return round(clamp(market.market_score, 0, 1), 3)
     relative_20d = clamp(market.relative_return_20d / 0.20, -1, 1)
@@ -1437,6 +1501,9 @@ def build_advisory_report(
     events = load_events(political_events_path, as_of_date)
     ai_signal = load_ai_signal(ai_signal_path)
     theme_momentum = load_theme_momentum(theme_momentum_path)
+    ai_signal, theme_momentum, freshness_warnings = apply_input_freshness(
+        ai_signal=ai_signal, theme_momentum=theme_momentum, as_of=as_of_date
+    )
     market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
@@ -1446,6 +1513,7 @@ def build_advisory_report(
         theme_momentum_path,
         market_confirmation_path,
     )
+    data_quality_warnings.extend(freshness_warnings)
 
     events_by_symbol: dict[str, list[Event]] = defaultdict(list)
     for event in events:

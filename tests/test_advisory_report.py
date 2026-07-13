@@ -34,6 +34,47 @@ def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     assert report["recommendations"]
 
 
+def test_expired_ai_signal_is_excluded_from_long_context_and_warns(tmp_path: Path) -> None:
+    signal = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    signal["expires_at"] = "2026-05-01"
+    signal_path = tmp_path / "expired_signal.json"
+    signal_path.write_text(json.dumps(signal), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=signal_path,
+    )
+
+    assert any("ai_signal_expired" in warning for warning in report["summary"]["data_quality_warnings"])
+    assert report["summary"]["long_context_available"] is False
+
+
+def test_manifest_records_input_hash_and_upstream_metadata(tmp_path: Path) -> None:
+    report_path = tmp_path / "report.json"
+    markdown_path = tmp_path / "report.md"
+    report_path.write_text("{}\n", encoding="utf-8")
+    markdown_path.write_text("# report\n", encoding="utf-8")
+    input_path = ROOT / "examples/political_events.example.csv"
+    report = {"as_of": "2026-05-30", "cadence": "weekly", "schema_version": "5", "mode": "model_recommendations"}
+
+    manifest_path = write_report_manifest(
+        report=report,
+        report_path=report_path,
+        markdown_path=markdown_path,
+        manifest_path=tmp_path / "report.manifest.json",
+        upstream_repo_shas={"QuantStrategyLab/PoliticalEventTrackingResearch": "abc123"},
+        input_paths={"political_events": input_path},
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["upstream_repositories"]["QuantStrategyLab/PoliticalEventTrackingResearch"] == "abc123"
+    assert manifest["source_artifacts"]["political_events"]["sha256"]
+    assert manifest["source_artifacts"]["political_events"]["schema"].startswith("event_id,")
+
+
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",

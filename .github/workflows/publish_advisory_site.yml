@@ -73,11 +73,13 @@ jobs:
         with:
           path: advisor
       - name: Checkout political event repository
+        id: checkout_political_events
         uses: actions/checkout@v6
         with:
           repository: QuantStrategyLab/PoliticalEventTrackingResearch
           path: political-events
       - name: Checkout signal context repository
+        id: checkout_signal_context
         uses: actions/checkout@v6
         with:
           repository: QuantStrategyLab/ResearchSignalContextPipelines
@@ -122,6 +124,8 @@ jobs:
             --cadence weekly
             --political-events "../political-events/${POLITICAL_EVENTS_PATH}"
             --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}"
+            --upstream-repo-sha "QuantStrategyLab/PoliticalEventTrackingResearch=${{ steps.checkout_political_events.outputs.commit }}"
+            --upstream-repo-sha "QuantStrategyLab/ResearchSignalContextPipelines=${{ steps.checkout_signal_context.outputs.commit }}"
             --ai-signal "../research-signal-context/${AI_SIGNAL_PATH}"
             --output-dir data/output/published
             --site-output-dir site

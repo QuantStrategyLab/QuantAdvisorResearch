@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import csv
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -37,6 +38,8 @@ def write_report_manifest(
     git_sha: str | None = None,
     run_id: str | None = None,
     run_attempt: str | None = None,
+    upstream_repo_shas: Mapping[str, str] | None = None,
+    input_paths: Mapping[str, str | Path] | None = None,
 ) -> Path:
     resolved_report = Path(report_path)
     resolved_markdown = Path(markdown_path)
@@ -59,6 +62,36 @@ def write_report_manifest(
     if run_attempt:
         version_parts.append(f"attempt-{run_attempt}")
 
+    source_artifacts = {}
+    for name, raw_path in (input_paths or {}).items():
+        if raw_path is None:
+            continue
+        path = Path(raw_path)
+        if not path.exists():
+            continue
+        metadata: dict[str, Any] = {"path": str(path), "sha256": sha256_file(path)}
+        if path.suffix.lower() == ".csv":
+            with path.open(encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                metadata["schema"] = ",".join(reader.fieldnames or [])
+                as_of_values = sorted({str(row.get("as_of", "")).strip() for row in reader if row.get("as_of")})
+                if as_of_values:
+                    metadata["as_of"] = as_of_values[-1]
+        elif path.suffix.lower() == ".json":
+            try:
+                source = json.loads(path.read_text(encoding="utf-8"))
+                metadata.update(
+                    {
+                        "as_of": source.get("as_of", ""),
+                        "generated_at": source.get("generated_at", ""),
+                        "expires_at": source.get("expires_at", ""),
+                        "schema": str(source.get("schema_version", "")),
+                    }
+                )
+            except (OSError, json.JSONDecodeError):
+                metadata["schema"] = "invalid_json"
+        source_artifacts[name] = metadata
+
     payload = {
         "manifest_type": "model_recommendation_report",
         "artifact_type": "model_recommendations",
@@ -76,7 +109,8 @@ def write_report_manifest(
             "github_run_id": run_id or "",
             "github_run_attempt": run_attempt or "",
         },
-        "source_artifacts": dict(report.get("source_artifacts") or {}),
+        "source_artifacts": source_artifacts or dict(report.get("source_artifacts") or {}),
+        "upstream_repositories": dict(upstream_repo_shas or {}),
         "summary": dict(report.get("summary") or {}),
         "artifacts": {
             "json": {

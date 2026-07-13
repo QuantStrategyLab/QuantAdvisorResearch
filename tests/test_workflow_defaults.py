@@ -23,6 +23,9 @@ def test_public_workflows_default_to_live_event_inputs() -> None:
         assert "actions/cache/restore@v5" in text
         assert "actions/cache/save@v5" in text
         assert "--market-cache-dir .cache/market-data" in text
+        assert "steps.checkout_political_events.outputs.commit" in text
+        assert "steps.checkout_signal_context.outputs.commit" in text
+        assert "--upstream-repo-sha" in text
         assert "--recommendation-review" in text
 
 
