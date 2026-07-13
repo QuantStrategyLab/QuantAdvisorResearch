@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import datetime as dt
 import json
 from pathlib import Path
 
 import pytest
 
 from quant_advisor_research.advisory_report import (
+    Event,
+    WatchlistItem,
+    accepted_entity_events,
+    build_recommendation,
     build_advisory_report,
     build_final_decisions,
     load_theme_momentum,
@@ -100,9 +105,9 @@ def test_mixed_confidence_recommendation_is_not_tier_one(tmp_path: Path) -> None
     events_path.write_text(
         "\n".join(
             [
-                "event_id,event_date,symbol,event_type,direction,confidence,source_url,notes",
-                "high-mention,2026-05-29,MIX,public_mention,bullish,high,https://example.invalid/high,high source",
-                "low-lead,2026-05-29,MIX,disclosure_buy,bullish,low,https://example.invalid/low,low source",
+                "event_id,event_date,symbol,event_type,direction,confidence,source_url,notes,entity_match_type,match_evidence,relationship_type",
+                "high-mention,2026-05-29,MIX,public_mention,bullish,high,https://example.invalid/high,high source,issuer,MIX is explicitly named,issuer",
+                "low-lead,2026-05-29,MIX,disclosure_buy,bullish,low,https://example.invalid/low,low source,issuer,MIX is explicitly named,issuer",
             ]
         )
         + "\n",
@@ -460,6 +465,110 @@ def test_source_score_does_not_use_recommendation_tier_prior() -> None:
             "recommendation_tier": "watchlist",
         }
     ) == 0.0
+
+
+def test_entity_acceptance_rejects_industry_context_from_company_source_score() -> None:
+    industry_event = Event(
+        event_id="industry-context",
+        event_date=dt.date(2026, 5, 29),
+        symbol="MSTR",
+        event_type="public_mention",
+        direction="neutral",
+        confidence="high",
+        source_url="https://www.nist.gov/example",
+        notes="Generic standards context without company evidence.",
+        entity_match_type="industry_context",
+        match_evidence="nuclear reactors",
+        relationship_type="industry_context",
+    )
+
+    assert accepted_entity_events([industry_event]) == []
+
+    recommendation = build_recommendation(
+        symbol="MSTR",
+        item=WatchlistItem(
+            symbol="MSTR",
+            name="Strategy",
+            bucket="named_mentioned",
+            research_status="watchlist",
+            thesis="Research candidate.",
+            source_url="https://example.invalid/mstr",
+        ),
+        events=[industry_event],
+        ai_signal=None,
+        as_of=dt.date(2026, 5, 30),
+    )
+
+    assert recommendation["source_confidence"] == "no_event"
+    assert recommendation["source_score"] == 0.0
+    assert recommendation["entity_evidence"][0]["accepted"] is False
+
+
+@pytest.mark.parametrize("symbol", ["MSTR", "OKLO", "PANW", "COIN"])
+def test_entity_acceptance_false_positive_fixtures_are_not_company_evidence(symbol: str) -> None:
+    event = Event(
+        event_id=f"false-positive-{symbol}",
+        event_date=dt.date(2026, 5, 29),
+        symbol=symbol,
+        event_type="public_mention",
+        direction="neutral",
+        confidence="high",
+        source_url="https://www.nist.gov/example",
+        notes="Generic policy context only.",
+        entity_match_type="industry_context",
+        match_evidence="generic industry term",
+        relationship_type="industry_context",
+    )
+
+    assert accepted_entity_events([event]) == []
+
+
+def test_entity_acceptance_allows_explicit_issuer_evidence() -> None:
+    issuer_event = Event(
+        event_id="issuer-release",
+        event_date=dt.date(2026, 5, 29),
+        symbol="COIN",
+        event_type="public_mention",
+        direction="bullish",
+        confidence="medium",
+        source_url="https://www.coinbase.com/news/example",
+        notes="Issuer release.",
+        entity_match_type="issuer",
+        match_evidence="Coinbase is named in the release.",
+        relationship_type="issuer",
+    )
+
+    assert accepted_entity_events([issuer_event]) == [issuer_event]
+
+    recommendation = build_recommendation(
+        symbol="COIN",
+        item=None,
+        events=[issuer_event],
+        ai_signal=None,
+        as_of=dt.date(2026, 5, 30),
+    )
+
+    assert recommendation["source_confidence"] == "medium"
+    assert recommendation["source_score"] > 0.0
+    assert recommendation["entity_evidence"][0]["accepted"] is True
+
+
+def test_entity_acceptance_uses_relationship_type_for_company_semantics() -> None:
+    event = Event(
+        event_id="issuer-with-preserved-match-class",
+        event_date=dt.date(2026, 5, 29),
+        symbol="COIN",
+        event_type="public_mention",
+        direction="bullish",
+        confidence="medium",
+        source_url="https://www.coinbase.com/news/example",
+        notes="Issuer release.",
+        entity_match_type="named_entity_match",
+        match_evidence="Coinbase is named in the release.",
+        relationship_type="issuer",
+    )
+
+    assert accepted_entity_events([event]) == [event]
 
 
 def test_final_decision_sections_keep_action_semantics_and_overflow() -> None:
