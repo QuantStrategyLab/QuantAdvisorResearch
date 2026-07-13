@@ -5,7 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from quant_advisor_research.advisory_report import build_advisory_report, primary_horizon_from_actions, render_markdown
+from quant_advisor_research.advisory_report import (
+    build_advisory_report,
+    build_final_decisions,
+    load_theme_momentum,
+    normalize_source_score,
+    primary_horizon_from_actions,
+    render_markdown,
+)
 from quant_advisor_research.artifacts import write_report_manifest
 from quant_advisor_research.contracts import AdvisoryValidationError, validate_advisory_report
 
@@ -307,10 +314,10 @@ def test_theme_bias_can_lift_static_watchlist_item_without_direct_symbol_bias(tm
     assert rec["rating"] == "watch"
     assert rec["evidence_score"] > 4
     assert any("主题=hbm_memory" in reason for reason in rec["reasons"])
-    assert report["summary"]["long_context_available"] is True
-    assert report["summary"]["long_context_missing_reason"] == ""
-    assert "MU" in report["summary"]["long_context_symbols"]
-    assert report["final_decisions"]["horizon_action_buckets"]["long"]["watch"][:1] == ["MU"]
+    assert report["summary"]["long_context_available"] is False
+    assert report["summary"]["long_context_missing_reason"] == "current_candidates_do_not_meet_long_context_gate"
+    assert "MU" not in report["summary"]["long_context_symbols"]
+    assert report["final_decisions"]["horizon_action_buckets"]["long"]["watch"] == []
 
 
 def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: Path) -> None:
@@ -442,4 +449,54 @@ def test_contract_rejects_final_decision_account_action_fields() -> None:
     report["final_decisions"]["recommendations"][0]["target_weight"] = 0.1
 
     with pytest.raises(AdvisoryValidationError):
+        validate_advisory_report(report)
+
+
+def test_source_score_does_not_use_recommendation_tier_prior() -> None:
+    assert normalize_source_score(
+        {
+            "evidence_score": 5,
+            "source_confidence": "no_event",
+            "recommendation_tier": "watchlist",
+        }
+    ) == 0.0
+
+
+def test_final_decision_sections_keep_action_semantics_and_overflow() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
+    )
+    decisions = build_final_decisions(
+        report["recommendations"],
+        load_theme_momentum(ROOT / "examples/theme_momentum_snapshot.example.json"),
+        max_recommendations=1,
+        max_watchlist=1,
+    )
+
+    assert all(item["action"] == "recommend" for item in decisions["recommendations"])
+    assert all(item["action"] == "watch" for item in decisions["watchlist"])
+    assert all(item["action"] == "recommend" for item in decisions["overflow_recommendations"])
+    assert decisions["overflow_recommendations"]
+    assert report["summary"]["recommendation_count"] == report["summary"]["base_recommendation_count"]
+    assert report["summary"]["final_recommendation_count"] == len(report["final_decisions"]["recommendations"])
+    assert report["summary"]["final_watchlist_count"] == len(report["final_decisions"]["watchlist"])
+
+
+def test_contract_rejects_final_decision_section_action_mismatch() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
+    )
+    report["final_decisions"]["watchlist"][0]["action"] = "recommend"
+
+    with pytest.raises(AdvisoryValidationError, match="watchlist.*action must be watch"):
         validate_advisory_report(report)
