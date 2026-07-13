@@ -286,6 +286,8 @@ def assess_context_freshness(payload: dict[str, Any] | None, *, name: str, repor
     generated_at = parse_context_datetime(payload.get("generated_at"))
     timezone = parse_context_timezone(payload.get("generated_at"))
     expires_at = parse_context_datetime(payload.get("expires_at"), date_timezone=timezone)
+    if expires_at is None and legacy_expiry_compatibility and generated_at is not None:
+        expires_at = generated_at + dt.timedelta(days=CONTEXT_FRESHNESS_MAX_AGE_DAYS[name])
     if source_as_of is None:
         return {"present": True, "valid": False, "reason": "invalid_as_of"}
     if generated_at is None or generated_local_date is None:

@@ -65,6 +65,55 @@ def test_v6_requires_explicit_time_contract_and_timezone() -> None:
     with pytest.raises(AdvisoryValidationError, match="reference_time"):
         validate_advisory_report(report)
 
+
+@pytest.mark.parametrize(
+    ("schema_version", "contract_version"),
+    [("6", "model_recommendations.v5"), ("5", "model_recommendations.v6")],
+)
+def test_schema_and_contract_versions_must_match(schema_version: str, contract_version: str) -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report["schema_version"] = schema_version
+    report["contract_version"] = contract_version
+    if schema_version == "5":
+        report.pop("reference_time")
+        report.pop("expires_at")
+        report.pop("freshness")
+    with pytest.raises(AdvisoryValidationError):
+        validate_advisory_report(report)
+
+
+def test_v5_rejects_v6_only_keys_even_without_contract_marker() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report["schema_version"] = "5"
+    report.pop("contract_version")
+    with pytest.raises(AdvisoryValidationError, match="v6-only"):
+        validate_advisory_report(report)
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda report: report["freshness"].pop("theme_momentum"),
+    lambda report: report["freshness"]["ai_signal"].update({"present": "yes"}),
+    lambda report: report["freshness"]["theme_momentum"].update({"valid": 1}),
+    lambda report: report["freshness"]["ai_signal"].update({"reason": ""}),
+])
+def test_v6_freshness_entries_are_complete_and_typed(mutation) -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    mutation(report)
+    with pytest.raises(AdvisoryValidationError):
+        validate_advisory_report(report)
+
     report = build_advisory_report(
         as_of="2026-05-30", cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",

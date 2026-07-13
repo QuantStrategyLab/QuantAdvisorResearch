@@ -121,19 +121,39 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
                 raise AdvisoryValidationError(f"missing required keys: {key}")
         if payload["contract_version"] != REPORT_CONTRACT_VERSION:
             raise AdvisoryValidationError("v6 reports must use model_recommendations.v6")
+    else:
+        if "contract_version" in payload and payload["contract_version"] != V5_REPORT_CONTRACT_VERSION:
+            raise AdvisoryValidationError("schema 5 contract_version must be model_recommendations.v5")
+        v6_only_keys = {"reference_time", "expires_at", "freshness"} & set(payload)
+        if v6_only_keys:
+            raise AdvisoryValidationError(f"schema 5 must not contain v6-only keys: {', '.join(sorted(v6_only_keys))}")
     _require_iso_date(payload["as_of"], "as_of")
     if schema_version == "6":
         _require_timezone_aware_iso_datetime(payload["generated_at"], "generated_at")
         _require_timezone_aware_iso_datetime(payload["reference_time"], "reference_time")
         _require_timezone_aware_iso_datetime(payload["expires_at"], "expires_at")
         freshness = _require_mapping(payload["freshness"], "freshness")
-        for name, item in freshness.items():
+        expected_freshness = {"ai_signal", "theme_momentum"}
+        missing_freshness = expected_freshness - set(freshness)
+        if missing_freshness:
+            raise AdvisoryValidationError(f"freshness missing entries: {', '.join(sorted(missing_freshness))}")
+        for name in expected_freshness:
+            item = freshness[name]
             if not isinstance(item, Mapping):
                 raise AdvisoryValidationError(f"freshness[{name}] must be an object")
+            if type(item.get("present")) is not bool:
+                raise AdvisoryValidationError(f"freshness[{name}].present must be boolean")
+            if type(item.get("valid")) is not bool:
+                raise AdvisoryValidationError(f"freshness[{name}].valid must be boolean")
+            reason = item.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                raise AdvisoryValidationError(f"freshness[{name}].reason must be non-empty")
             if item.get("valid") and item.get("generated_at"):
                 _require_timezone_aware_iso_datetime(item["generated_at"], f"freshness[{name}].generated_at")
             if item.get("valid") and item.get("expires_at"):
                 _require_timezone_aware_iso_datetime(item["expires_at"], f"freshness[{name}].expires_at")
+            if item.get("valid") and not all(item.get(key) for key in ("as_of", "generated_at", "expires_at")):
+                raise AdvisoryValidationError(f"freshness[{name}] valid entry missing time fields")
     else:
         _require_iso_datetime(payload["generated_at"], "generated_at")
     if payload["mode"] != "model_recommendations":
