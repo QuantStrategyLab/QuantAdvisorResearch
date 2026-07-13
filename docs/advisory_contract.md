@@ -8,6 +8,10 @@ Required top-level fields:
 schema_version: "5"
 as_of: ISO date
 generated_at: ISO datetime
+reference_time: ISO datetime used for deterministic freshness evaluation
+expires_at: ISO datetime
+freshness_status: fresh for a generated report
+freshness: object containing status and validated upstream input metadata
 mode: "model_recommendations"
 cadence: "daily" | "weekly" | "monthly"
 audience_scope: "non_personalized_model_research"

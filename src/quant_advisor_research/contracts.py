@@ -88,6 +88,10 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         "schema_version",
         "as_of",
         "generated_at",
+        "reference_time",
+        "expires_at",
+        "freshness_status",
+        "freshness",
         "mode",
         "cadence",
         "audience_scope",
@@ -104,6 +108,14 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         raise AdvisoryValidationError("schema_version must be '5'")
     _require_iso_date(payload["as_of"], "as_of")
     _require_iso_datetime(payload["generated_at"], "generated_at")
+    _require_iso_datetime(payload["reference_time"], "reference_time")
+    _require_iso_datetime(payload["expires_at"], "expires_at")
+    if payload["freshness_status"] != "fresh":
+        raise AdvisoryValidationError("freshness_status must be fresh for a generated report")
+    freshness = _require_mapping(payload["freshness"], "freshness")
+    if freshness.get("status") != payload["freshness_status"]:
+        raise AdvisoryValidationError("freshness.status must match freshness_status")
+    _require_mapping(freshness.get("inputs", {}), "freshness.inputs")
     if payload["mode"] != "model_recommendations":
         raise AdvisoryValidationError("mode must be model_recommendations")
     if payload["cadence"] not in ALLOWED_CADENCES:

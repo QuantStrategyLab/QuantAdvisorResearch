@@ -8,6 +8,7 @@ import pytest
 from quant_advisor_research.advisory_report import (
     build_advisory_report,
     build_final_decisions,
+    FreshnessError,
     load_theme_momentum,
     normalize_source_score,
     primary_horizon_from_actions,
@@ -39,6 +40,41 @@ def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     assert report["summary"]["source_mode"] == "fixture"
     assert report["summary"]["data_quality_warnings"]
     assert report["recommendations"]
+
+
+def test_report_freshness_metadata_uses_injected_reference_time() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+        theme_momentum_path=ROOT / "examples/theme_momentum_snapshot.example.json",
+    )
+
+    assert report["reference_time"] == "2026-05-30T12:00:00Z"
+    assert report["generated_at"] == report["reference_time"]
+    assert report["expires_at"] == "2026-06-06T12:00:00Z"
+    assert report["freshness_status"] == "fresh"
+
+
+def test_stale_upstream_artifact_fails_closed(tmp_path: Path) -> None:
+    ai_signal = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    ai_signal["as_of"] = "2026-05-01"
+    ai_signal["expires_at"] = "2026-05-10"
+    ai_path = tmp_path / "stale_ai_signal.json"
+    ai_path.write_text(json.dumps(ai_signal), encoding="utf-8")
+
+    with pytest.raises(FreshnessError, match="stale"):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            ai_signal_path=ai_path,
+        )
 
 
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:
@@ -176,6 +212,8 @@ def test_render_markdown_keeps_public_report_direct() -> None:
     markdown = render_markdown(report)
 
     assert "# 智慧投顾研究周度复盘 - 2026-05-30" in markdown
+    assert "- 参考时间: `2026-05-30T00:00:00Z`" in markdown
+    assert "- 数据新鲜度: `fresh`" in markdown
     assert "股票背景" in markdown
     assert "推荐理由" in markdown
     assert "主要风险" in markdown
@@ -248,6 +286,11 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
     assert manifest["contract_version"] == "model_recommendations.v5"
     assert manifest["version"] == "2026-05-30-weekly-schema-5-run-123-attempt-2"
     assert manifest["producer"]["git_sha"] == "abcdef1234567890"
+    assert manifest["as_of"] == "2026-05-30"
+    assert manifest["generated_at"] == report["generated_at"]
+    assert manifest["reference_time"] == report["reference_time"]
+    assert manifest["expires_at"] == report["expires_at"]
+    assert manifest["freshness_status"] == report["freshness_status"]
     assert manifest["artifacts"]["json"]["sha256"]
     assert manifest["artifacts"]["markdown"]["sha256"]
 

@@ -17,13 +17,25 @@ def example_path(name: str) -> Path:
 
 
 def build_fixture_report(tmp_path: Path, as_of: dt.date) -> Path:
+    ai_signal = json.loads(example_path("research_signal_context.example.json").read_text(encoding="utf-8"))
+    ai_signal["as_of"] = as_of.isoformat()
+    ai_signal["generated_at"] = f"{as_of.isoformat()}T00:00:00Z"
+    ai_signal["expires_at"] = (as_of + dt.timedelta(days=7)).isoformat()
+    ai_signal_path = tmp_path / "ai_signal.json"
+    ai_signal_path.parent.mkdir(parents=True, exist_ok=True)
+    ai_signal_path.write_text(json.dumps(ai_signal), encoding="utf-8")
+    theme_momentum = json.loads(example_path("theme_momentum_snapshot.example.json").read_text(encoding="utf-8"))
+    theme_momentum["as_of"] = as_of.isoformat()
+    theme_momentum["generated_at"] = f"{as_of.isoformat()}T00:00:00Z"
+    theme_momentum_path = tmp_path / "theme_momentum.json"
+    theme_momentum_path.write_text(json.dumps(theme_momentum), encoding="utf-8")
     result = build_advisory_artifacts(
         as_of=as_of,
         cadence="weekly",
         political_events_path=example_path("political_events.example.csv"),
         political_watchlist_path=example_path("political_watchlist.example.csv"),
-        ai_signal_path=example_path("research_signal_context.example.json"),
-        theme_momentum_path=example_path("theme_momentum_snapshot.example.json"),
+        ai_signal_path=ai_signal_path,
+        theme_momentum_path=theme_momentum_path,
         market_confirmation_path=None,
         output_dir=tmp_path / as_of.isoformat(),
         max_candidates=12,

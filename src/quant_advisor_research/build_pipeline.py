@@ -180,6 +180,7 @@ def build_advisory_artifacts(
     *,
     as_of: dt.date,
     cadence: str,
+    reference_time: str | None = None,
     political_events_path: str | Path,
     political_watchlist_path: str | Path,
     ai_signal_path: str | Path | None,
@@ -206,7 +207,7 @@ def build_advisory_artifacts(
 ) -> BuildPipelineResult:
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    resolved_theme_momentum = existing_optional_path(theme_momentum_path)
+    resolved_theme_momentum = required_path(theme_momentum_path, label="theme momentum") if theme_momentum_path else None
     resolved_ai_signal = required_path(ai_signal_path, label="ai signal") if ai_signal_path else None
 
     market_path = existing_optional_path(market_confirmation_path)
@@ -235,6 +236,7 @@ def build_advisory_artifacts(
     report = build_advisory_report(
         as_of=as_of.isoformat(),
         cadence=cadence,
+        reference_time=reference_time,
         political_events_path=political_events_path,
         political_watchlist_path=political_watchlist_path,
         ai_signal_path=resolved_ai_signal,
@@ -333,6 +335,7 @@ def build_advisory_artifacts(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build advisory report, market confirmation, optional review, and optional site.")
     parser.add_argument("--as-of", required=True, help="Report date in YYYY-MM-DD format.")
+    parser.add_argument("--reference-time", help="Reference ISO datetime used for deterministic freshness evaluation.")
     parser.add_argument("--cadence", required=True, choices=("daily", "weekly", "monthly"))
     parser.add_argument("--political-events", required=True, help="Political event CSV.")
     parser.add_argument("--political-watchlist", required=True, help="Political watchlist CSV.")
@@ -365,6 +368,7 @@ def main(argv: list[str] | None = None) -> None:
     result = build_advisory_artifacts(
         as_of=parse_date(args.as_of),
         cadence=args.cadence,
+        reference_time=args.reference_time,
         political_events_path=args.political_events,
         political_watchlist_path=args.political_watchlist,
         ai_signal_path=args.ai_signal,
