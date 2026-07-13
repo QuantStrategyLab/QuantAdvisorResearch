@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
+import quant_advisor_research.advisory_report as advisory_report_module
 from quant_advisor_research.advisory_report import (
+    FreshnessError,
     build_advisory_report,
     build_final_decisions,
     load_theme_momentum,
@@ -24,6 +26,7 @@ def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -39,12 +42,182 @@ def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     assert report["summary"]["source_mode"] == "fixture"
     assert report["summary"]["data_quality_warnings"]
     assert report["recommendations"]
+    assert report["schema_version"] == "6"
+    assert report["reference_time"] == "2026-05-30T12:00:00Z"
+    assert report["expires_at"] == "2026-06-06T12:00:00Z"
+    assert report["freshness_status"] == "fresh"
+    assert set(report["freshness"]["inputs"]) == {"ai_signal"}
+
+
+def test_stale_ai_signal_fails_closed(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload["as_of"] = "2026-05-01"
+    payload["generated_at"] = "2026-05-01T00:00:00Z"
+    payload["expires_at"] = "2026-06-30"
+    path = tmp_path / "stale-ai.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(FreshnessError, match="stale"):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            ai_signal_path=path,
+        )
+
+
+def test_intraday_expiry_fails_closed(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload["as_of"] = "2026-05-30"
+    payload["generated_at"] = "2026-05-30T00:00:00Z"
+    payload["expires_at"] = "2026-05-30T01:00:00Z"
+    path = tmp_path / "expired-ai.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(FreshnessError, match="expired"):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            ai_signal_path=path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"as_of": ""}, "as_of"),
+        ({"generated_at": ""}, "generated_at"),
+        ({"as_of": "2026-05-31"}, "future"),
+    ],
+)
+def test_invalid_or_future_ai_metadata_fails_closed(
+    tmp_path: Path,
+    changes: dict[str, str],
+    message: str,
+) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update(changes)
+    path = tmp_path / "invalid-ai.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(FreshnessError, match=message):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            ai_signal_path=path,
+        )
+
+
+def test_stale_market_confirmation_fails_closed(tmp_path: Path) -> None:
+    source = (ROOT / "examples/market_confirmation.example.csv").read_text(encoding="utf-8").splitlines()
+    header = source[0]
+    row = source[1].replace("2026-05-30", "2026-05-01", 1)
+    path = tmp_path / "stale-market.csv"
+    path.write_text(f"{header}\n{row}\n", encoding="utf-8")
+
+    with pytest.raises(FreshnessError, match="market_confirmation stale"):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            market_confirmation_path=path,
+        )
+
+
+def test_future_market_confirmation_fails_closed(tmp_path: Path) -> None:
+    source = (ROOT / "examples/market_confirmation.example.csv").read_text(encoding="utf-8").splitlines()
+    header = source[0]
+    row = source[1].replace("2026-05-30", "2026-05-31", 1)
+    path = tmp_path / "future-market.csv"
+    path.write_text(f"{header}\n{row}\n", encoding="utf-8")
+
+    with pytest.raises(FreshnessError, match="market_confirmation future"):
+        build_advisory_report(
+            as_of="2026-05-30",
+            cadence="weekly",
+            reference_time="2026-05-30T12:00:00Z",
+            political_events_path=ROOT / "examples/political_events.example.csv",
+            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+            market_confirmation_path=path,
+        )
+
+
+def test_empty_market_confirmation_is_unavailable_not_blocking(tmp_path: Path) -> None:
+    header = (ROOT / "examples/market_confirmation.example.csv").read_text(encoding="utf-8").splitlines()[0]
+    path = tmp_path / "empty-market.csv"
+    path.write_text(f"{header}\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        market_confirmation_path=path,
+    )
+
+    assert report["summary"]["market_confirmation_count"] == 0
+    assert "market_confirmation" not in report["freshness"]["inputs"]
+
+
+def test_v5_report_contract_remains_readable() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report["schema_version"] = "5"
+    for key in ("reference_time", "expires_at", "freshness_status", "freshness"):
+        report.pop(key)
+
+    validate_advisory_report(report)
+
+
+def test_v6_report_contract_requires_freshness_fields() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report.pop("freshness")
+
+    with pytest.raises(AdvisoryValidationError, match="freshness"):
+        validate_advisory_report(report)
+
+
+def test_omitted_reference_time_uses_actual_generation_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(advisory_report_module, "utc_now_iso", lambda: "2026-05-30T12:34:56Z")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+
+    assert report["generated_at"] == "2026-05-30T12:34:56Z"
+    assert report["reference_time"] == report["generated_at"]
 
 
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="daily",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -60,6 +233,7 @@ def test_ai_avoid_bias_defers_research_item() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="monthly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -74,6 +248,7 @@ def test_high_evidence_events_generate_recommendations_with_horizon() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -123,6 +298,7 @@ def test_mixed_confidence_recommendation_is_not_tier_one(tmp_path: Path) -> None
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=events_path,
         political_watchlist_path=watchlist_path,
     )
@@ -137,6 +313,7 @@ def test_long_horizon_window_is_measured_in_years() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -153,6 +330,7 @@ def test_contract_rejects_execution_enabled_report() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -167,6 +345,7 @@ def test_render_markdown_keeps_public_report_direct() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -194,6 +373,7 @@ def test_contract_rejects_account_action_fields() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -208,6 +388,7 @@ def test_contract_rejects_theme_candidate_account_action_fields() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -223,6 +404,7 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -245,9 +427,13 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["manifest_type"] == "model_recommendation_report"
-    assert manifest["contract_version"] == "model_recommendations.v5"
-    assert manifest["version"] == "2026-05-30-weekly-schema-5-run-123-attempt-2"
+    assert manifest["contract_version"] == "model_recommendations.v6"
+    assert manifest["version"] == "2026-05-30-weekly-schema-6-run-123-attempt-2"
     assert manifest["producer"]["git_sha"] == "abcdef1234567890"
+    assert manifest["generated_at"] == report["generated_at"]
+    assert manifest["reference_time"] == report["reference_time"]
+    assert manifest["expires_at"] == report["expires_at"]
+    assert manifest["freshness_status"] == report["freshness_status"]
     assert manifest["artifacts"]["json"]["sha256"]
     assert manifest["artifacts"]["markdown"]["sha256"]
 
@@ -304,6 +490,7 @@ def test_theme_bias_can_lift_static_watchlist_item_without_direct_symbol_bias(tm
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=events_path,
         political_watchlist_path=watchlist_path,
         ai_signal_path=ai_signal_path,
@@ -342,12 +529,14 @@ def test_theme_momentum_snapshot_is_display_context_not_rating_input(tmp_path: P
     report_without_theme = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=events_path,
         political_watchlist_path=watchlist_path,
     )
     report_with_theme = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=events_path,
         political_watchlist_path=watchlist_path,
         theme_momentum_path=theme_momentum_path,
@@ -397,6 +586,7 @@ def test_market_confirmation_is_optional_audit_input_not_public_copy() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -441,6 +631,7 @@ def test_contract_rejects_final_decision_account_action_fields() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -466,6 +657,7 @@ def test_final_decision_sections_keep_action_semantics_and_overflow() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -491,6 +683,7 @@ def test_contract_rejects_final_decision_section_action_mismatch() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",

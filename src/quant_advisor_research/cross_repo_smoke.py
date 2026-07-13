@@ -45,6 +45,7 @@ def assert_site_shape(site_dir: Path, report_json: Path) -> None:
 def run_cross_repo_smoke(
     *,
     as_of: str,
+    reference_time: str | None,
     political_events: str | Path,
     political_watchlist: str | Path,
     ai_signal: str | Path,
@@ -64,6 +65,7 @@ def run_cross_repo_smoke(
     result = build_advisory_artifacts(
         as_of=parse_date(as_of),
         cadence="weekly",
+        reference_time=reference_time,
         political_events_path=political_events,
         political_watchlist_path=political_watchlist,
         ai_signal_path=ai_signal,
@@ -104,6 +106,7 @@ def run_cross_repo_smoke(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a deterministic cross-repository smoke test for advisory publishing.")
     parser.add_argument("--as-of", required=True)
+    parser.add_argument("--reference-time", help="UTC ISO datetime used for point-in-time freshness evaluation.")
     parser.add_argument("--political-events", required=True)
     parser.add_argument("--political-watchlist", required=True)
     parser.add_argument("--ai-signal", required=True)
@@ -117,6 +120,7 @@ def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
     run_cross_repo_smoke(
         as_of=args.as_of,
+        reference_time=args.reference_time,
         political_events=args.political_events,
         political_watchlist=args.political_watchlist,
         ai_signal=args.ai_signal,

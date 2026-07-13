@@ -105,9 +105,11 @@ jobs:
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
+          REFERENCE_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           mkdir -p .cache/market-data
           ARGS=(
             --as-of "${AS_OF}"
+            --reference-time "${REFERENCE_TIME}"
             --cadence monthly
             --political-events "../political-events/${POLITICAL_EVENTS_PATH}"
             --political-watchlist "../political-events/${POLITICAL_WATCHLIST_PATH}"

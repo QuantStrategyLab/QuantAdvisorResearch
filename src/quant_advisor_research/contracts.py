@@ -11,7 +11,8 @@ class AdvisoryValidationError(ValueError):
 
 ALLOWED_CADENCES = frozenset({"daily", "weekly", "monthly"})
 SOURCE_PROJECT = "QuantAdvisorResearch"
-REPORT_CONTRACT_VERSION = "model_recommendations.v5"
+REPORT_CONTRACT_VERSION = "model_recommendations.v6"
+REPORT_CONTRACT_VERSIONS = {"5": "model_recommendations.v5", "6": REPORT_CONTRACT_VERSION}
 ALLOWED_RECOMMENDATION_RATINGS = frozenset({"recommend", "watch", "verify_source", "defer", "monitor"})
 ALLOWED_RECOMMENDATION_TIERS = frozenset({"tier_1", "tier_2", "watchlist", "source_check", "defer", "monitor"})
 ALLOWED_HORIZONS = frozenset({"short", "medium", "long", "not_applicable"})
@@ -76,6 +77,25 @@ def _require_iso_datetime(value: Any, name: str) -> None:
         raise AdvisoryValidationError(f"{name} must be an ISO datetime") from exc
 
 
+def _require_timezone_aware_datetime(value: Any, name: str) -> None:
+    text = _require_string(value, name)
+    normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = dt.datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise AdvisoryValidationError(f"{name} must be an ISO datetime") from exc
+    if parsed.tzinfo is None:
+        raise AdvisoryValidationError(f"{name} must include a timezone")
+
+
+def report_contract_version(schema_version: Any) -> str:
+    version = str(schema_version)
+    try:
+        return REPORT_CONTRACT_VERSIONS[version]
+    except KeyError as exc:
+        raise AdvisoryValidationError("schema_version must be '5' or '6'") from exc
+
+
 def _require_number_0_1(value: Any, name: str) -> None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise AdvisoryValidationError(f"{name} must be numeric")
@@ -100,10 +120,24 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     if missing:
         raise AdvisoryValidationError(f"missing required keys: {', '.join(missing)}")
 
-    if payload["schema_version"] != "5":
-        raise AdvisoryValidationError("schema_version must be '5'")
+    schema_version = str(payload["schema_version"])
+    report_contract_version(schema_version)
     _require_iso_date(payload["as_of"], "as_of")
     _require_iso_datetime(payload["generated_at"], "generated_at")
+    if schema_version == "6":
+        freshness_required = ("reference_time", "expires_at", "freshness_status", "freshness")
+        freshness_missing = [key for key in freshness_required if key not in payload]
+        if freshness_missing:
+            raise AdvisoryValidationError(f"missing required keys: {', '.join(freshness_missing)}")
+        _require_timezone_aware_datetime(payload["generated_at"], "generated_at")
+        _require_timezone_aware_datetime(payload["reference_time"], "reference_time")
+        _require_timezone_aware_datetime(payload["expires_at"], "expires_at")
+        if payload["freshness_status"] != "fresh":
+            raise AdvisoryValidationError("freshness_status must be fresh for a generated report")
+        freshness = _require_mapping(payload["freshness"], "freshness")
+        if freshness.get("status") != payload["freshness_status"]:
+            raise AdvisoryValidationError("freshness.status must match freshness_status")
+        _require_mapping(freshness.get("inputs", {}), "freshness.inputs")
     if payload["mode"] != "model_recommendations":
         raise AdvisoryValidationError("mode must be model_recommendations")
     if payload["cadence"] not in ALLOWED_CADENCES:

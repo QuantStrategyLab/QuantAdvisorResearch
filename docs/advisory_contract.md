@@ -270,9 +270,13 @@ Required manifest fields:
 ```text
 manifest_type = model_recommendation_report
 artifact_type = model_recommendations
-contract_version = model_recommendations.v5
-schema_version = 5
-version = <as_of>-<cadence>-schema-5-<run-or-sha>
+contract_version = model_recommendations.v6
+schema_version = 6
+version = <as_of>-<cadence>-schema-6-<run-or-sha>
+reference_time
+expires_at
+freshness_status
+freshness.inputs
 source_project = QuantAdvisorResearch
 producer.repository
 producer.git_sha
@@ -284,6 +288,8 @@ artifacts.markdown.sha256
 policy
 generated_at
 ```
+
+Schema v5 reports remain readable for archive and publishing compatibility. New reports use v6; `generated_at` is the actual generation time, while `reference_time` is the explicit point-in-time freshness cutoff shared by the report and manifest.
 
 ## Source Mode
 

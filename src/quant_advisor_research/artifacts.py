@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from .contracts import REPORT_CONTRACT_VERSION, SOURCE_PROJECT
+from .contracts import SOURCE_PROJECT, report_contract_version
 
 
 def sha256_file(path: str | Path) -> str:
@@ -62,12 +61,16 @@ def write_report_manifest(
     payload = {
         "manifest_type": "model_recommendation_report",
         "artifact_type": "model_recommendations",
-        "contract_version": REPORT_CONTRACT_VERSION,
+        "contract_version": report_contract_version(report.get("schema_version")),
         "schema_version": str(report.get("schema_version") or ""),
         "version": "-".join(version_parts),
         "mode": str(report.get("mode") or ""),
         "cadence": str(report.get("cadence") or ""),
         "as_of": str(report.get("as_of") or ""),
+        "reference_time": str(report.get("reference_time") or ""),
+        "expires_at": str(report.get("expires_at") or ""),
+        "freshness_status": str(report.get("freshness_status") or ""),
+        "freshness": dict(report.get("freshness") or {}),
         "audience_scope": str(report.get("audience_scope") or ""),
         "source_project": SOURCE_PROJECT,
         "producer": {
@@ -89,6 +92,6 @@ def write_report_manifest(
             },
         },
         "policy": dict(report.get("policy") or {}),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": str(report.get("generated_at") or ""),
     }
     return write_json(manifest_path, payload)

@@ -6,6 +6,7 @@ from pathlib import Path
 from quant_advisor_research.advisory_report import build_advisory_report, write_json
 from quant_advisor_research.publisher import (
     publish_reports,
+    report_content_fingerprint,
     render_archive_html,
     render_feed_xml,
     render_index_html,
@@ -22,6 +23,7 @@ def build_sample_report() -> dict:
     return build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
@@ -153,6 +155,18 @@ def test_unique_report_paths_by_content_keeps_first_duplicate_report(tmp_path: P
     assert reports == [current_path, older_path]
 
 
+def test_report_content_fingerprint_ignores_freshness_runtime_metadata() -> None:
+    first = build_sample_report()
+    second = deepcopy(first)
+    second["generated_at"] = "2026-05-30T13:00:00Z"
+    second["schema_version"] = "5"
+    second["reference_time"] = "2026-05-30T13:00:00Z"
+    second["expires_at"] = "2026-06-06T13:00:00Z"
+    second["freshness"] = {"status": "fresh", "inputs": {"ai_signal": {"generated_at": "later"}}}
+
+    assert report_content_fingerprint(first) == report_content_fingerprint(second)
+
+
 def test_index_limits_recent_history_and_archive_keeps_all_reports() -> None:
     base = build_sample_report()
     reports = [make_report_for_date(base, f"2026-05-{day:02d}") for day in range(1, 23)]
@@ -194,6 +208,7 @@ def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_pat
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=political_events,
         political_watchlist_path=political_watchlist,
         ai_signal_path=ai_signal,
@@ -365,6 +380,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",

@@ -53,6 +53,8 @@ HORIZON_WINDOWS = {
 }
 SHORT_PRIMARY_MIN_SCORE_EDGE = 0.05
 THEME_MOMENTUM_ARTIFACT_TYPE = "medium_horizon_theme_context"
+UPSTREAM_MAX_LAG_DAYS = 7
+REPORT_TTL_DAYS = 7
 
 CADENCE_LABELS_ZH = {
     "daily": "日度",
@@ -209,12 +211,82 @@ class MarketConfirmation:
     price_observation_count: int = 0
 
 
+class FreshnessError(ValueError):
+    """Raised when an upstream artifact cannot support the requested point in time."""
+
+
 def parse_date(value: str) -> dt.date:
     return dt.date.fromisoformat(value.strip())
 
 
 def utc_now_iso() -> str:
     return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_utc_datetime(value: str, *, name: str) -> dt.datetime:
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = dt.datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise FreshnessError(f"{name} must be an ISO datetime") from exc
+    if parsed.tzinfo is None:
+        raise FreshnessError(f"{name} must include a timezone")
+    return parsed.astimezone(dt.UTC)
+
+
+def iso_datetime(value: dt.datetime) -> str:
+    return value.astimezone(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def validate_upstream_freshness(
+    name: str,
+    payload: dict[str, Any],
+    *,
+    as_of: dt.date,
+    reference_time: dt.datetime,
+) -> dict[str, str]:
+    raw_as_of = str(payload.get("as_of") or "").strip()
+    try:
+        artifact_as_of = parse_date(raw_as_of)
+    except ValueError as exc:
+        raise FreshnessError(f"{name} invalid: missing or invalid as_of") from exc
+    raw_generated_at = str(payload.get("generated_at") or "").strip()
+    if not raw_generated_at:
+        raise FreshnessError(f"{name} invalid: missing generated_at")
+    try:
+        artifact_generated_at = parse_utc_datetime(raw_generated_at, name=f"{name}.generated_at")
+    except FreshnessError as exc:
+        raise FreshnessError(f"{name} invalid: generated_at") from exc
+    if artifact_as_of > as_of or artifact_generated_at > reference_time:
+        raise FreshnessError(f"{name} invalid: artifact is from the future")
+    if (as_of - artifact_as_of).days > UPSTREAM_MAX_LAG_DAYS:
+        raise FreshnessError(f"{name} stale: as_of={artifact_as_of.isoformat()}")
+
+    raw_expires_at = str(payload.get("expires_at") or "").strip()
+    if raw_expires_at:
+        if len(raw_expires_at) == 10:
+            try:
+                expires_date = parse_date(raw_expires_at)
+            except ValueError as exc:
+                raise FreshnessError(f"{name} invalid: expires_at") from exc
+            if reference_time.date() > expires_date:
+                raise FreshnessError(f"{name} expired: expires_at={raw_expires_at}")
+        else:
+            try:
+                expires_at = parse_utc_datetime(raw_expires_at, name=f"{name}.expires_at")
+            except FreshnessError as exc:
+                raise FreshnessError(f"{name} invalid: expires_at") from exc
+            if reference_time >= expires_at:
+                raise FreshnessError(f"{name} expired: expires_at={raw_expires_at}")
+
+    return {
+        "status": "fresh",
+        "as_of": artifact_as_of.isoformat(),
+        "generated_at": iso_datetime(artifact_generated_at),
+        "expires_at": raw_expires_at,
+    }
 
 
 def load_events(path: str | Path, as_of: dt.date) -> list[Event]:
@@ -346,7 +418,7 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
             continue
         row_as_of = optional_date(row.get("as_of"))
         if row_as_of and row_as_of > as_of:
-            continue
+            raise FreshnessError(f"market_confirmation future: as_of={row_as_of.isoformat()}")
         current = confirmations.get(symbol)
         if current and current.as_of and row_as_of and row_as_of < current.as_of:
             continue
@@ -366,6 +438,28 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
             price_observation_count=int(as_float(row.get("price_observation_count"))),
         )
     return confirmations
+
+
+def validate_market_confirmation_freshness(
+    confirmations: dict[str, MarketConfirmation],
+    *,
+    as_of: dt.date,
+) -> dict[str, Any] | None:
+    if not confirmations:
+        return None
+    dates: list[dt.date] = []
+    for symbol, confirmation in confirmations.items():
+        if confirmation.as_of is None:
+            raise FreshnessError(f"market_confirmation invalid: missing as_of for {symbol}")
+        if (as_of - confirmation.as_of).days > UPSTREAM_MAX_LAG_DAYS:
+            raise FreshnessError(f"market_confirmation stale: as_of={confirmation.as_of.isoformat()}")
+        dates.append(confirmation.as_of)
+    return {
+        "status": "fresh",
+        "symbol_count": len(confirmations),
+        "as_of_min": min(dates).isoformat(),
+        "as_of_max": max(dates).isoformat(),
+    }
 
 
 def display_number(value: Any, *, digits: int = 2) -> str:
@@ -1421,6 +1515,7 @@ def build_advisory_report(
     *,
     as_of: str,
     cadence: str,
+    reference_time: str | None = None,
     political_events_path: str | Path,
     political_watchlist_path: str | Path,
     ai_signal_path: str | Path | None = None,
@@ -1431,11 +1526,25 @@ def build_advisory_report(
     if cadence not in ALLOWED_CADENCES:
         raise ValueError(f"cadence must be one of: {', '.join(sorted(ALLOWED_CADENCES))}")
     as_of_date = parse_date(as_of)
+    generated_at = utc_now_iso()
+    reference_datetime = parse_utc_datetime(reference_time or generated_at, name="reference_time")
     watchlist = load_watchlist(political_watchlist_path)
     events = load_events(political_events_path, as_of_date)
     ai_signal = load_ai_signal(ai_signal_path)
     theme_momentum = load_theme_momentum(theme_momentum_path)
     market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
+    market_freshness = validate_market_confirmation_freshness(market_confirmations, as_of=as_of_date)
+    freshness_inputs: dict[str, dict[str, str]] = {}
+    if ai_signal is not None:
+        freshness_inputs["ai_signal"] = validate_upstream_freshness(
+            "ai_signal", ai_signal, as_of=as_of_date, reference_time=reference_datetime
+        )
+    if theme_momentum is not None:
+        freshness_inputs["theme_momentum"] = validate_upstream_freshness(
+            "theme_momentum", theme_momentum, as_of=as_of_date, reference_time=reference_datetime
+        )
+    if market_freshness is not None:
+        freshness_inputs["market_confirmation"] = market_freshness
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
         political_events_path,
@@ -1472,9 +1581,13 @@ def build_advisory_report(
     long_context_symbols = long_context_symbols_from_decisions(final_decisions)
 
     report = {
-        "schema_version": "5",
+        "schema_version": "6",
         "as_of": as_of_date.isoformat(),
-        "generated_at": utc_now_iso(),
+        "generated_at": generated_at,
+        "reference_time": iso_datetime(reference_datetime),
+        "expires_at": iso_datetime(reference_datetime + dt.timedelta(days=REPORT_TTL_DAYS)),
+        "freshness_status": "fresh",
+        "freshness": {"status": "fresh", "inputs": freshness_inputs},
         "mode": "model_recommendations",
         "cadence": cadence,
         "audience_scope": "non_personalized_model_research",
@@ -1538,6 +1651,16 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"# 智慧投顾研究{cadence_label}复盘 - {report['as_of']}",
         "",
     ]
+    if report.get("freshness_status"):
+        lines.extend(
+            [
+                f"- 生成时间: `{report.get('generated_at', '')}`",
+                f"- 参考时间: `{report.get('reference_time', '')}`",
+                f"- 过期时间: `{report.get('expires_at', '')}`",
+                f"- 数据新鲜度: `{report.get('freshness_status', '')}`",
+                "",
+            ]
+        )
     final_decisions = report.get("final_decisions", {})
     if final_decisions:
         horizon_buckets = final_decisions.get("horizon_buckets", {})
@@ -1650,6 +1773,7 @@ def write_text(path: str | Path, content: str) -> None:
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build an intelligent advisory research report.")
     parser.add_argument("--as-of", required=True, help="Report date in YYYY-MM-DD format.")
+    parser.add_argument("--reference-time", help="UTC ISO datetime used for point-in-time freshness evaluation.")
     parser.add_argument("--cadence", required=True, choices=sorted(ALLOWED_CADENCES))
     parser.add_argument("--political-events", required=True, help="Political event CSV.")
     parser.add_argument("--political-watchlist", required=True, help="Political watchlist CSV.")
@@ -1668,6 +1792,7 @@ def main(argv: list[str] | None = None) -> None:
     report = build_advisory_report(
         as_of=args.as_of,
         cadence=args.cadence,
+        reference_time=args.reference_time,
         political_events_path=args.political_events,
         political_watchlist_path=args.political_watchlist,
         ai_signal_path=args.ai_signal,
