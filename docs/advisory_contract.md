@@ -154,6 +154,7 @@ list while preserving audit details in JSON:
 ```text
 recommendations[]
 watchlist[]
+overflow_recommendations[]
 horizon_buckets.short | medium | long
 horizon_rankings.short | medium | long
 horizon_action_buckets.short | medium | long
@@ -176,6 +177,17 @@ prospect_summary
 why_selected[]
 risk_summary
 ```
+
+Section semantics are strict: `recommendations[]` and
+`overflow_recommendations[]` contain only items with `action = "recommend"`;
+`watchlist[]` contains only items with `action = "watch"`.
+`overflow_recommendations[]` preserves valid recommendations outside the public
+top-N list without relabeling them as watchlist items.
+
+For compatibility, `summary.recommendation_count` remains the base-layer
+`recommendations[]` count. The final layer separately reports
+`base_recommendation_count`, `final_recommendation_count`,
+`final_watchlist_count`, and `final_overflow_recommendation_count`.
 
 Scoring and gate intent by horizon:
 

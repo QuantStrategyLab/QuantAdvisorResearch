@@ -198,7 +198,12 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
 
     if "final_decisions" in payload:
         final_decisions = _require_mapping(payload["final_decisions"], "final_decisions")
-        for section in ("recommendations", "watchlist"):
+        section_actions = {
+            "recommendations": "recommend",
+            "watchlist": "watch",
+            "overflow_recommendations": "recommend",
+        }
+        for section, expected_action in section_actions.items():
             for index, pick in enumerate(_require_sequence(final_decisions.get(section, []), f"final_decisions.{section}")):
                 item = _require_mapping(pick, f"final_decisions.{section}[{index}]")
                 account_keys = sorted(DISALLOWED_ACCOUNT_ACTION_KEYS & set(item))
@@ -207,6 +212,10 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
                         f"final_decisions.{section}[{index}] contains account-action fields: {', '.join(account_keys)}"
                     )
                 _require_string(item.get("symbol"), f"final_decisions.{section}[{index}].symbol")
+                if item.get("action") != expected_action:
+                    raise AdvisoryValidationError(
+                        f"final_decisions.{section}[{index}].action must be {expected_action}"
+                    )
                 if "horizon_scores" in item:
                     horizon_scores = _require_mapping(
                         item["horizon_scores"], f"final_decisions.{section}[{index}].horizon_scores"

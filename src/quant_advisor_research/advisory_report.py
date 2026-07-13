@@ -886,18 +886,12 @@ def normalize_source_score(rec: dict[str, Any] | None) -> float:
         "unknown": 0.1,
         "no_event": 0.0,
     }
-    tier_scores = {
-        "tier_1": 1.0,
-        "tier_2": 0.85,
-        "watchlist": 0.6,
-        "source_check": 0.25,
-        "defer": 0.0,
-        "monitor": 0.0,
-    }
+    if str(rec.get("source_confidence", "")) == "no_event":
+        return 0.0
     evidence_component = clamp(as_float(rec.get("evidence_score")) / 18, 0, 1)
     confidence_component = confidence_scores.get(str(rec.get("source_confidence", "")), 0.0)
     blended = evidence_component * 0.65 + confidence_component * 0.35
-    return round(max(blended, tier_scores.get(str(rec.get("recommendation_tier", "")), 0.0)), 3)
+    return round(blended, 3)
 
 
 def theme_symbol_context(theme_momentum: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -1328,10 +1322,13 @@ def build_final_decisions(
     recommendation_candidates = [item for item in picks if item["action"] == "recommend"]
     recommendations_out = recommendation_candidates[:max_recommendations]
     recommendation_symbols = {item["symbol"] for item in recommendations_out}
+    overflow_recommendations = [
+        item for item in recommendation_candidates if item["symbol"] not in recommendation_symbols
+    ]
     watchlist_out = [
         item
         for item in picks
-        if item["action"] == "watch" or (item["action"] == "recommend" and item["symbol"] not in recommendation_symbols)
+        if item["action"] == "watch"
     ][:max_watchlist]
     horizon_buckets = {
         horizon: [item["symbol"] for item in recommendations_out if item.get("primary_horizon") == horizon]
@@ -1373,6 +1370,7 @@ def build_final_decisions(
         "method": "Final recommendation blend for model scoring.",
         "recommendations": recommendations_out,
         "watchlist": watchlist_out,
+        "overflow_recommendations": overflow_recommendations,
         "horizon_buckets": horizon_buckets,
         "horizon_rankings": horizon_rankings,
         "horizon_action_buckets": horizon_action_buckets,
@@ -1488,7 +1486,12 @@ def build_advisory_report(
             "market_confirmation": str(market_confirmation_path) if market_confirmation_path else "",
         },
         "summary": {
+            # Keep recommendation_count as the historical base-layer count.
             "recommendation_count": len(recommendations),
+            "base_recommendation_count": len(recommendations),
+            "final_recommendation_count": len(final_decisions["recommendations"]),
+            "final_watchlist_count": len(final_decisions["watchlist"]),
+            "final_overflow_recommendation_count": len(final_decisions["overflow_recommendations"]),
             "candidate_universe_count": len(all_recommendations),
             "source_event_count": len(events),
             "ai_regime": ai_signal.get("regime", "not_available") if ai_signal else "not_available",
