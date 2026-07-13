@@ -68,6 +68,34 @@ def test_legacy_market_confirmation_without_quality_metadata_cannot_score(tmp_pa
     )
 
     assert report["final_decisions"]["recommendations"] == []
+    assert any("market_confirmation_excluded:MU:missing_quality_metadata" in warning for warning in report["summary"]["data_quality_warnings"])
+
+
+def test_invalid_theme_top_symbols_fails_closed_with_warning(tmp_path: Path) -> None:
+    theme_path = tmp_path / "invalid_theme.json"
+    theme_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "as_of": "2026-05-30",
+                "generated_at": "2026-05-30T00:00:00Z",
+                "mode": "theme_momentum_snapshot",
+                "policy": {"execution_allowed": False},
+                "theme_ranks": [{"theme_id": "bad", "top_symbols": None}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        theme_momentum_path=theme_path,
+    )
+
+    assert report["theme_momentum"]["available"] is False
+    assert "theme_momentum_invalid_top_symbols" in report["summary"]["data_quality_warnings"]
 
 
 def test_manifest_records_input_hash_and_upstream_metadata(tmp_path: Path) -> None:
@@ -100,6 +128,27 @@ def test_manifest_records_input_hash_and_upstream_metadata(tmp_path: Path) -> No
     assert metadata["schema_version"] == "1"
     assert metadata["items"]["political_events"]["sha256"]
     assert metadata["items"]["political_events"]["schema"].startswith("event_id,")
+
+
+def test_manifest_records_invalid_json_metadata_without_crashing(tmp_path: Path) -> None:
+    report_path = tmp_path / "report.json"
+    markdown_path = tmp_path / "report.md"
+    report_path.write_text("{}\n", encoding="utf-8")
+    markdown_path.write_text("# report\n", encoding="utf-8")
+    invalid_shape = tmp_path / "signal.json"
+    invalid_shape.write_text("null\n", encoding="utf-8")
+
+    manifest_path = write_report_manifest(
+        report={"source_artifacts": {"ai_signal": str(invalid_shape)}},
+        report_path=report_path,
+        markdown_path=markdown_path,
+        manifest_path=tmp_path / "report.manifest.json",
+        input_paths={"ai_signal": invalid_shape},
+    )
+
+    metadata = json.loads(manifest_path.read_text(encoding="utf-8"))["source_artifacts_metadata"]["items"]["ai_signal"]
+    assert metadata["schema"] == "invalid_json"
+    assert metadata["warning"] == "invalid_json_metadata"
 
 
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:

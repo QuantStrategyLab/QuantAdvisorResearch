@@ -80,6 +80,12 @@ def write_report_manifest(
         elif path.suffix.lower() == ".json":
             try:
                 source = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(source, dict):
+                    metadata.update({"schema": "invalid_json", "warning": "invalid_json_metadata"})
+                    source = None
+                if source is None:
+                    source_artifact_metadata[name] = metadata
+                    continue
                 metadata.update(
                     {
                         "as_of": source.get("as_of", ""),

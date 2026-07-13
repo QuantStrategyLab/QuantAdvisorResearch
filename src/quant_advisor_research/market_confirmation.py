@@ -528,7 +528,10 @@ def fallback_rows_from_theme_momentum(
     for theme in theme_momentum.get("theme_ranks", []):
         if not isinstance(theme, dict):
             continue
-        for item in theme.get("top_symbols", []):
+        items = theme.get("top_symbols")
+        if not isinstance(items, list):
+            continue
+        for item in items:
             if not isinstance(item, dict) or not item.get("symbol"):
                 continue
             symbol = str(item["symbol"]).upper()
@@ -597,7 +600,10 @@ def collect_symbols(
         for theme in theme_momentum.get("theme_ranks", []):
             if not isinstance(theme, dict):
                 continue
-            for item in theme.get("top_symbols", []):
+            items = theme.get("top_symbols")
+            if not isinstance(items, list):
+                continue
+            for item in items:
                 if isinstance(item, dict) and item.get("symbol"):
                     symbols.add(str(item["symbol"]).upper())
     symbols = {symbol for symbol in symbols if symbol and symbol not in EXCLUDED_SYMBOLS}

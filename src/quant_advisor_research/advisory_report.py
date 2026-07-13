@@ -311,9 +311,21 @@ def apply_input_freshness(
             warnings.append(warning or "theme_momentum_not_fresh")
             theme_momentum = None
             return ai_signal, theme_momentum, warnings
+        theme_ranks = theme_momentum.get("theme_ranks")
+        if not isinstance(theme_ranks, list):
+            warnings.append("theme_momentum_invalid_theme_ranks")
+            theme_momentum = None
+            return ai_signal, theme_momentum, warnings
+        if any(
+            not isinstance(theme, dict) or not isinstance(theme.get("top_symbols"), list)
+            for theme in theme_ranks
+        ):
+            warnings.append("theme_momentum_invalid_top_symbols")
+            theme_momentum = None
+            return ai_signal, theme_momentum, warnings
         extreme = any(
             abs(as_float(item.get("return_3m"))) > 2.0
-            for theme in theme_momentum.get("theme_ranks", [])
+            for theme in theme_ranks
             if isinstance(theme, dict)
             for item in theme.get("top_symbols", [])
             if isinstance(item, dict)
@@ -1048,6 +1060,18 @@ def market_confirmation_score(market: MarketConfirmation | None) -> float | None
     return round(clamp(score, 0, 1), 3)
 
 
+def market_quality_warnings(confirmations: dict[str, MarketConfirmation]) -> list[str]:
+    warnings: list[str] = []
+    for symbol, market in sorted(confirmations.items()):
+        if market.confirmation_quality == "price_observed":
+            continue
+        quality = market.confirmation_quality or "missing_quality_metadata"
+        warnings.append(f"market_confirmation_excluded:{symbol}:{quality}")
+        for warning in filter(None, market.warnings.split(";")):
+            warnings.append(f"market_confirmation:{symbol}:{warning}")
+    return dedupe(warnings)
+
+
 def horizon_score_components(
     rec: dict[str, Any] | None,
     theme: dict[str, Any],
@@ -1517,6 +1541,7 @@ def build_advisory_report(
         market_confirmation_path,
     )
     data_quality_warnings.extend(freshness_warnings)
+    data_quality_warnings.extend(market_quality_warnings(market_confirmations))
 
     events_by_symbol: dict[str, list[Event]] = defaultdict(list)
     for event in events:
