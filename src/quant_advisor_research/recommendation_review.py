@@ -55,6 +55,17 @@ def first_bar_on_or_after(bars: list[PriceBar], target: dt.date) -> PriceBar | N
     return None
 
 
+def start_bar_for_report(bars: list[PriceBar], target: dt.date) -> PriceBar | None:
+    ordered = sorted(bars, key=lambda item: item.date)
+    exact = next((bar for bar in ordered if bar.date == target), None)
+    if exact:
+        return exact
+    previous = last_bar_on_or_before(ordered, target)
+    if previous and (target - previous.date).days <= MAX_START_BAR_DELAY_DAYS:
+        return previous
+    return first_bar_on_or_after(ordered, target)
+
+
 def last_bar_on_or_before(bars: list[PriceBar], target: dt.date) -> PriceBar | None:
     candidates = [bar for bar in bars if bar.date <= target]
     return max(candidates, key=lambda item: item.date) if candidates else None
@@ -72,16 +83,16 @@ def outcome_label(
     elapsed_days: int,
     has_price_data: bool,
     horizon: str,
-    trading_observations: int,
+    trading_intervals: int,
 ) -> str:
     if elapsed_days <= 0:
         return "pending"
     if not has_price_data:
         return "insufficient_price_data"
+    if trading_intervals < MIN_MATURITY_TRADING_DAYS.get(horizon, MIN_MATURITY_TRADING_DAYS["medium"]):
+        return "in_progress"
     if relative_return is None:
         return "insufficient_price_data"
-    if trading_observations < MIN_MATURITY_TRADING_DAYS.get(horizon, MIN_MATURITY_TRADING_DAYS["medium"]):
-        return "in_progress"
     if relative_return >= 0.02:
         return "outperforming"
     if relative_return <= -0.02:
@@ -123,9 +134,9 @@ def build_review_item(
     data_source: str,
 ) -> dict[str, Any]:
     symbol = str(pick.get("symbol", "")).upper()
-    start_bar = first_bar_on_or_after(symbol_bars, report_as_of)
+    start_bar = start_bar_for_report(symbol_bars, report_as_of)
     end_bar = last_bar_on_or_before(symbol_bars, review_as_of)
-    benchmark_start = first_bar_on_or_after(benchmark_bars, report_as_of)
+    benchmark_start = start_bar_for_report(benchmark_bars, report_as_of)
     benchmark_end = last_bar_on_or_before(benchmark_bars, review_as_of)
     has_price_data = bool(start_bar and end_bar and start_bar.date <= end_bar.date)
 
@@ -147,11 +158,12 @@ def build_review_item(
     elapsed_days = (review_as_of - report_as_of).days
     horizon = str(pick.get("primary_horizon", ""))
     maturity_days = MIN_MATURITY_TRADING_DAYS.get(horizon, MIN_MATURITY_TRADING_DAYS["medium"])
+    trading_intervals = max(trading_observations - 1, 0)
     if elapsed_days <= 0:
         maturity_status = "pending"
     elif not has_price_data:
         maturity_status = "insufficient_price_data"
-    elif trading_observations < maturity_days:
+    elif trading_intervals < maturity_days:
         maturity_status = "in_progress"
     else:
         maturity_status = "matured"
@@ -166,6 +178,7 @@ def build_review_item(
         "end_price_date": end_date,
         "elapsed_calendar_days": elapsed_days,
         "trading_observations": trading_observations,
+        "trading_intervals": trading_intervals,
         "maturity_required_trading_days": maturity_days,
         "maturity_status": maturity_status,
         "absolute_return": absolute_return,
@@ -176,7 +189,7 @@ def build_review_item(
             elapsed_days=elapsed_days,
             has_price_data=has_price_data,
             horizon=horizon,
-            trading_observations=trading_observations,
+            trading_intervals=trading_intervals,
         ),
         "market_data_source": data_source if has_price_data else "",
         "combined_score": pick.get("combined_score"),

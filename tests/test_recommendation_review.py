@@ -149,6 +149,38 @@ def test_review_requires_price_coverage_on_or_before_report_date(tmp_path: Path)
     assert item["outcome"] == "insufficient_price_data"
 
 
+def test_weekend_report_uses_previous_trading_close(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "market-cache"
+    trading_dates = [dt.date(2026, 1, 9), dt.date(2026, 1, 12), dt.date(2026, 1, 13)]
+    write_cached_bars("MU", [PriceBar(date=date, close=100 + index, volume=1000) for index, date in enumerate(trading_dates)], cache_dir=cache_dir)
+    write_cached_bars("SPY", [PriceBar(date=date, close=100, volume=1000) for date in trading_dates], cache_dir=cache_dir)
+    report_path = tmp_path / "advisory_report_2026-01-10.json"
+    write_report(report_path, as_of="2026-01-10", horizon="short")
+
+    review = build_recommendation_review(
+        report_paths=[report_path], as_of=dt.date(2026, 1, 20), benchmark="SPY",
+        cache_dir=cache_dir, cache_max_age_days=14, use_network=False,
+    )
+
+    assert review["review_items"][0]["start_price_date"] == "2026-01-09"
+
+
+def test_pre_maturity_item_stays_in_progress_when_benchmark_is_unavailable(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "market-cache"
+    write_cached_bars("MU", make_bars(dt.date(2026, 1, 5), [100] * 6), cache_dir=cache_dir)
+    report_path = tmp_path / "advisory_report_2026-01-05.json"
+    write_report(report_path, horizon="short")
+
+    review = build_recommendation_review(
+        report_paths=[report_path], as_of=dt.date(2026, 1, 10), benchmark="SPY",
+        cache_dir=cache_dir, cache_max_age_days=14, use_network=False,
+    )
+
+    item = review["review_items"][0]
+    assert item["maturity_status"] == "in_progress"
+    assert item["outcome"] == "in_progress"
+
+
 def test_recommendation_review_marks_same_day_report_as_pending(tmp_path: Path) -> None:
     report_path = tmp_path / "advisory_report_2026-01-05.json"
     write_report(report_path)
