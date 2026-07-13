@@ -134,22 +134,24 @@ def test_stale_market_confirmation_fails_closed(tmp_path: Path) -> None:
         )
 
 
-def test_future_market_confirmation_fails_closed(tmp_path: Path) -> None:
+def test_future_market_confirmation_rows_do_not_break_historical_selection(tmp_path: Path) -> None:
     source = (ROOT / "examples/market_confirmation.example.csv").read_text(encoding="utf-8").splitlines()
     header = source[0]
-    row = source[1].replace("2026-05-30", "2026-05-31", 1)
-    path = tmp_path / "future-market.csv"
-    path.write_text(f"{header}\n{row}\n", encoding="utf-8")
+    future_row = source[1].replace("2026-05-30", "2026-05-31", 1)
+    current_row = source[1]
+    path = tmp_path / "rolling-market.csv"
+    path.write_text(f"{header}\n{future_row}\n{current_row}\n", encoding="utf-8")
 
-    with pytest.raises(FreshnessError, match="market_confirmation future"):
-        build_advisory_report(
-            as_of="2026-05-30",
-            cadence="weekly",
-            reference_time="2026-05-30T12:00:00Z",
-            political_events_path=ROOT / "examples/political_events.example.csv",
-            political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-            market_confirmation_path=path,
-        )
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        market_confirmation_path=path,
+    )
+
+    assert report["freshness"]["inputs"]["market_confirmation"]["as_of_max"] == "2026-05-30"
 
 
 def test_empty_market_confirmation_is_unavailable_not_blocking(tmp_path: Path) -> None:
@@ -199,8 +201,26 @@ def test_v6_report_contract_requires_freshness_fields() -> None:
         validate_advisory_report(report)
 
 
+def test_v6_report_contract_requires_freshness_inputs() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        reference_time="2026-05-30T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report["freshness"].pop("inputs")
+
+    with pytest.raises(AdvisoryValidationError, match="freshness.inputs"):
+        validate_advisory_report(report)
+
+
 def test_omitted_reference_time_uses_actual_generation_time(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(advisory_report_module, "utc_now_iso", lambda: "2026-05-30T12:34:56Z")
+    monkeypatch.setattr(
+        advisory_report_module,
+        "utc_now",
+        lambda: advisory_report_module.dt.datetime.fromisoformat("2026-05-30T12:34:56.900+00:00"),
+    )
 
     report = build_advisory_report(
         as_of="2026-05-30",
@@ -211,6 +231,29 @@ def test_omitted_reference_time_uses_actual_generation_time(monkeypatch: pytest.
 
     assert report["generated_at"] == "2026-05-30T12:34:56Z"
     assert report["reference_time"] == report["generated_at"]
+
+
+def test_omitted_reference_time_preserves_subsecond_cutoff(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        advisory_report_module,
+        "utc_now",
+        lambda: advisory_report_module.dt.datetime.fromisoformat("2026-05-30T12:34:56.900+00:00"),
+    )
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload["as_of"] = "2026-05-30"
+    payload["generated_at"] = "2026-05-30T12:34:56.500Z"
+    path = tmp_path / "same-second-ai.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=path,
+    )
+
+    assert report["freshness_status"] == "fresh"
 
 
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:

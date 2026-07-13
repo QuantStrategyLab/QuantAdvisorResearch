@@ -137,7 +137,9 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         freshness = _require_mapping(payload["freshness"], "freshness")
         if freshness.get("status") != payload["freshness_status"]:
             raise AdvisoryValidationError("freshness.status must match freshness_status")
-        _require_mapping(freshness.get("inputs", {}), "freshness.inputs")
+        if "inputs" not in freshness:
+            raise AdvisoryValidationError("freshness.inputs is required")
+        _require_mapping(freshness["inputs"], "freshness.inputs")
     if payload["mode"] != "model_recommendations":
         raise AdvisoryValidationError("mode must be model_recommendations")
     if payload["cadence"] not in ALLOWED_CADENCES:

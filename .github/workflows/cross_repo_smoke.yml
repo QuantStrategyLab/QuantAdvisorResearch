@@ -7,6 +7,10 @@ on:
         description: "Smoke date. Defaults to current UTC date when empty."
         required: false
         type: string
+      reference_time:
+        description: "Optional UTC freshness cutoff for historical replay. Defaults to current UTC time."
+        required: false
+        type: string
   schedule:
     - cron: "45 11 * * 6"
 
@@ -46,10 +50,11 @@ jobs:
         working-directory: advisor
         env:
           INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
+          INPUT_REFERENCE_TIME: ${{ github.event.inputs.reference_time || '' }}
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
-          REFERENCE_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          REFERENCE_TIME="${INPUT_REFERENCE_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
           python scripts/run_cross_repo_smoke.py \
             --as-of "${AS_OF}" \
             --reference-time "${REFERENCE_TIME}" \

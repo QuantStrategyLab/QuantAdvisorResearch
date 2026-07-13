@@ -45,7 +45,7 @@ def assert_site_shape(site_dir: Path, report_json: Path) -> None:
 def run_cross_repo_smoke(
     *,
     as_of: str,
-    reference_time: str | None,
+    reference_time: str | None = None,
     political_events: str | Path,
     political_watchlist: str | Path,
     ai_signal: str | Path,

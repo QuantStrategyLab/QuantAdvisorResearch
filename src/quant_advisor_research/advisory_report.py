@@ -219,8 +219,12 @@ def parse_date(value: str) -> dt.date:
     return dt.date.fromisoformat(value.strip())
 
 
+def utc_now() -> dt.datetime:
+    return dt.datetime.now(dt.UTC)
+
+
 def utc_now_iso() -> str:
-    return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return iso_datetime(utc_now())
 
 
 def parse_utc_datetime(value: str, *, name: str) -> dt.datetime:
@@ -418,7 +422,7 @@ def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[st
             continue
         row_as_of = optional_date(row.get("as_of"))
         if row_as_of and row_as_of > as_of:
-            raise FreshnessError(f"market_confirmation future: as_of={row_as_of.isoformat()}")
+            continue
         current = confirmations.get(symbol)
         if current and current.as_of and row_as_of and row_as_of < current.as_of:
             continue
@@ -1526,8 +1530,11 @@ def build_advisory_report(
     if cadence not in ALLOWED_CADENCES:
         raise ValueError(f"cadence must be one of: {', '.join(sorted(ALLOWED_CADENCES))}")
     as_of_date = parse_date(as_of)
-    generated_at = utc_now_iso()
-    reference_datetime = parse_utc_datetime(reference_time or generated_at, name="reference_time")
+    generated_datetime = utc_now()
+    generated_at = iso_datetime(generated_datetime)
+    reference_datetime = (
+        parse_utc_datetime(reference_time, name="reference_time") if reference_time else generated_datetime
+    )
     watchlist = load_watchlist(political_watchlist_path)
     events = load_events(political_events_path, as_of_date)
     ai_signal = load_ai_signal(ai_signal_path)

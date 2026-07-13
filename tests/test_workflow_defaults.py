@@ -24,7 +24,9 @@ def test_public_workflows_default_to_live_event_inputs() -> None:
         assert "actions/cache/save@v5" in text
         assert "--market-cache-dir .cache/market-data" in text
         assert "--recommendation-review" in text
-        assert 'REFERENCE_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"' in text
+        assert "reference_time:" in text
+        assert "INPUT_REFERENCE_TIME:" in text
+        assert 'REFERENCE_TIME="${INPUT_REFERENCE_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"' in text
         assert '--reference-time "${REFERENCE_TIME}"' in text
 
 
@@ -38,5 +40,7 @@ def test_cross_repo_smoke_workflow_uses_live_artifacts_and_no_network_market_fal
     assert "data/output/latest_signal.json" in text
     assert "data/output/theme_momentum_snapshot.json" in text
     assert "scripts/run_cross_repo_smoke.py" in text
-    assert 'REFERENCE_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"' in text
+    assert "reference_time:" in text
+    assert "INPUT_REFERENCE_TIME:" in text
+    assert 'REFERENCE_TIME="${INPUT_REFERENCE_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"' in text
     assert '--reference-time "${REFERENCE_TIME}"' in text

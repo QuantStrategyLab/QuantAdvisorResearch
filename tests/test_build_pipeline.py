@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import inspect
 import json
 from pathlib import Path
 
@@ -167,3 +168,7 @@ def test_cross_repo_smoke_uses_fixture_artifacts_without_network(tmp_path: Path)
 
     assert summary["recommendation_count"] >= 1
     assert (tmp_path / "smoke" / "site" / "index.html").exists()
+
+
+def test_cross_repo_smoke_reference_time_remains_optional_for_python_callers() -> None:
+    assert inspect.signature(run_cross_repo_smoke).parameters["reference_time"].default is None

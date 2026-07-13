@@ -5,9 +5,13 @@
 Required top-level fields:
 
 ```text
-schema_version: "5"
+schema_version: "6"
 as_of: ISO date
 generated_at: ISO datetime
+reference_time: timezone-aware ISO datetime used for point-in-time freshness evaluation
+expires_at: timezone-aware ISO datetime
+freshness_status: "fresh"
+freshness: object containing status and inputs
 mode: "model_recommendations"
 cadence: "daily" | "weekly" | "monthly"
 audience_scope: "non_personalized_model_research"

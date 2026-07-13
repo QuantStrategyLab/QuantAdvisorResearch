@@ -7,6 +7,10 @@ on:
         description: "Report date. Defaults to current UTC date when empty."
         required: false
         type: string
+      reference_time:
+        description: "Optional UTC freshness cutoff for historical replay. Defaults to current UTC time."
+        required: false
+        type: string
       political_events_path:
         description: "Path inside PoliticalEventTrackingResearch."
         required: false
@@ -89,6 +93,7 @@ jobs:
         working-directory: advisor
         env:
           INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
+          INPUT_REFERENCE_TIME: ${{ github.event.inputs.reference_time || '' }}
           POLITICAL_EVENTS_PATH: ${{ github.event.inputs.political_events_path || 'data/live/political_events.csv' }}
           POLITICAL_WATCHLIST_PATH: ${{ github.event.inputs.political_watchlist_path || 'data/live/political_watchlist.csv' }}
           AI_SIGNAL_PATH: ${{ github.event.inputs.ai_signal_path || 'data/output/latest_signal.json' }}
@@ -99,7 +104,7 @@ jobs:
         run: |
           set -euo pipefail
           AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
-          REFERENCE_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          REFERENCE_TIME="${INPUT_REFERENCE_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
           mkdir -p .cache/market-data
           ARGS=(
             --as-of "${AS_OF}"
