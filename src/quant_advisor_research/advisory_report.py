@@ -254,10 +254,25 @@ def parse_context_datetime(value: Any, *, end_of_day_for_date: bool = False) -> 
         return None
 
 
+def parse_context_local_date(value: Any) -> dt.date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        if "T" not in text and " " not in text:
+            return dt.date.fromisoformat(text)
+        normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+        parsed = dt.datetime.fromisoformat(normalized)
+        return parsed.date() if parsed.tzinfo is not None else None
+    except ValueError:
+        return None
+
+
 def assess_context_freshness(
     payload: dict[str, Any] | None,
     *,
     name: str,
+    report_as_of: dt.date,
     reference_time: dt.datetime,
 ) -> dict[str, Any]:
     if payload is None:
@@ -270,19 +285,21 @@ def assess_context_freshness(
     except (TypeError, ValueError):
         source_as_of = None
     generated_at = parse_context_datetime(payload.get("generated_at"))
+    generated_local_date = parse_context_local_date(payload.get("generated_at"))
     expires_at = parse_context_datetime(payload.get("expires_at"), end_of_day_for_date=True)
     if source_as_of is None:
         return {"present": True, "valid": False, "reason": "invalid_as_of"}
     if generated_at is None:
         return {"present": True, "valid": False, "reason": "invalid_generated_at"}
+    if generated_local_date is None:
+        return {"present": True, "valid": False, "reason": "invalid_generated_at"}
     if expires_at is None:
         return {"present": True, "valid": False, "reason": "invalid_expires_at"}
     if generated_at > reference_time:
         return {"present": True, "valid": False, "reason": "generated_at_in_future"}
-    if source_as_of > reference_time.date():
+    if source_as_of > report_as_of:
         return {"present": True, "valid": False, "reason": "as_of_in_future"}
-    source_start = dt.datetime.combine(source_as_of, dt.time.min, tzinfo=dt.UTC)
-    if generated_at < source_start:
+    if generated_local_date < source_as_of:
         return {"present": True, "valid": False, "reason": "generated_before_as_of"}
     if expires_at < generated_at:
         return {"present": True, "valid": False, "reason": "expires_before_generated"}
@@ -1585,11 +1602,13 @@ def build_advisory_report(
     ai_freshness = assess_context_freshness(
         raw_ai_signal,
         name="ai_signal",
+        report_as_of=as_of_date,
         reference_time=reference_time,
     )
     theme_freshness = assess_context_freshness(
         raw_theme_momentum,
         name="theme_momentum",
+        report_as_of=as_of_date,
         reference_time=reference_time,
     )
     freshness = {

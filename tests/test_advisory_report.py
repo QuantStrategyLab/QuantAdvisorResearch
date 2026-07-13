@@ -212,6 +212,53 @@ def test_malformed_context_as_of_fails_closed_without_raising(tmp_path: Path) ->
     assert report["freshness"]["ai_signal"]["valid"] is False
     assert "ai_signal:invalid_as_of" in report["summary"]["data_quality_warnings"]
 
+
+def test_future_context_as_of_is_rejected_against_report_cutoff(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "as_of": "2026-06-01",
+            "generated_at": "2026-06-01T12:00:00Z",
+            "expires_at": "2026-06-30",
+        }
+    )
+    ai_path = tmp_path / "future_source_as_of.json"
+    ai_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ai_path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is False
+    assert "ai_signal:as_of_in_future" in report["summary"]["data_quality_warnings"]
+
+
+def test_generated_at_offset_preserves_source_local_date(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "as_of": "2026-05-30",
+            "generated_at": "2026-05-30T00:30:00+08:00",
+            "expires_at": "2026-06-30",
+        }
+    )
+    ai_path = tmp_path / "offset_generated_at.json"
+    ai_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ai_path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is True
+
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
