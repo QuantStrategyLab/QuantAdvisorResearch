@@ -87,7 +87,9 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     required = (
         "schema_version",
         "as_of",
+        "reference_time",
         "generated_at",
+        "expires_at",
         "mode",
         "cadence",
         "audience_scope",
@@ -103,7 +105,9 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     if payload["schema_version"] != "5":
         raise AdvisoryValidationError("schema_version must be '5'")
     _require_iso_date(payload["as_of"], "as_of")
+    _require_iso_datetime(payload["reference_time"], "reference_time")
     _require_iso_datetime(payload["generated_at"], "generated_at")
+    _require_iso_datetime(payload["expires_at"], "expires_at")
     if payload["mode"] != "model_recommendations":
         raise AdvisoryValidationError("mode must be model_recommendations")
     if payload["cadence"] not in ALLOWED_CADENCES:

@@ -55,6 +55,11 @@ HORIZON_WINDOWS = {
 }
 SHORT_PRIMARY_MIN_SCORE_EDGE = 0.05
 THEME_MOMENTUM_ARTIFACT_TYPE = "medium_horizon_theme_context"
+REPORT_EXPIRY_DAYS = 7
+CONTEXT_FRESHNESS_MAX_AGE_DAYS = {
+    "ai_signal": 7,
+    "theme_momentum": 14,
+}
 
 CADENCE_LABELS_ZH = {
     "daily": "日度",
@@ -220,6 +225,76 @@ def parse_date(value: str) -> dt.date:
 
 def utc_now_iso() -> str:
     return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def deterministic_reference_time(as_of: dt.date) -> dt.datetime:
+    return dt.datetime.combine(as_of, dt.time(23, 59, 59), tzinfo=dt.UTC)
+
+
+def parse_context_datetime(value: Any, *, end_of_day_for_date: bool = False) -> dt.datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        if "T" not in text and " " not in text:
+            parsed_date = dt.date.fromisoformat(text)
+            clock = dt.time.max if end_of_day_for_date else dt.time.min
+            return dt.datetime.combine(parsed_date, clock, tzinfo=dt.UTC)
+        normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+        parsed = dt.datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(dt.UTC)
+    except ValueError:
+        return None
+
+
+def assess_context_freshness(
+    payload: dict[str, Any] | None,
+    *,
+    name: str,
+    reference_time: dt.datetime,
+) -> dict[str, Any]:
+    if payload is None:
+        return {"present": False, "valid": False, "reason": "not_provided"}
+    missing = [key for key in ("as_of", "generated_at", "expires_at") if not str(payload.get(key) or "").strip()]
+    if missing:
+        return {"present": True, "valid": False, "reason": f"missing_{missing[0]}"}
+    source_as_of = optional_date(payload.get("as_of"))
+    generated_at = parse_context_datetime(payload.get("generated_at"))
+    expires_at = parse_context_datetime(payload.get("expires_at"), end_of_day_for_date=True)
+    if source_as_of is None:
+        return {"present": True, "valid": False, "reason": "invalid_as_of"}
+    if generated_at is None:
+        return {"present": True, "valid": False, "reason": "invalid_generated_at"}
+    if expires_at is None:
+        return {"present": True, "valid": False, "reason": "invalid_expires_at"}
+    if generated_at > reference_time:
+        return {"present": True, "valid": False, "reason": "generated_at_in_future"}
+    if source_as_of > reference_time.date():
+        return {"present": True, "valid": False, "reason": "as_of_in_future"}
+    if reference_time > expires_at:
+        return {"present": True, "valid": False, "reason": "expired"}
+    age_days = (reference_time.date() - source_as_of).days
+    max_age_days = CONTEXT_FRESHNESS_MAX_AGE_DAYS[name]
+    if age_days > max_age_days:
+        return {
+            "present": True,
+            "valid": False,
+            "reason": "stale_as_of",
+            "age_days": age_days,
+            "max_age_days": max_age_days,
+        }
+    return {
+        "present": True,
+        "valid": True,
+        "reason": "fresh",
+        "as_of": source_as_of.isoformat(),
+        "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
+        "expires_at": expires_at.isoformat().replace("+00:00", "Z"),
+        "age_days": age_days,
+        "max_age_days": max_age_days,
+    }
 
 
 def load_events(path: str | Path, as_of: dt.date) -> list[Event]:
@@ -1447,7 +1522,12 @@ def long_context_symbols_from_decisions(final_decisions: dict[str, Any]) -> list
     return symbols
 
 
-def infer_long_context_missing_reason(ai_signal: dict[str, Any] | None) -> str:
+def infer_long_context_missing_reason(
+    ai_signal: dict[str, Any] | None,
+    ai_freshness: dict[str, Any] | None = None,
+) -> str:
+    if ai_freshness and not ai_freshness.get("valid"):
+        return f"ai_signal_{ai_freshness.get('reason', 'invalid')}"
     if not ai_signal:
         return "ai_signal_not_available"
     horizon_text = str(ai_signal.get("horizon", "")).strip()
@@ -1474,10 +1554,27 @@ def build_advisory_report(
     if cadence not in ALLOWED_CADENCES:
         raise ValueError(f"cadence must be one of: {', '.join(sorted(ALLOWED_CADENCES))}")
     as_of_date = parse_date(as_of)
+    reference_time = deterministic_reference_time(as_of_date)
+    raw_ai_signal = load_ai_signal(ai_signal_path)
+    raw_theme_momentum = load_theme_momentum(theme_momentum_path)
+    ai_freshness = assess_context_freshness(
+        raw_ai_signal,
+        name="ai_signal",
+        reference_time=reference_time,
+    )
+    theme_freshness = assess_context_freshness(
+        raw_theme_momentum,
+        name="theme_momentum",
+        reference_time=reference_time,
+    )
+    freshness = {
+        "ai_signal": ai_freshness,
+        "theme_momentum": theme_freshness,
+    }
     watchlist = load_watchlist(political_watchlist_path)
     events = load_events(political_events_path, as_of_date)
-    ai_signal = load_ai_signal(ai_signal_path)
-    theme_momentum = load_theme_momentum(theme_momentum_path)
+    ai_signal = raw_ai_signal if ai_freshness.get("valid") else None
+    theme_momentum = raw_theme_momentum if theme_freshness.get("valid") else None
     market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
@@ -1486,6 +1583,11 @@ def build_advisory_report(
         ai_signal_path,
         theme_momentum_path,
         market_confirmation_path,
+    )
+    data_quality_warnings.extend(
+        f"{name}:{status['reason']}"
+        for name, status in freshness.items()
+        if status.get("present") and not status.get("valid")
     )
 
     events_by_symbol: dict[str, list[Event]] = defaultdict(list)
@@ -1517,7 +1619,10 @@ def build_advisory_report(
     report = {
         "schema_version": "5",
         "as_of": as_of_date.isoformat(),
-        "generated_at": utc_now_iso(),
+        "reference_time": reference_time.isoformat().replace("+00:00", "Z"),
+        "generated_at": reference_time.isoformat().replace("+00:00", "Z"),
+        "expires_at": (reference_time + dt.timedelta(days=REPORT_EXPIRY_DAYS)).isoformat().replace("+00:00", "Z"),
+        "freshness": freshness,
         "mode": "model_recommendations",
         "cadence": cadence,
         "audience_scope": "non_personalized_model_research",
@@ -1541,6 +1646,7 @@ def build_advisory_report(
             "ai_confidence": ai_signal.get("confidence", 0.0) if ai_signal else 0.0,
             "source_mode": source_mode,
             "data_quality_warnings": data_quality_warnings,
+            "freshness_warnings": [warning for warning in data_quality_warnings if ":" in warning],
             "theme_momentum_available": theme_momentum_summary["available"],
             "theme_momentum_artifact_type": theme_momentum_summary.get("artifact_type", ""),
             "theme_momentum_horizon": theme_momentum_summary.get("horizon", ""),
@@ -1553,7 +1659,7 @@ def build_advisory_report(
             "long_context_symbols": long_context_symbols[:12],
             "long_context_missing_reason": ""
             if long_context_symbols
-            else infer_long_context_missing_reason(ai_signal),
+            else infer_long_context_missing_reason(raw_ai_signal, ai_freshness),
             "top_theme_candidate_symbols": [item["symbol"] for item in theme_first_candidates[:8]],
             "top_recommended_symbols": [item["symbol"] for item in final_decisions["recommendations"][:5]],
             "review_note": "Intelligent advisory research output. No order, target quantity, account suitability, or portfolio allocation is encoded.",

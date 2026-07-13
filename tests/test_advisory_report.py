@@ -46,6 +46,91 @@ def test_build_advisory_report_blocks_execution_and_allocation() -> None:
     assert report["recommendations"]
 
 
+def test_report_freshness_fields_are_deterministic() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+    )
+
+    assert report["reference_time"] == "2026-05-30T23:59:59Z"
+    assert report["generated_at"] == report["reference_time"]
+    assert report["expires_at"] == "2026-06-06T23:59:59Z"
+    assert report["freshness"]["ai_signal"]["valid"] is True
+
+
+def test_expired_ai_signal_fails_closed_for_long_context(tmp_path: Path) -> None:
+    ai_signal = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    ai_signal.update(
+        {
+            "as_of": "2026-06-01",
+            "generated_at": "2026-06-01T00:00:00Z",
+            "expires_at": "2026-06-30",
+        }
+    )
+    ai_path = tmp_path / "expired_ai_signal.json"
+    ai_path.write_text(json.dumps(ai_signal) + "\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-07-11",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ai_path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is False
+    assert "ai_signal:expired" in report["summary"]["data_quality_warnings"]
+    assert report["summary"]["long_context_available"] is False
+    assert report["final_decisions"]["horizon_action_buckets"]["long"]["recommend"] == []
+
+
+def test_missing_context_expiry_fails_closed_with_warning(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.pop("expires_at", None)
+    ai_path = tmp_path / "missing_expiry.json"
+    ai_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ai_path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is False
+    assert "ai_signal:missing_expires_at" in report["summary"]["data_quality_warnings"]
+
+
+def test_stale_theme_momentum_fails_closed_with_warning(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/theme_momentum_snapshot.example.json").read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "as_of": "2026-04-01",
+            "generated_at": "2026-04-01T00:00:00Z",
+            "expires_at": "2026-12-31",
+        }
+    )
+    theme_path = tmp_path / "stale_theme.json"
+    theme_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+        theme_momentum_path=theme_path,
+    )
+
+    assert report["freshness"]["theme_momentum"]["valid"] is False
+    assert "theme_momentum:stale_as_of" in report["summary"]["data_quality_warnings"]
+    assert report["summary"]["theme_momentum_available"] is False
+
+
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
