@@ -56,6 +56,7 @@ HORIZON_WINDOWS = {
 SHORT_PRIMARY_MIN_SCORE_EDGE = 0.05
 THEME_MOMENTUM_ARTIFACT_TYPE = "medium_horizon_theme_context"
 REPORT_EXPIRY_DAYS = 7
+REFERENCE_POST_AS_OF_SKEW_DAYS = 2
 CONTEXT_FRESHNESS_MAX_AGE_DAYS = {
     "ai_signal": 7,
     "theme_momentum": 14,
@@ -228,7 +229,11 @@ def utc_now_iso() -> str:
 
 
 def deterministic_reference_time(as_of: dt.date) -> dt.datetime:
-    return dt.datetime.combine(as_of, dt.time(23, 59, 59), tzinfo=dt.UTC)
+    return dt.datetime.combine(
+        as_of + dt.timedelta(days=REFERENCE_POST_AS_OF_SKEW_DAYS),
+        dt.time(23, 59, 59),
+        tzinfo=dt.UTC,
+    )
 
 
 def parse_context_datetime(value: Any, *, end_of_day_for_date: bool = False) -> dt.datetime | None:
@@ -260,7 +265,10 @@ def assess_context_freshness(
     missing = [key for key in ("as_of", "generated_at", "expires_at") if not str(payload.get(key) or "").strip()]
     if missing:
         return {"present": True, "valid": False, "reason": f"missing_{missing[0]}"}
-    source_as_of = optional_date(payload.get("as_of"))
+    try:
+        source_as_of = optional_date(payload.get("as_of"))
+    except (TypeError, ValueError):
+        source_as_of = None
     generated_at = parse_context_datetime(payload.get("generated_at"))
     expires_at = parse_context_datetime(payload.get("expires_at"), end_of_day_for_date=True)
     if source_as_of is None:
@@ -273,9 +281,15 @@ def assess_context_freshness(
         return {"present": True, "valid": False, "reason": "generated_at_in_future"}
     if source_as_of > reference_time.date():
         return {"present": True, "valid": False, "reason": "as_of_in_future"}
+    source_start = dt.datetime.combine(source_as_of, dt.time.min, tzinfo=dt.UTC)
+    if generated_at < source_start:
+        return {"present": True, "valid": False, "reason": "generated_before_as_of"}
+    if expires_at < generated_at:
+        return {"present": True, "valid": False, "reason": "expires_before_generated"}
     if reference_time > expires_at:
         return {"present": True, "valid": False, "reason": "expired"}
     age_days = (reference_time.date() - source_as_of).days
+    generated_age_days = (reference_time - generated_at).total_seconds() / 86400
     max_age_days = CONTEXT_FRESHNESS_MAX_AGE_DAYS[name]
     if age_days > max_age_days:
         return {
@@ -283,6 +297,16 @@ def assess_context_freshness(
             "valid": False,
             "reason": "stale_as_of",
             "age_days": age_days,
+            "generated_age_days": round(generated_age_days, 3),
+            "max_age_days": max_age_days,
+        }
+    if generated_age_days > max_age_days:
+        return {
+            "present": True,
+            "valid": False,
+            "reason": "stale_generated_at",
+            "age_days": age_days,
+            "generated_age_days": round(generated_age_days, 3),
             "max_age_days": max_age_days,
         }
     return {
@@ -293,6 +317,7 @@ def assess_context_freshness(
         "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
         "expires_at": expires_at.isoformat().replace("+00:00", "Z"),
         "age_days": age_days,
+        "generated_age_days": round(generated_age_days, 3),
         "max_age_days": max_age_days,
     }
 

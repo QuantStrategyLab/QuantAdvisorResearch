@@ -55,9 +55,9 @@ def test_report_freshness_fields_are_deterministic() -> None:
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
 
-    assert report["reference_time"] == "2026-05-30T23:59:59Z"
+    assert report["reference_time"] == "2026-06-01T23:59:59Z"
     assert report["generated_at"] == report["reference_time"]
-    assert report["expires_at"] == "2026-06-06T23:59:59Z"
+    assert report["expires_at"] == "2026-06-08T23:59:59Z"
     assert report["freshness"]["ai_signal"]["valid"] is True
 
 
@@ -130,6 +130,87 @@ def test_stale_theme_momentum_fails_closed_with_warning(tmp_path: Path) -> None:
     assert "theme_momentum:stale_as_of" in report["summary"]["data_quality_warnings"]
     assert report["summary"]["theme_momentum_available"] is False
 
+
+
+def test_old_schema_v5_report_without_new_freshness_fields_remains_compatible() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+    )
+    report.pop("reference_time")
+    report.pop("expires_at")
+    report.pop("freshness")
+
+    validate_advisory_report(report)
+
+
+def test_old_generated_at_fails_closed_even_with_recent_as_of(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "as_of": "2026-07-06",
+            "generated_at": "2026-07-06T00:00:00Z",
+            "expires_at": "2026-12-31",
+        }
+    )
+    ai_path = tmp_path / "old_generated_at.json"
+    ai_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-07-11",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ai_path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is False
+    assert "ai_signal:stale_generated_at" in report["summary"]["data_quality_warnings"]
+
+
+def test_context_generated_at_must_not_precede_context_as_of(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "as_of": "2026-05-30",
+            "generated_at": "2026-05-29T23:00:00Z",
+            "expires_at": "2026-06-30",
+        }
+    )
+    ai_path = tmp_path / "generated_before_as_of.json"
+    ai_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ai_path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is False
+    assert "ai_signal:generated_before_as_of" in report["summary"]["data_quality_warnings"]
+
+
+def test_malformed_context_as_of_fails_closed_without_raising(tmp_path: Path) -> None:
+    payload = json.loads((ROOT / "examples/research_signal_context.example.json").read_text(encoding="utf-8"))
+    payload["as_of"] = "not-a-date"
+    ai_path = tmp_path / "malformed_as_of.json"
+    ai_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ai_path,
+    )
+
+    assert report["freshness"]["ai_signal"]["valid"] is False
+    assert "ai_signal:invalid_as_of" in report["summary"]["data_quality_warnings"]
 
 def test_low_confidence_events_remain_verify_source_until_verified() -> None:
     report = build_advisory_report(
