@@ -45,13 +45,6 @@ def final_recommendations(report: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for item in recommendations if isinstance(item, dict) and item.get("symbol")]
 
 
-def first_bar_on_or_after(bars: list[PriceBar], target: dt.date) -> PriceBar | None:
-    for bar in sorted(bars, key=lambda item: item.date):
-        if bar.date >= target:
-            return bar
-    return None
-
-
 def last_bar_on_or_before(bars: list[PriceBar], target: dt.date) -> PriceBar | None:
     candidates = [bar for bar in bars if bar.date <= target]
     return max(candidates, key=lambda item: item.date) if candidates else None
@@ -120,9 +113,9 @@ def build_review_item(
     data_source: str,
 ) -> dict[str, Any]:
     symbol = str(pick.get("symbol", "")).upper()
-    start_bar = first_bar_on_or_after(symbol_bars, report_as_of)
+    start_bar = last_bar_on_or_before(symbol_bars, report_as_of)
     end_bar = last_bar_on_or_before(symbol_bars, review_as_of)
-    benchmark_start = first_bar_on_or_after(benchmark_bars, report_as_of)
+    benchmark_start = last_bar_on_or_before(benchmark_bars, report_as_of)
     benchmark_end = last_bar_on_or_before(benchmark_bars, review_as_of)
     has_price_data = bool(start_bar and end_bar and start_bar.date <= end_bar.date)
 

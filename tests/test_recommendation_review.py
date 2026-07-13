@@ -131,6 +131,24 @@ def test_long_horizon_cannot_be_labeled_lagging_after_a_few_weeks(tmp_path: Path
     assert item["outcome"] == "in_progress"
 
 
+def test_review_requires_price_coverage_on_or_before_report_date(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "market-cache"
+    write_cached_bars("MU", make_bars(dt.date(2026, 2, 1), [100] * 300), cache_dir=cache_dir)
+    write_cached_bars("SPY", make_bars(dt.date(2026, 2, 1), [100] * 300), cache_dir=cache_dir)
+    report_path = tmp_path / "advisory_report_2026-01-05.json"
+    write_report(report_path, horizon="long")
+
+    review = build_recommendation_review(
+        report_paths=[report_path], as_of=dt.date(2026, 11, 1), benchmark="SPY",
+        cache_dir=cache_dir, cache_max_age_days=400, use_network=False,
+    )
+
+    item = review["review_items"][0]
+    assert item["start_price_date"] == ""
+    assert item["maturity_status"] == "insufficient_price_data"
+    assert item["outcome"] == "insufficient_price_data"
+
+
 def test_recommendation_review_marks_same_day_report_as_pending(tmp_path: Path) -> None:
     report_path = tmp_path / "advisory_report_2026-01-05.json"
     write_report(report_path)
