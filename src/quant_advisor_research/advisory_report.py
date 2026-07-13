@@ -37,6 +37,8 @@ CONFIDENCE_WEIGHTS = {
     "low": 1,
 }
 
+COMPANY_LEVEL_ENTITY_TYPES = frozenset({"issuer", "direct_beneficiary"})
+
 AI_BIAS_WEIGHTS = {
     "positive": 3,
     "watch": 1,
@@ -180,6 +182,9 @@ class Event:
     confidence: str
     source_url: str
     notes: str
+    entity_match_type: str = "unverified"
+    match_evidence: str = ""
+    relationship_type: str = "unverified"
 
 
 @dataclass(frozen=True)
@@ -233,9 +238,37 @@ def load_events(path: str | Path, as_of: dt.date) -> list[Event]:
                 confidence=row.get("confidence", ""),
                 source_url=row.get("source_url", ""),
                 notes=row.get("notes", ""),
+                entity_match_type=row.get("entity_match_type", "unverified"),
+                match_evidence=row.get("match_evidence", ""),
+                relationship_type=row.get("relationship_type", "unverified"),
             )
         )
     return events
+
+
+def event_has_company_entity_acceptance(event: Event) -> bool:
+    return (
+        event.entity_match_type in COMPANY_LEVEL_ENTITY_TYPES
+        and event.relationship_type in COMPANY_LEVEL_ENTITY_TYPES
+        and bool(event.match_evidence.strip())
+    )
+
+
+def accepted_entity_events(events: list[Event]) -> list[Event]:
+    return [event for event in events if event_has_company_entity_acceptance(event)]
+
+
+def entity_evidence_details(events: list[Event]) -> list[dict[str, Any]]:
+    return [
+        {
+            "event_id": event.event_id,
+            "entity_match_type": event.entity_match_type,
+            "match_evidence": event.match_evidence,
+            "relationship_type": event.relationship_type,
+            "accepted": event_has_company_entity_acceptance(event),
+        }
+        for event in events
+    ]
 
 
 def load_watchlist(path: str | Path) -> dict[str, WatchlistItem]:
@@ -715,6 +748,8 @@ def build_recommendation(
     ai_signal: dict[str, Any] | None,
     as_of: dt.date,
 ) -> dict[str, Any]:
+    accepted_events = accepted_entity_events(events)
+    rejected_events = [event for event in events if event not in accepted_events]
     ai_bias, ai_bias_source_themes, ai_bias_confidence = resolve_ai_bias(symbol, ai_signal)
     ai_confidence = (
         ai_bias_confidence
@@ -735,7 +770,7 @@ def build_recommendation(
         evidence_refs.append(item.source_url)
 
     low_confidence_count = 0
-    for event in events:
+    for event in accepted_events:
         evidence_score += EVENT_WEIGHTS.get(event.event_type, 0)
         evidence_score += CONFIDENCE_WEIGHTS.get(event.confidence, 0)
         evidence_score += freshness_bonus(event.event_date, as_of)
@@ -766,6 +801,10 @@ def build_recommendation(
         risks.append("事件证据包含低置信来源行，需要用官方来源复核。")
         review_checklist.append("对照官方公告、披露文件、讲话或公司材料复核事件日期和来源链接。")
 
+    if rejected_events:
+        risks.append("部分事件缺少明确的发行方/直接受益实体证据，未用于公司级评分。")
+        review_checklist.append("补充实体匹配文本和 issuer/direct_beneficiary 关系后再评估公司级结论。")
+
     if ai_signal:
         evidence_refs.extend(ai_signal.get("evidence", {}).get("sources", []))
         data_gaps = ai_signal.get("evidence", {}).get("data_gaps", [])
@@ -775,7 +814,7 @@ def build_recommendation(
 
     if ai_bias in {"avoid", "negative"}:
         rating = "defer"
-    elif low_confidence_count and not any(event.confidence in {"medium", "high"} for event in events):
+    elif low_confidence_count and not any(event.confidence in {"medium", "high"} for event in accepted_events):
         rating = "verify_source"
     elif evidence_score >= 12 and risk_score <= 7:
         rating = "recommend"
@@ -784,19 +823,22 @@ def build_recommendation(
     else:
         rating = "monitor"
 
-    style = strategy_style(item, events, ai_bias)
+    style = strategy_style(item, accepted_events, ai_bias)
     score = round(clamp((evidence_score - risk_score + 8) / 24, 0.05, 0.85), 2)
     primary_horizon, suitable_horizons, primary_horizon_label, horizon_note = horizon_fit(style, rating)
     primary_horizon_window = HORIZON_WINDOWS[primary_horizon]
     suitable_horizon_windows = {horizon: HORIZON_WINDOWS[horizon] for horizon in suitable_horizons}
-    confidence, confidence_label = source_confidence(events)
+    confidence, confidence_label = source_confidence(accepted_events)
     tier, tier_label = recommendation_tier(rating, score, confidence)
+    source_score = normalize_source_score(
+        {"source_confidence": confidence, "evidence_score": evidence_score}
+    )
 
     reasons: list[str] = []
     if item and item.thesis:
         reasons.append(item.thesis)
-    if events:
-        event_names = ", ".join(sorted({event.event_type for event in events}))
+    if accepted_events:
+        event_names = ", ".join(sorted({event.event_type for event in accepted_events}))
         reasons.append(f"观察到事件证据：{event_names}。")
     if ai_bias:
         if ai_bias_source_themes:
@@ -837,6 +879,7 @@ def build_recommendation(
         "strategy_style": style,
         "score": score,
         "evidence_score": int(evidence_score),
+        "source_score": source_score,
         "risk_score": int(risk_score),
         "source_confidence": confidence,
         "source_confidence_label": confidence_label,
@@ -845,6 +888,7 @@ def build_recommendation(
         "evidence_summary": " ".join(reasons),
         "evidence_refs": dedupe(evidence_refs),
         "review_checklist": dedupe(review_checklist),
+        "entity_evidence": entity_evidence_details(events),
         "ai_context": {
             "source": "latest_signal" if ai_signal else "",
             "horizon": "long" if ai_signal else "",
