@@ -147,8 +147,16 @@ def test_v3_same_semantic_digest_different_artifact_is_allowed() -> None:
 def test_same_period_different_semantic_and_artifact_variants_are_allowed() -> None:
     canonical = v3_entry(semantic_digest=DIGEST_A, artifact_digest=DIGEST_A)
     variant = v3_entry(identity_class="V3_VARIANT", semantic_digest=DIGEST_B, artifact_digest=DIGEST_B)
+    canonical["display_primary"] = False
+    variant["display_primary"] = True
 
-    assert len(parse_v3_index(v3_payload(canonical, variant)).bindings) == 2
+    index = parse_v3_index(v3_payload(canonical, variant))
+
+    assert len(index.bindings) == 2
+    assert index.bindings[0].canonical_identity is True
+    assert index.bindings[0].display_primary is False
+    assert index.bindings[1].canonical_identity is False
+    assert index.bindings[1].display_primary is True
 
 
 def test_semantic_digest_can_repeat_across_periods() -> None:

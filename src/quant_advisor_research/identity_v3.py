@@ -1,3 +1,10 @@
+"""Pure v3 persistent identity-ledger contract.
+
+This module does not select candidates or compute a display/latest view. A v3
+index preserves immutable identities; same-period semantic reruns may coexist
+when their artifact identities and public names are internally coherent.
+"""
+
 from __future__ import annotations
 
 import re
@@ -43,6 +50,8 @@ _MANIFEST_PATTERN = re.compile(
 
 @dataclass(frozen=True, slots=True)
 class V3IdentityBinding:
+    """One pending, structurally validated persistent identity ledger entry."""
+
     period_key: str
     as_of: str
     cadence: str
@@ -65,6 +74,8 @@ class V3IdentityBinding:
 
 @dataclass(frozen=True, slots=True)
 class V3IdentityIndex:
+    """Persistent immutable identity ledger, not a selected-candidate group."""
+
     schema_version: int
     bindings: tuple[V3IdentityBinding, ...]
 
@@ -259,6 +270,8 @@ def _parse_v3_snapshot(payload: dict[str, object]) -> V3IdentityIndex:
 
 
 def parse_v3_index(payload: Mapping[str, Any]) -> V3IdentityIndex:
+    """Parse a complete v3 ledger without applying selection or display policy."""
+
     return _parse_v3_snapshot(_snapshot_payload(payload))
 
 
