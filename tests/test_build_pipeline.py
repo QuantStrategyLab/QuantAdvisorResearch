@@ -10,6 +10,7 @@ from quant_advisor_research.archive_backfill import backfill_site_archive, disco
 from quant_advisor_research import build_pipeline as build_pipeline_module
 from quant_advisor_research.build_pipeline import build_advisory_artifacts, default_weekly_as_of
 from quant_advisor_research.cross_repo_smoke import run_cross_repo_smoke
+import quant_advisor_research.publisher as publisher_module
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,6 +122,12 @@ def test_archive_backfill_same_identity_different_fingerprint_publishes_variant(
     second_payload = json.loads(second.read_text(encoding="utf-8"))
     second_payload["recommendations"][0]["reasons"] = ["different semantic content"]
     second.write_text(json.dumps(second_payload), encoding="utf-8")
+    second_variant = second.with_name(
+        f"advisory_report_2026-05-31.variant-"
+        f"{publisher_module._variant_digest(publisher_module.report_content_fingerprint(second_payload))}.json"
+    )
+    second.rename(second_variant)
+    second = second_variant
     output = tmp_path / "site"
     backfill_site_archive(
         report_paths=[first, second],

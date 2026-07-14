@@ -315,8 +315,43 @@ def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]
     return list(require_publish_candidates(None, report_paths).selected_paths)
 
 
-def preflight_publish_destinations(report_paths: list[str | Path]) -> None:
-    plan = build_publication_plan(report_paths)
+RECOVERED_JSON_PATTERN = re.compile(
+    r"^advisory_report_(?P<as_of>\d{4}-\d{2}-\d{2})(?P<variant>\.variant-(?P<digest>[0-9a-f]{12}))?\.json$"
+)
+
+
+def _recovered_public_identity(candidate: _ReportCandidate) -> tuple[str, str, str, str, bool]:
+    assert candidate.report is not None and candidate.fingerprint is not None
+    match = RECOVERED_JSON_PATTERN.fullmatch(candidate.path.name)
+    if match is None or match.group("as_of") != str(candidate.report.get("as_of", "")):
+        raise ValueError("recovered_public_identity_invalid")
+    digest = match.group("digest")
+    if digest is not None and digest != _variant_digest(candidate.fingerprint):
+        raise ValueError("recovered_variant_digest_mismatch")
+    json_name = candidate.path.name
+    html_name = report_filename(candidate.report)
+    markdown_name = f"advisory_report_{match.group('as_of')}.md"
+    manifest_name = f"{json_name}.manifest.json"
+    if digest is not None:
+        html_name = _variant_name(html_name, digest)
+        markdown_name = _variant_name(markdown_name, digest)
+    return html_name, json_name, markdown_name, manifest_name, digest is None
+
+
+def preflight_publish_destinations(
+    report_paths: list[str | Path],
+    *,
+    mandatory_current: str | Path | None = None,
+    recovered_history: list[str | Path] | None = None,
+    reject_invalid: bool = False,
+    publication_plan: PublicationPlan | None = None,
+) -> None:
+    plan = publication_plan or build_publication_plan(
+        report_paths,
+        mandatory_current=mandatory_current,
+        recovered_history=recovered_history,
+        reject_invalid=reject_invalid,
+    )
     preflight_publication_plan(plan)
 
 
@@ -362,25 +397,80 @@ def build_publication_plan(
     if reject_invalid and selection.quarantined:
         raise ValueError("invalid_report_candidate")
     selected_paths = list(selection.selected_paths)
-    artifact_ids = _relative_artifact_ids(selected_paths)
-    candidates = [
+    mandatory_resolved = Path(mandatory_current).resolve() if mandatory_current is not None else None
+    recovered_paths = {
+        path.resolve()
+        for path in _canonical_paths(list(recovered_history or []))
+        if path.resolve() != mandatory_resolved
+    }
+    all_paths = _canonical_paths(selected_paths + list(recovered_paths))
+    artifact_ids = _relative_artifact_ids(all_paths)
+    all_candidates = [
         _load_candidate(path, artifact_ids[path], index)
-        for index, path in enumerate(selected_paths)
+        for index, path in enumerate(all_paths)
     ]
-    valid_candidates = [candidate for candidate in candidates if candidate.report is not None]
+    candidates_by_path = {candidate.path.resolve(): candidate for candidate in all_candidates}
+    recovered_candidates = [
+        candidate
+        for candidate in all_candidates
+        if candidate.path.resolve() in recovered_paths and candidate.report is not None
+    ]
+    recovered_identities: dict[Path, tuple[str, str, str, str, bool]] = {}
+    identity_fingerprints: dict[str, str] = {}
+    recovered_canonical_names_by_period: dict[str, set[str]] = {}
+    for candidate in recovered_candidates:
+        identity = _recovered_public_identity(candidate)
+        recovered_identities[candidate.path.resolve()] = identity
+        if identity[4] and candidate.period is not None:
+            recovered_canonical_names_by_period.setdefault(candidate.period.key, set()).add(identity[1])
+        for name in identity[:4]:
+            previous = identity_fingerprints.get(name)
+            if previous is not None and previous != candidate.fingerprint:
+                raise ValueError("recovered_public_identity_conflict")
+            identity_fingerprints[name] = candidate.fingerprint or ""
+    if any(len(names) > 1 for names in recovered_canonical_names_by_period.values()):
+        raise ValueError("recovered_public_identity_conflict")
+
+    selected_candidates: list[_ReportCandidate] = []
+    for path in selected_paths:
+        candidate = candidates_by_path[path.resolve()]
+        if candidate.report is None:
+            continue
+        if candidate.path.resolve() != mandatory_resolved:
+            matches = [
+                recovered
+                for recovered in recovered_candidates
+                if recovered.period == candidate.period and recovered.fingerprint == candidate.fingerprint
+            ]
+            if matches:
+                candidate = sorted(matches, key=lambda item: item.artifact_id)[0]
+        if candidate.path.resolve() not in {item.path.resolve() for item in selected_candidates}:
+            selected_candidates.append(candidate)
+    valid_candidates = selected_candidates
     groups: dict[str, list[_ReportCandidate]] = {}
     for candidate in valid_candidates:
         assert candidate.period is not None
         groups.setdefault(candidate.period.key, []).append(candidate)
-    mandatory_resolved = Path(mandatory_current).resolve() if mandatory_current is not None else None
     entries_by_path: dict[Path, PublicationEntry] = {}
     ordered_groups: list[tuple[CanonicalPeriod, list[_ReportCandidate]]] = []
     for group in groups.values():
         ranked = _publication_rank(group)
-        owner = next(
-            (candidate for candidate in ranked if candidate.path.resolve() == mandatory_resolved),
-            ranked[0],
+        mandatory_owner = next(
+            (candidate for candidate in ranked if candidate.path.resolve() == mandatory_resolved), None
         )
+        recovered_canonical = [
+            candidate
+            for candidate in group
+            if recovered_identities.get(candidate.path.resolve(), ("", "", "", "", False))[4]
+        ]
+        if mandatory_owner is not None:
+            owner = mandatory_owner
+        elif len({recovered_identities[candidate.path.resolve()][0] for candidate in recovered_canonical}) > 1:
+            raise ValueError("recovered_public_identity_conflict")
+        elif recovered_canonical:
+            owner = sorted(recovered_canonical, key=lambda item: item.artifact_id)[0]
+        else:
+            owner = ranked[0]
         assert owner.period is not None
         ordered_groups.append(
             (owner.period, [owner, *(candidate for candidate in ranked if candidate is not owner)])
@@ -399,14 +489,20 @@ def build_publication_plan(
             canonical_html = report_filename(candidate.report)
             canonical_json = f"advisory_report_{as_of}.json"
             canonical_markdown = f"advisory_report_{as_of}.md"
-            if candidate is owner:
+            recovered_identity = recovered_identities.get(candidate.path.resolve())
+            if recovered_identity is not None and (not recovered_identity[4] or candidate is owner):
+                html_name, json_name, markdown_name, manifest_name, _ = recovered_identity
+                canonical_owner = candidate is owner and recovered_identity[4]
+            elif candidate is owner:
                 html_name, json_name, markdown_name = canonical_html, canonical_json, canonical_markdown
+                manifest_name = f"{json_name}.manifest.json"
                 canonical_owner = True
             else:
                 suffix = _variant_digest(candidate.fingerprint)
                 html_name = _variant_name(canonical_html, suffix)
                 json_name = _variant_name(canonical_json, suffix)
                 markdown_name = _variant_name(canonical_markdown, suffix)
+                manifest_name = f"{json_name}.manifest.json"
                 canonical_owner = False
             entries_by_path[candidate.path] = PublicationEntry(
                 report=candidate.report,
@@ -414,7 +510,7 @@ def build_publication_plan(
                 html_name=html_name,
                 json_name=json_name,
                 markdown_name=markdown_name,
-                manifest_name=f"{json_name}.manifest.json",
+                manifest_name=manifest_name,
                 fingerprint=candidate.fingerprint,
                 canonical_owner=canonical_owner,
                 generated_at=candidate.generated_at,

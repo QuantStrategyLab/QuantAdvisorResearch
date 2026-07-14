@@ -68,7 +68,7 @@ def backfill_site_archive(
     publication_plan = build_publication_plan(
         report_paths,
         mandatory_current=current_report,
-        recovered_history=report_paths if current_report is not None else None,
+        recovered_history=report_paths,
     )
     preflight_publication_plan(publication_plan)
     report_paths = [entry.source_path for entry in publication_plan.entries]
@@ -80,7 +80,7 @@ def backfill_site_archive(
         site_url=site_url,
         feed_title=feed_title,
         mandatory_current=current_report,
-        recovered_history=report_paths if current_report is not None else None,
+        recovered_history=report_paths,
         publication_plan=publication_plan,
     )
     for entry in publication_plan.entries:

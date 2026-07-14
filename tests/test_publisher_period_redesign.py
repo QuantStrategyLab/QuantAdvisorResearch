@@ -12,11 +12,13 @@ from quant_advisor_research.archive_backfill import discover_report_paths
 from quant_advisor_research.publisher import (
     build_publication_plan,
     classify_report_path,
+    preflight_publish_destinations,
     main as publisher_main,
     publish_reports,
     report_content_fingerprint,
     select_publish_candidates,
     unique_report_paths_by_content,
+    _variant_digest,
 )
 import quant_advisor_research.publisher as publisher_module
 from quant_advisor_research.time_contract import canonical_reference_time
@@ -122,7 +124,10 @@ def test_publication_plan_pins_mandatory_current_as_group_owner_and_first(
     recovered["generated_at"] = "2026-06-16T12:00:00Z"
     recovered["expires_at"] = "2026-06-23T12:00:00Z"
     current_path = write_report(tmp_path / "advisory_report_2026-06-21.json", current)
-    recovered_path = write_report(tmp_path / "recovered.json", recovered)
+    recovered_digest = _variant_digest(report_content_fingerprint(recovered))
+    recovered_path = write_report(
+        tmp_path / f"advisory_report_2026-06-15.variant-{recovered_digest}.json", recovered
+    )
 
     plan = build_publication_plan(
         [current_path], mandatory_current=current_path, recovered_history=[recovered_path]
@@ -147,6 +152,82 @@ def test_publication_plan_pins_mandatory_current_as_group_owner_and_first(
     assert reports_index["reports"][0]["json"] == "advisory_report_2026-06-21.json"
     assert feed.index("2026-06-21") < feed.index("2026-06-15")
     assert "Tue, 16 Jun 2026 12:00:00 GMT" in feed
+
+
+def test_recovered_public_identities_are_preserved_across_ranking_changes(tmp_path: Path) -> None:
+    canonical = build_v5("2026-06-20")
+    variant = copy.deepcopy(canonical)
+    variant["recommendations"][0]["reasons"] = ["variant content"]
+    canonical_path = write_report(tmp_path / "advisory_report_2026-06-20.json", canonical)
+    variant_digest = _variant_digest(report_content_fingerprint(variant))
+    variant_path = write_report(
+        tmp_path / f"advisory_report_2026-06-20.variant-{variant_digest}.json", variant
+    )
+
+    plan = build_publication_plan(
+        [canonical_path, variant_path], recovered_history=[canonical_path, variant_path]
+    )
+    reversed_plan = build_publication_plan(
+        [variant_path, canonical_path], recovered_history=[variant_path, canonical_path]
+    )
+
+    assert [(entry.json_name, entry.html_name) for entry in plan.entries] == [
+        ("advisory_report_2026-06-20.json", "2026-06-20-weekly-model-recommendations.html"),
+        (variant_path.name, f"2026-06-20-weekly-model-recommendations.variant-{variant_digest}.html"),
+    ]
+    assert [(entry.json_name, entry.html_name) for entry in plan.entries] == [
+        (entry.json_name, entry.html_name) for entry in reversed_plan.entries
+    ]
+
+
+def test_recovered_identity_conflicts_fail_before_write(tmp_path: Path) -> None:
+    first = build_v5("2026-06-20")
+    second = copy.deepcopy(first)
+    second["recommendations"][0]["reasons"] = ["different content"]
+    first_path = write_report(tmp_path / "a" / "advisory_report_2026-06-20.json", first)
+    second_path = write_report(tmp_path / "b" / "advisory_report_2026-06-20.json", second)
+
+    with pytest.raises(ValueError, match="recovered_public_identity_conflict"):
+        build_publication_plan(
+            [first_path, second_path], recovered_history=[first_path, second_path]
+        )
+
+
+def test_recovered_variant_digest_mismatch_fails_closed(tmp_path: Path) -> None:
+    path = write_report(
+        tmp_path / "advisory_report_2026-06-20.variant-000000000000.json", build_v5()
+    )
+
+    with pytest.raises(ValueError, match="recovered_variant_digest_mismatch"):
+        build_publication_plan([path], recovered_history=[path])
+
+
+def test_multiple_recovered_canonical_identities_same_period_fail_closed(tmp_path: Path) -> None:
+    monday = build_v5("2026-06-15")
+    sunday = copy.deepcopy(monday)
+    sunday["as_of"] = "2026-06-21"
+    sunday["recommendations"][0]["reasons"] = ["different content"]
+    monday_path = write_report(tmp_path / "advisory_report_2026-06-15.json", monday)
+    sunday_path = write_report(tmp_path / "advisory_report_2026-06-21.json", sunday)
+
+    with pytest.raises(ValueError, match="recovered_public_identity_conflict"):
+        build_publication_plan(
+            [monday_path, sunday_path], recovered_history=[monday_path, sunday_path]
+        )
+
+
+def test_preflight_publish_destinations_forwards_publish_context(tmp_path: Path) -> None:
+    current = write_report(tmp_path / "advisory_report_2026-06-20.json", build_v5())
+    variant = copy.deepcopy(build_v5())
+    variant["recommendations"][0]["reasons"] = ["variant content"]
+    variant_digest = _variant_digest(report_content_fingerprint(variant))
+    variant_path = write_report(
+        tmp_path / f"advisory_report_2026-06-20.variant-{variant_digest}.json", variant
+    )
+
+    preflight_publish_destinations(
+        [current], mandatory_current=current, recovered_history=[variant_path]
+    )
 
 
 def test_invalid_v6_cannot_shadow_valid_v5(tmp_path: Path) -> None:
