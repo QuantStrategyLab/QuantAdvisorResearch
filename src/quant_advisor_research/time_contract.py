@@ -41,7 +41,8 @@ def normalize_aware_datetime(value: dt.datetime | str) -> dt.datetime:
 
 
 def canonical_reference_time(as_of: dt.date) -> dt.datetime:
-    return dt.datetime.combine(as_of, dt.time(23, 59, 59), tzinfo=dt.UTC)
+    """Return the exclusive start of the next UTC calendar day."""
+    return dt.datetime.combine(as_of + dt.timedelta(days=1), dt.time.min, tzinfo=dt.UTC)
 
 
 def report_time_bounds(as_of: dt.date, generated_at: dt.datetime | str) -> ReportTimeBounds:
@@ -119,7 +120,13 @@ def assess_context_freshness(
         return ContextFreshness(True, False, "generated_after_report_build", source_as_of, generated)
     if generated_local_date < source_as_of:
         return ContextFreshness(True, False, "generated_before_as_of", source_as_of, generated)
-    expires = None if legacy else context_expiry_instant(expires_text, generated_text)
+    if legacy:
+        expires = None
+    else:
+        try:
+            expires = context_expiry_instant(expires_text, generated_text)
+        except (TypeError, ValueError, TimeContractError):
+            return ContextFreshness(True, False, "invalid_expires_at", source_as_of, generated)
     if expires is not None and expires < generated:
         return ContextFreshness(True, False, "expires_before_generated", source_as_of, generated, expires)
     if expires is not None and reference_time > expires:

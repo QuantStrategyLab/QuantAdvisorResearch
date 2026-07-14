@@ -24,13 +24,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_golden_reference_build_and_expiry_bounds() -> None:
     bounds = report_time_bounds(dt.date(2026, 5, 30), "2026-05-31T00:00:00.123456Z")
 
-    assert bounds.reference_time == dt.datetime(2026, 5, 30, 23, 59, 59, tzinfo=dt.UTC)
+    assert bounds.reference_time == dt.datetime(2026, 5, 31, 0, 0, tzinfo=dt.UTC)
     assert bounds.generated_at == dt.datetime(2026, 5, 31, 0, 0, 0, 123456, tzinfo=dt.UTC)
     assert bounds.expires_at == dt.datetime(2026, 6, 7, 0, 0, 0, 123456, tzinfo=dt.UTC)
 
 
 def test_reference_and_build_order_are_strict() -> None:
-    assert canonical_reference_time(dt.date(2026, 5, 30)) == dt.datetime(2026, 5, 30, 23, 59, 59, tzinfo=dt.UTC)
+    assert canonical_reference_time(dt.date(2026, 5, 30)) == dt.datetime(2026, 5, 31, 0, 0, tzinfo=dt.UTC)
     with pytest.raises(TimeContractError, match="generated_at"):
         report_time_bounds(dt.date(2026, 5, 30), "2026-05-30T12:00:00Z")
 
@@ -39,6 +39,17 @@ def test_context_date_only_expiry_uses_original_offset_local_eod() -> None:
     assert context_expiry_instant("2026-06-30", "2026-05-30T00:30:00+08:00") == dt.datetime(
         2026, 6, 30, 15, 59, 59, tzinfo=dt.UTC
     )
+
+
+def test_final_fractional_second_before_exclusive_next_day_cutoff_is_valid() -> None:
+    result = assess_context_freshness(
+        {"as_of": "2026-05-30", "generated_at": "2026-05-30T23:59:59.999999Z", "expires_at": "2026-06-30"},
+        report_as_of=dt.date(2026, 5, 30),
+        reference_time=canonical_reference_time(dt.date(2026, 5, 30)),
+        report_generated_at=dt.datetime(2026, 5, 31, 0, 0, 1, tzinfo=dt.UTC),
+        max_age_days=7,
+    )
+    assert result.valid is True
     assert context_expiry_instant("2026-06-30T23:00:00-04:00", "2026-05-30T00:30:00+08:00") == dt.datetime(
         2026, 7, 1, 3, 0, tzinfo=dt.UTC
     )
@@ -63,6 +74,19 @@ def test_context_freshness_bounds_and_legacy_marker() -> None:
     assert legacy.reason == "legacy_expiry_compatibility"
 
 
+@pytest.mark.parametrize("expires_at", ["not-a-date", "2026-06-30Tbad"])
+def test_malformed_context_expiry_is_deterministic_invalid(expires_at: str) -> None:
+    result = assess_context_freshness(
+        {"as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00Z", "expires_at": expires_at},
+        report_as_of=dt.date(2026, 5, 30),
+        reference_time=canonical_reference_time(dt.date(2026, 5, 30)),
+        report_generated_at=dt.datetime(2026, 5, 31, tzinfo=dt.UTC),
+        max_age_days=7,
+    )
+    assert result.valid is False
+    assert result.reason == "invalid_expires_at"
+
+
 @pytest.mark.parametrize("case", json.loads((ROOT / "tests/fixtures/time_contract_cases.json").read_text()))
 def test_adversarial_freshness_cases(case: dict[str, object]) -> None:
     result = assess_context_freshness(
@@ -78,7 +102,7 @@ def test_adversarial_freshness_cases(case: dict[str, object]) -> None:
 
 @pytest.mark.parametrize(
     ("now", "expected"),
-    [("2026-05-30T23:59:58Z", "before_cutoff"), ("2026-05-30T23:59:59Z", "at_cutoff"), ("2026-05-31T00:00:00Z", "after_cutoff")],
+    [("2026-05-30T23:59:59.999999Z", "before_cutoff"), ("2026-05-31T00:00:00Z", "at_cutoff"), ("2026-05-31T00:00:00.000001Z", "after_cutoff")],
 )
 def test_schedule_cutoff_decisions(now: str, expected: str) -> None:
     assert schedule_cutoff_decision(dt.date(2026, 5, 30), now) == expected
