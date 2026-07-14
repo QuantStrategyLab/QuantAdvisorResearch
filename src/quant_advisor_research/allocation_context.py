@@ -138,6 +138,13 @@ def _validated_index(index: object) -> V3IdentityIndex:
     try:
         if type(index.bindings) is not tuple:
             raise _error("identity_inventory_invalid")
+        if any(
+            not isinstance(binding, V3IdentityBinding)
+            or type(binding.status) is not str
+            or binding.status != PENDING_ARTIFACT_VALIDATION
+            for binding in index.bindings
+        ):
+            raise _error("identity_inventory_invalid")
         payload = {
             "schema_version": index.schema_version,
             "reports": [_binding_payload(binding) for binding in index.bindings],
@@ -346,6 +353,19 @@ def allocate_v3_identity(
     ]
     if len(exact_matches) > 1 or len(same_artifact) > 1:
         raise _error("identity_integrity_conflict")
+    period_bindings = [binding for binding in v3_bindings if binding.period_key == period_key]
+    true_v3_canonical_exists = any(
+        binding.identity_class == V3_CANONICAL for binding in period_bindings
+    )
+    legacy_canonical_exists = any(
+        binding.identity_class == LEGACY_V2 and binding.canonical_identity
+        for binding in bindings
+        if binding.period_key == period_key
+    )
+    if context.mode is AllocationMode.CURRENT_MANDATORY and legacy_canonical_exists and not true_v3_canonical_exists:
+        raise _error("legacy_migration_required")
+    if context.mode is AllocationMode.HISTORICAL_RECOVERY and not true_v3_canonical_exists:
+        raise _error("canonical_bootstrap_required")
     if exact_matches:
         binding = exact_matches[0]
         _validate_reuse_policy(binding, requested, display_placement)
@@ -354,14 +374,10 @@ def allocate_v3_identity(
         raise _error("exact_artifact_not_found")
     if same_artifact:
         raise _error("identity_reuse_mismatch")
-    period_bindings = [binding for binding in v3_bindings if binding.period_key == period_key]
-    canonical_exists = any(binding.canonical_identity for binding in period_bindings)
-    if context.mode is AllocationMode.HISTORICAL_RECOVERY and not canonical_exists:
-        raise _error("canonical_bootstrap_required")
     display = _validate_display(display_placement)
     candidate = _new_binding(
         metadata,
-        canonical=context.mode is AllocationMode.CURRENT_MANDATORY and not canonical_exists,
+        canonical=context.mode is AllocationMode.CURRENT_MANDATORY and not true_v3_canonical_exists,
         requested=requested,
         display=display,
     )
@@ -379,13 +395,9 @@ def _exact_key_from_metadata(metadata: tuple[dict[str, object], str, str, str, s
 
 def _simulate(index: V3IdentityIndex, candidate: V3IdentityBinding) -> None:
     try:
-        # LEGACY_V2 entries remain dual-read migration evidence. The candidate
-        # must satisfy the complete v3 ledger invariants without rewriting or
-        # treating legacy canonical metadata as a v3 canonical owner.
-        v3_bindings = tuple(binding for binding in index.bindings if binding.identity_class != LEGACY_V2)
         parse_v3_index({
             "schema_version": 3,
-            "reports": [_binding_payload(binding) for binding in (*v3_bindings, candidate)],
+            "reports": [_binding_payload(binding) for binding in (*index.bindings, candidate)],
         })
     except IdentityMetadataError as exc:
         raise _error(exc.code) from None

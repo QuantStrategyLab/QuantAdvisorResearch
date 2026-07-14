@@ -16,6 +16,7 @@ from quant_advisor_research.allocation_context import (
     V3AllocationPlan,
     allocate_v3_identity,
     make_complete_source_inventory,
+    _simulate,
 )
 from quant_advisor_research.artifact_integrity import artifact_integrity_digest
 from quant_advisor_research.identity_lifecycle import FINGERPRINT_VERSION, IdentityMetadataError
@@ -293,22 +294,19 @@ def test_legacy_exact_match_is_not_reused_or_migrated() -> None:
         )
 
 
-def test_legacy_only_current_bootstraps_v3_canonical() -> None:
+def test_legacy_only_current_requires_explicit_migration() -> None:
     report = build_report()
     legacy = binding_for(report, identity_class="LEGACY_V2")
     period_key = metadata(report)[0]
 
-    result = allocate_v3_identity(
-        report,
-        inventory=inventory_for((legacy, report)),
-        context=AllocationContext.current_mandatory(period_key),
-        requested_artifacts=REQUESTED,
-        display_placement=DISPLAY,
-    )
-
-    assert result.reused_existing is False
-    assert result.binding.identity_class == "V3_CANONICAL"
-    assert result.binding.canonical_identity is True
+    with pytest.raises(IdentityMetadataError, match="legacy_migration_required"):
+        allocate_v3_identity(
+            report,
+            inventory=inventory_for((legacy, report)),
+            context=AllocationContext.current_mandatory(period_key),
+            requested_artifacts=REQUESTED,
+            display_placement=DISPLAY,
+        )
 
 
 def test_legacy_only_historical_recovery_requires_v3_canonical() -> None:
@@ -354,6 +352,69 @@ def test_mixed_legacy_and_v3_uses_v3_canonical_for_variant_allocation() -> None:
 
     assert result.binding.identity_class == "V3_VARIANT"
     assert result.reused_existing is False
+
+
+def test_legacy_canonical_and_exact_v3_variant_require_migration_for_current() -> None:
+    legacy_report = build_report()
+    variant_report = dict(legacy_report)
+    variant_report["generated_at"] = "2026-07-15T00:00:00Z"
+    legacy = binding_for(legacy_report, identity_class="LEGACY_V2")
+    variant_base = binding_for(variant_report)
+    artifact = metadata(variant_report)[2]
+    variant = replace(
+        variant_base,
+        identity_class="V3_VARIANT",
+        canonical_identity=False,
+        json_name=f"advisory_report_{variant_report['as_of']}.variant-{artifact}.json",
+        html_name=(
+            f"{variant_report['as_of']}-{variant_report['cadence']}-model-recommendations"
+            f".variant-{artifact}.html"
+        ),
+    )
+    inventory = inventory_for((legacy, legacy_report), (variant, variant_report))
+    period_key = metadata(variant_report)[0]
+
+    with pytest.raises(IdentityMetadataError, match="legacy_migration_required"):
+        allocate_v3_identity(
+            variant_report,
+            inventory=inventory,
+            context=AllocationContext.current_mandatory(period_key),
+            requested_artifacts=REQUESTED,
+            display_placement=DISPLAY,
+        )
+
+    with pytest.raises(IdentityMetadataError, match="canonical_bootstrap_required"):
+        allocate_v3_identity(
+            variant_report,
+            inventory=inventory,
+            context=AllocationContext.historical_recovery(),
+            requested_artifacts=REQUESTED,
+            display_placement=DISPLAY,
+        )
+
+
+def test_non_pending_inventory_status_is_rejected_and_pending_is_preserved() -> None:
+    report = build_report()
+    binding = binding_for(report)
+    inventory = make_complete_source_inventory(
+        V3IdentityIndex(3, (binding,)), {binding.json_name: report}
+    )
+    assert inventory.index.bindings[0].status == "PENDING_ARTIFACT_VALIDATION"
+
+    non_pending = replace(binding, status="VERIFIED")
+    with pytest.raises(IdentityMetadataError, match="identity_inventory_invalid"):
+        make_complete_source_inventory(
+            V3IdentityIndex(3, (non_pending,)), {binding.json_name: report}
+        )
+
+
+def test_whole_index_simulation_keeps_legacy_canonical_collision_visible() -> None:
+    report = build_report()
+    legacy = binding_for(report, identity_class="LEGACY_V2")
+    candidate = binding_for(report)
+
+    with pytest.raises(IdentityMetadataError, match="identity_(canonical|content)_conflict"):
+        _simulate(V3IdentityIndex(3, (legacy,)), candidate)
 
 
 def test_semantic_same_artifact_different_is_not_reused() -> None:
