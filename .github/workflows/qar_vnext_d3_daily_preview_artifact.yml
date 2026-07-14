@@ -1,0 +1,72 @@
+name: QAR vNext D3 Daily Preview Artifact
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/qar_vnext_d3_daily_preview_artifact.yml"
+      - "scripts/d3_build_daily_preview_artifact.py"
+      - "scripts/d3_verify_daily_preview_artifact.py"
+      - "src/quant_advisor_research/preview_bundle.py"
+      - "src/quant_advisor_research/advisory_report.py"
+      - "tests/test_d3_daily_preview_artifact.py"
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "Representative daily report date"
+        required: true
+        default: "2026-06-20"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install advisor package
+        run: python -m pip install -e .
+      - name: Build representative daily preview
+        env:
+          AS_OF: ${{ inputs.as_of || '2026-06-20' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python scripts/d3_build_daily_preview_artifact.py \
+            --as-of "${AS_OF}" \
+            --political-events examples/political_events.example.csv \
+            --political-watchlist examples/political_watchlist.example.csv \
+            --artifact-dir "${RUNNER_TEMP}/qar-daily-preview" \
+            --evidence-path "${RUNNER_TEMP}/qar-daily-preview-build-evidence.json" \
+            --base-sha "${BASE_SHA}" \
+            > "${RUNNER_TEMP}/qar-daily-preview-build-evidence.log"
+          cat "${RUNNER_TEMP}/qar-daily-preview-build-evidence.log"
+      - name: Upload daily preview artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: qar-daily-preview
+          path: ${{ runner.temp }}/qar-daily-preview
+          if-no-files-found: error
+      - name: Download daily preview artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: qar-daily-preview
+          path: ${{ runner.temp }}/qar-daily-preview-downloaded
+      - name: Read back uploaded artifact
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python scripts/d3_verify_daily_preview_artifact.py \
+            --artifact-dir "${RUNNER_TEMP}/qar-daily-preview-downloaded" \
+            --evidence-path "${RUNNER_TEMP}/qar-daily-preview-download-evidence.json" \
+            --base-sha "${BASE_SHA}"
