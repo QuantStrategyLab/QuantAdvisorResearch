@@ -114,6 +114,77 @@ def test_v6_present_false_rejects_timestamp_keys_even_when_falsey(value) -> None
     with pytest.raises(AdvisoryValidationError, match="freshness_state_incoherent"):
         validate_advisory_report(report)
 
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        {
+            "present": True, "valid": False, "reason": "as_of_in_future",
+            "as_of": "2026-05-31", "generated_at": "2026-05-30T12:00:00Z",
+            "expires_at": "2026-06-30",
+        },
+        {
+            "present": True, "valid": False, "reason": "generated_after_reference",
+            "as_of": "2026-05-30", "generated_at": "2026-05-31T00:00:00.000001Z",
+            "expires_at": "2026-06-30",
+        },
+        {
+            "present": True, "valid": False, "reason": "expires_before_generated",
+            "as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00Z",
+            "expires_at": "2026-05-30T11:00:00Z",
+        },
+    ],
+)
+def test_v6_accepts_well_formed_canonical_invalid_outcomes(item: dict[str, object]) -> None:
+    report = build_v6()
+    report["freshness"]["ai_signal"] = item
+    validate_advisory_report(report)
+
+
+def test_v6_rejects_malformed_invalid_outcome_and_unknown_data_keys() -> None:
+    report = build_v6()
+    report["freshness"]["ai_signal"] = {
+        "present": True,
+        "valid": False,
+        "reason": "invalid_generated_at",
+        "as_of": "2026-05-30",
+        "generated_at": "not-a-time",
+        "expires_at": "2026-06-30",
+    }
+    with pytest.raises(AdvisoryValidationError, match="freshness_assessment_invalid"):
+        validate_advisory_report(report)
+
+    report = build_v6()
+    report["freshness"]["ai_signal"]["raw_payload"] = {"secret": "must-not-persist"}
+    with pytest.raises(AdvisoryValidationError, match="freshness_keys_invalid"):
+        validate_advisory_report(report)
+
+
+def test_v6_requires_freshness_when_source_artifact_is_declared() -> None:
+    report = build_v6()
+    report["source_artifacts"]["ai_signal"] = "context.json"
+    with pytest.raises(AdvisoryValidationError, match="source_artifact_freshness_mismatch"):
+        validate_advisory_report(report)
+
+
+def test_v6_rejects_field_timestamp_and_reason_mismatch() -> None:
+    report = build_v6()
+    item = {
+        "present": True,
+        "valid": False,
+        "reason": "expired",
+        "as_of": "2026-05-30",
+        "generated_at": "2026-05-30T12:00:00Z",
+        "expires_at": "2026-06-30",
+    }
+    report["freshness"]["ai_signal"] = item
+    with pytest.raises(AdvisoryValidationError, match="freshness_state_incoherent"):
+        validate_advisory_report(report)
+
+    item["reason"] = "fresh"
+    with pytest.raises(AdvisoryValidationError, match="freshness_state_incoherent|freshness_reason_mismatch"):
+        validate_advisory_report(report)
+
     report = build_v6()
     report["freshness"]["ai_signal"] = {"present": False, "valid": False, "reason": "fresh"}
     with pytest.raises(AdvisoryValidationError):

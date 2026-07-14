@@ -10,6 +10,7 @@ from .time_contract import (
     assess_context_freshness,
     canonical_reference_time,
     contract_version_for_schema,
+    context_expiry_instant,
     normalize_aware_datetime,
 )
 
@@ -98,22 +99,34 @@ def _validate_v6_freshness(
     report_as_of: dt.date,
     reference_time: dt.datetime,
     report_generated_at: dt.datetime,
+    source_artifacts: Mapping[str, Any],
 ) -> None:
     if not isinstance(freshness, Mapping):
         raise AdvisoryValidationError("freshness_invalid")
+    if not isinstance(source_artifacts, Mapping):
+        raise AdvisoryValidationError("source_artifacts_invalid")
     for name in ("ai_signal", "theme_momentum"):
         item = freshness.get(name)
         if not isinstance(item, Mapping):
             raise AdvisoryValidationError("freshness_entry_invalid")
+        base_keys = {"present", "valid", "reason", "as_of", "generated_at", "expires_at"}
+        legacy_key = "compatibility_warning"
+        if set(item) - base_keys - {legacy_key}:
+            raise AdvisoryValidationError("freshness_keys_invalid")
         if type(item.get("present")) is not bool or type(item.get("valid")) is not bool:
             raise AdvisoryValidationError("freshness_status_invalid")
         reason = item.get("reason")
         if not isinstance(reason, str) or not reason.strip():
             raise AdvisoryValidationError("freshness_reason_invalid")
         legacy = reason == "legacy_expiry_compatibility" and item.get("compatibility_warning") == "missing_expires_at"
+        if legacy_key in item and not legacy:
+            raise AdvisoryValidationError("freshness_keys_invalid")
+        declared_artifact = source_artifacts.get(name)
         if not item["present"]:
             if item["valid"] or any(key in item for key in ("as_of", "generated_at", "expires_at")):
                 raise AdvisoryValidationError("freshness_state_incoherent")
+            if declared_artifact:
+                raise AdvisoryValidationError("source_artifact_freshness_mismatch")
             result = assess_context_freshness(
                 None,
                 report_as_of=report_as_of,
@@ -125,6 +138,9 @@ def _validate_v6_freshness(
             required = ("as_of", "generated_at") + (() if legacy else ("expires_at",))
             if any(not item.get(key) for key in required):
                 raise AdvisoryValidationError("freshness_timestamps_incomplete")
+            for key in required:
+                if not isinstance(item[key], str):
+                    raise AdvisoryValidationError("freshness_timestamp_type_invalid")
             result = assess_context_freshness(
                 item,
                 report_as_of=report_as_of,
@@ -133,12 +149,29 @@ def _validate_v6_freshness(
                 max_age_days=REPORT_EXPIRY_DAYS,
                 allow_legacy_expiry=True,
             )
-        if not result.valid and result.reason not in {"not_provided", "expired", "stale_as_of"}:
+        structural_reasons = {
+            "missing_as_of", "missing_generated_at", "missing_expires_at",
+            "invalid_as_of", "invalid_generated_at", "invalid_expires_at",
+        }
+        if result.reason in structural_reasons:
             raise AdvisoryValidationError("freshness_assessment_invalid")
         if item["present"] != result.present or item["valid"] != result.valid:
             raise AdvisoryValidationError("freshness_state_incoherent")
         if reason != result.reason:
             raise AdvisoryValidationError("freshness_reason_mismatch")
+        if result.as_of is not None and dt.date.fromisoformat(item["as_of"]) != result.as_of:
+            raise AdvisoryValidationError("freshness_timestamp_mismatch")
+        if result.generated_at is not None and normalize_aware_datetime(item["generated_at"]) != result.generated_at:
+            raise AdvisoryValidationError("freshness_timestamp_mismatch")
+        if result.expires_at is not None:
+            if "expires_at" not in item:
+                raise AdvisoryValidationError("freshness_timestamp_mismatch")
+            try:
+                expires_at = context_expiry_instant(item["expires_at"], item["generated_at"])
+            except (TimeContractError, TypeError, ValueError) as exc:
+                raise AdvisoryValidationError("freshness_assessment_invalid") from exc
+            if expires_at != result.expires_at:
+                raise AdvisoryValidationError("freshness_timestamp_mismatch")
 
 
 def _require_number_0_1(value: Any, name: str) -> None:
@@ -206,6 +239,7 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
             report_as_of=report_as_of,
             reference_time=reference_time,
             report_generated_at=report_generated_at,
+            source_artifacts=payload["source_artifacts"],
         )
     if payload["mode"] != "model_recommendations":
         raise AdvisoryValidationError("mode must be model_recommendations")
