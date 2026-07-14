@@ -165,6 +165,33 @@ def test_v2_optional_attachments_can_be_declared_independently(optional_fields: 
     assert len(parse_v2_index({"schema_version": 2, "reports": [v2_entry(), entry]}).bindings) == 2
 
 
+@pytest.mark.parametrize("field", ["md", "manifest"])
+def test_variant_declared_unsuffixed_optional_attachment_is_rejected(field: str) -> None:
+    entry = v2_entry(variant=True, digest=DIGEST_B)
+    entry[field] = entry[field].replace(f".variant-{DIGEST_B}", "")
+
+    with pytest.raises(IdentityMetadataError, match="identity_name_mismatch"):
+        parse_v2_index({"schema_version": 2, "reports": [v2_entry(), entry]})
+
+
+@pytest.mark.parametrize("field", ["md", "manifest"])
+def test_variant_declared_wrong_digest_optional_attachment_is_rejected(field: str) -> None:
+    entry = v2_entry(variant=True, digest=DIGEST_B)
+    entry[field] = entry[field].replace(DIGEST_B, DIGEST_A)
+
+    with pytest.raises(IdentityMetadataError, match="identity_name_mismatch"):
+        parse_v2_index({"schema_version": 2, "reports": [v2_entry(), entry]})
+
+
+@pytest.mark.parametrize("field", ["md", "manifest"])
+def test_canonical_declared_suffixed_optional_attachment_is_rejected(field: str) -> None:
+    entry = v2_entry()
+    entry[field] = entry[field].replace(".md" if field == "md" else ".json.manifest.json", ".variant-" + DIGEST_A + (".md" if field == "md" else ".json.manifest.json"))
+
+    with pytest.raises(IdentityMetadataError, match="identity_name_mismatch"):
+        parse_v2_index({"schema_version": 2, "reports": [entry]})
+
+
 def test_v2_duplicate_identity_rejects_any_metadata_or_digest_difference() -> None:
     first = v2_entry()
     duplicate = dict(first)

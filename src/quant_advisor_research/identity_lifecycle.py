@@ -174,7 +174,12 @@ def _validate_v2_entry(entry: object) -> V2IdentityBinding:
     expected_html = f"{as_of}-{cadence}-model-recommendations.html"
     if html_name != expected_html and html_digest is None:
         raise _error("identity_name_mismatch")
-    if any(digest != json_digest for digest in (html_digest, md_digest, manifest_digest) if digest is not None):
+    declared_digests = [html_digest]
+    if md_name is not None:
+        declared_digests.append(md_digest)
+    if manifest_name is not None:
+        declared_digests.append(manifest_digest)
+    if any(digest != json_digest for digest in declared_digests):
         raise _error("identity_name_mismatch")
     if json_digest is None:
         if canonical_identity is not True:
