@@ -189,6 +189,51 @@ def test_exact_hit_requires_complete_policy_and_exact_miss_is_stable() -> None:
         )
 
 
+def test_current_exact_hit_accepts_new_display_without_rewriting_binding() -> None:
+    value = report()
+    index = index_for((value, True))
+    result = allocate(
+        value,
+        index,
+        AllocationContext.current_mandatory(index.bindings[0].period_key),
+        DisplayPlacement(True, 7),
+    )
+
+    assert result.reused_existing is True
+    assert result.binding == index.bindings[0]
+    assert result.publication_entry is not None
+    assert result.publication_entry.display_primary is True
+    assert result.publication_entry.display_order == 7
+
+
+@pytest.mark.parametrize("mode", [
+    AllocationContext.exact_artifact_reuse(),
+    AllocationContext.current_mandatory("weekly:2026-06-15:2026-06-21"),
+    AllocationContext.historical_recovery(),
+])
+def test_attachment_policy_mismatch_is_rejected_for_every_mode(mode: AllocationContext) -> None:
+    value = report()
+    index = index_for((value, True))
+    with pytest.raises(VNextIdentityError, match="identity_reuse_mismatch"):
+        allocate_vnext_identity(
+            value,
+            index=index,
+            context=mode,
+            requested_artifacts=RequestedArtifactSet(True, False),
+            display_placement=DisplayPlacement(True, 9),
+            source_identity="source-2026-06-20",
+        )
+
+
+def test_historical_exact_reuse_does_not_use_stored_display_as_identity() -> None:
+    value = report()
+    index = index_for((value, True))
+    result = allocate(value, index, AllocationContext.historical_recovery(), DisplayPlacement(True, 9))
+    assert result.reused_existing is True
+    assert result.binding == index.bindings[0]
+    assert result.publication_entry is None
+
+
 def test_historical_requires_existing_canonical_and_then_allocates_variant() -> None:
     value = report()
     with pytest.raises(VNextIdentityError, match="canonical_bootstrap_required"):
@@ -239,6 +284,28 @@ def test_wire_entries_are_canonicalized_independent_of_input_order() -> None:
     right = VNextIdentityIndex(VNEXT_INDEX_SCHEMA, tuple(reversed(left.bindings)))
 
     assert serialize_vnext_index(left) == serialize_vnext_index(right)
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("period_key", "weekly:2026-06-08:2026-06-14"),
+        ("report_schema_version", "6"),
+        ("contract_version", "model_recommendations.v6"),
+        ("semantic_fingerprint_version", "other.sha256"),
+        ("artifact_integrity_version", "other.sha256"),
+        ("semantic_digest", "A" * 64),
+        ("artifact_integrity_digest", "B" * 64),
+        ("identity_class", V3_VARIANT),
+        ("status", "VERIFIED"),
+    ],
+)
+def test_cadence_aware_names_do_not_bypass_full_binding_validation(field: str, replacement: object) -> None:
+    value = report()
+    payload = binding_payload(value, canonical=True)
+    payload[field] = replacement
+    with pytest.raises(VNextIdentityError):
+        parse_vnext_index({"schema_version": VNEXT_INDEX_SCHEMA, "entries": [payload]})
 
 
 def test_duplicate_target_and_digest_conflicts_fail_closed() -> None:

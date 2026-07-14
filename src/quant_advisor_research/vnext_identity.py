@@ -3,26 +3,21 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
 from .artifact_integrity import (
-    ARTIFACT_INTEGRITY_VERSION,
     ArtifactIntegrityError,
     snapshot_json_wire,
 )
-from .identity_lifecycle import FINGERPRINT_VERSION, IdentityMetadataError
 from .identity_v3 import (
     PENDING_ARTIFACT_VALIDATION,
     V3_CANONICAL,
     V3_VARIANT,
     V3IdentityBinding,
 )
-from .period_contract import PeriodContractError, canonical_period_identity
-from .time_contract import TimeContractError, contract_version_for_schema
 from .publication_plan import (
     PublicationEntry,
     PublicationPlan,
@@ -30,6 +25,7 @@ from .publication_plan import (
     PublicationRole,
     SelectedCandidate,
 )
+from .vnext_binding import VNextBindingError, binding_payload, validate_vnext_binding
 
 
 VNEXT_INDEX_SCHEMA = "qar_vnext.identity_index.v1"
@@ -96,123 +92,6 @@ def _error(code: str) -> VNextIdentityError:
     return VNextIdentityError(code)
 
 
-def _binding_payload(binding: V3IdentityBinding) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "period_key": binding.period_key,
-        "as_of": binding.as_of,
-        "cadence": binding.cadence,
-        "report_schema_version": binding.report_schema_version,
-        "contract_version": binding.contract_version,
-        "semantic_fingerprint_version": binding.semantic_fingerprint_version,
-        "semantic_digest": binding.semantic_digest,
-        "artifact_integrity_version": binding.artifact_integrity_version,
-        "artifact_integrity_digest": binding.artifact_integrity_digest,
-        "json": binding.json_name,
-        "html": binding.html_name,
-        "identity_class": binding.identity_class,
-        "canonical_identity": binding.canonical_identity,
-        "display_primary": binding.display_primary,
-        "display_order": binding.display_order,
-    }
-    if binding.markdown_name is not None:
-        payload["md"] = binding.markdown_name
-    if binding.manifest_name is not None:
-        payload["manifest"] = binding.manifest_name
-    return payload
-
-
-_DATE = r"(?P<as_of>\d{4}-\d{2}-\d{2})"
-_DIGEST = r"(?P<digest>[0-9a-f]{64})"
-_CADENCE = r"(?P<cadence>daily|weekly|monthly)"
-_JSON_PATTERN = re.compile(rf"^advisory_report_{_DATE}-{_CADENCE}(?:\.variant-{_DIGEST})?\.json$")
-_HTML_PATTERN = re.compile(
-    rf"^{_DATE}-{_CADENCE}-model-recommendations(?:\.variant-{_DIGEST})?\.html$"
-)
-_MD_PATTERN = re.compile(rf"^advisory_report_{_DATE}-{_CADENCE}(?:\.variant-{_DIGEST})?\.md$")
-_MANIFEST_PATTERN = re.compile(
-    rf"^advisory_report_{_DATE}-{_CADENCE}(?:\.variant-{_DIGEST})?\.json\.manifest\.json$"
-)
-
-
-def _name_digest(name: object, pattern: re.Pattern[str], *, as_of: str, cadence: str) -> str | None:
-    if type(name) is not str or not name or "/" in name or "\\" in name:
-        raise _error("identity_name_invalid")
-    match = pattern.fullmatch(name)
-    if match is None or match.group("as_of") != as_of or match.group("cadence") != cadence:
-        raise _error("identity_name_mismatch")
-    return match.groupdict().get("digest")
-
-
-def _parse_clean_binding(entry: object) -> V3IdentityBinding:
-    required = {
-        "period_key", "as_of", "cadence", "report_schema_version", "contract_version",
-        "semantic_fingerprint_version", "semantic_digest", "artifact_integrity_version",
-        "artifact_integrity_digest", "json", "html", "identity_class", "canonical_identity",
-        "display_primary", "display_order",
-    }
-    optional = {"md", "manifest"}
-    if type(entry) is not dict or set(entry) != required | (set(entry) & optional):
-        raise _error("identity_binding_invalid")
-    as_of = entry["as_of"]
-    cadence = entry["cadence"]
-    if type(as_of) is not str or type(cadence) is not str:
-        raise _error("identity_binding_invalid")
-    try:
-        period_key = canonical_period_identity(cadence, as_of).key
-    except (PeriodContractError, TypeError, ValueError, OverflowError):
-        raise _error("period_mismatch") from None
-    if type(entry["period_key"]) is not str or entry["period_key"] != period_key:
-        raise _error("period_mismatch")
-    schema = entry["report_schema_version"]
-    contract = entry["contract_version"]
-    if type(schema) is not str or schema not in {"5", "6"}:
-        raise _error("invalid_schema_version")
-    if type(contract) is not str:
-        raise _error("invalid_contract_version")
-    try:
-        expected_contract = contract_version_for_schema(schema)
-    except (TimeContractError, TypeError, ValueError):
-        raise _error("invalid_schema_version") from None
-    if contract != expected_contract:
-        raise _error("contract_version_mismatch")
-    if entry["semantic_fingerprint_version"] != FINGERPRINT_VERSION:
-        raise _error("invalid_fingerprint_version")
-    semantic_digest = entry["semantic_digest"]
-    if type(semantic_digest) is not str or re.fullmatch(r"[0-9a-f]{64}", semantic_digest) is None:
-        raise _error("invalid_semantic_digest")
-    if entry["artifact_integrity_version"] != ARTIFACT_INTEGRITY_VERSION:
-        raise _error("invalid_artifact_integrity_version")
-    artifact_digest = entry["artifact_integrity_digest"]
-    if type(artifact_digest) is not str or re.fullmatch(r"[0-9a-f]{64}", artifact_digest) is None:
-        raise _error("invalid_artifact_integrity_digest")
-    identity_class = entry["identity_class"]
-    if type(identity_class) is not str or identity_class not in {V3_CANONICAL, V3_VARIANT}:
-        raise _error("legacy_identity_rejected" if identity_class == "LEGACY_V2" else "invalid_identity_class")
-    canonical = entry["canonical_identity"]
-    primary = entry["display_primary"]
-    order = entry["display_order"]
-    if type(canonical) is not bool or type(primary) is not bool or type(order) is not int or order < 0:
-        raise _error("identity_binding_invalid")
-    if (identity_class == V3_CANONICAL) != canonical:
-        raise _error("identity_metadata_mismatch")
-    names = [
-        (_name_digest(entry["json"], _JSON_PATTERN, as_of=as_of, cadence=cadence), entry["json"]),
-        (_name_digest(entry["html"], _HTML_PATTERN, as_of=as_of, cadence=cadence), entry["html"]),
-    ]
-    md = None if "md" not in entry else entry["md"]
-    manifest = None if "manifest" not in entry else entry["manifest"]
-    if md is not None:
-        names.append((_name_digest(md, _MD_PATTERN, as_of=as_of, cadence=cadence), md))
-    if manifest is not None:
-        names.append((_name_digest(manifest, _MANIFEST_PATTERN, as_of=as_of, cadence=cadence), manifest))
-    expected_suffix = None if canonical else artifact_digest
-    if any(name_digest != expected_suffix for name_digest, _name in names):
-        raise _error("identity_digest_mismatch")
-    return V3IdentityBinding(
-        period_key, as_of, cadence, schema, contract, FINGERPRINT_VERSION, semantic_digest,
-        ARTIFACT_INTEGRITY_VERSION, artifact_digest, entry["json"], entry["html"], md, manifest,
-        identity_class, canonical, primary, order, PENDING_ARTIFACT_VALIDATION,
-    )
 
 
 def _validate_binding(binding: object) -> V3IdentityBinding:
@@ -220,12 +99,10 @@ def _validate_binding(binding: object) -> V3IdentityBinding:
         raise _error("identity_binding_invalid")
     if binding.status != PENDING_ARTIFACT_VALIDATION:
         raise _error("identity_binding_invalid")
-    if binding.identity_class not in {V3_CANONICAL, V3_VARIANT}:
-        raise _error("legacy_identity_rejected" if binding.identity_class == "LEGACY_V2" else "identity_binding_invalid")
     try:
-        validated = _parse_clean_binding(_binding_payload(binding))
-    except (AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
-        raise _error("identity_binding_invalid") from None
+        validated = validate_vnext_binding(binding)
+    except VNextBindingError as exc:
+        raise _error(exc.code) from None
     if validated != binding:
         raise _error("identity_binding_invalid")
     return binding
@@ -282,7 +159,7 @@ def empty_vnext_index() -> VNextIdentityIndex:
 def _wire_payload(index: VNextIdentityIndex) -> dict[str, object]:
     return {
         "schema_version": VNEXT_INDEX_SCHEMA,
-        "entries": [_binding_payload(binding) for binding in index.bindings],
+        "entries": [binding_payload(binding) for binding in index.bindings],
     }
 
 
@@ -296,11 +173,13 @@ def parse_vnext_index(payload: Mapping[str, Any]) -> VNextIdentityIndex:
         entries = snapshot["entries"]
         if type(entries) is not list:
             raise _error("identity_index_invalid")
-        bindings = tuple(_parse_clean_binding(entry) for entry in entries)
+        bindings = tuple(validate_vnext_binding(entry) for entry in entries)
         return _validate_index(VNextIdentityIndex(VNEXT_INDEX_SCHEMA, bindings))
     except VNextIdentityError:
         raise
-    except (ArtifactIntegrityError, IdentityMetadataError, AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
+    except VNextBindingError as exc:
+        raise _error(exc.code) from None
+    except (ArtifactIntegrityError, AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
         raise _error("identity_index_invalid") from None
 
 
@@ -383,13 +262,21 @@ def _new_binding(candidate: SelectedCandidate, requested: RequestedArtifactSet, 
     )
 
 
-def _check_policy(binding: V3IdentityBinding, requested: RequestedArtifactSet, display: DisplayPlacement) -> None:
-    if (
+def _check_policy(
+    binding: V3IdentityBinding,
+    requested: RequestedArtifactSet,
+    display: DisplayPlacement,
+    *,
+    require_stored_display: bool,
+) -> None:
+    attachment_mismatch = (
         (binding.markdown_name is not None) != requested.include_markdown
         or (binding.manifest_name is not None) != requested.include_manifest
-        or binding.display_primary != display.display_primary
-        or binding.display_order != display.display_order
-    ):
+    )
+    display_mismatch = require_stored_display and (
+        binding.display_primary != display.display_primary or binding.display_order != display.display_order
+    )
+    if attachment_mismatch or display_mismatch:
         raise _error("identity_reuse_mismatch")
 
 
@@ -418,7 +305,12 @@ def allocate_vnext_identity(
         raise _error("identity_integrity_conflict")
     if exact:
         binding = exact[0]
-        _check_policy(binding, requested, display)
+        _check_policy(
+            binding,
+            requested,
+            display,
+            require_stored_display=context.mode is AllocationMode.EXACT_ARTIFACT_REUSE,
+        )
         publication_entry = None
         publication_plan = None
         if context.mode is AllocationMode.CURRENT_MANDATORY:

@@ -32,7 +32,10 @@ and monthly reports for one `as_of` cannot collide.
 - `EXACT_ARTIFACT_REUSE` returns only an exact clean vNext binding and requires
   attachment/display policy equality. An exact `CURRENT_MANDATORY` hit reuses
   the immutable binding and reports `reused_existing=True`; it does not create
-  an identical variant.
+  an identical variant. CURRENT may supply new display placement for the
+  publication plan without mutating the stored binding; EXACT reuse requires
+  stored display equality, while historical reuse treats display as separate
+  from identity. All modes still require exact attachment presence.
 - `CURRENT_MANDATORY` may bootstrap one canonical identity in an empty period;
   a rerun in an occupied period receives a full artifact-digest variant.
 - `HISTORICAL_RECOVERY` requires an existing canonical identity and otherwise
