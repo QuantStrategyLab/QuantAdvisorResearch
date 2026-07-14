@@ -434,19 +434,27 @@ def make_complete_identity_inventory(
     index: V2IdentityIndex,
     identities: tuple[VerifiedIdentityEvidence, ...] | list[VerifiedIdentityEvidence],
 ) -> CompleteVerifiedIdentityInventory:
-    if not isinstance(index, V2IdentityIndex) or index.schema_version != 2:
+    if not isinstance(index, V2IdentityIndex) or index.schema_version != 2 or type(index.bindings) is not tuple:
         raise _error("identity_inventory_invalid")
-    if any(not _valid_identity_evidence(item) for item in identities):
-        raise _error("identity_evidence_untrusted")
-    bindings = tuple(index.bindings)
     try:
-        _validate_v2_index(bindings)
-    except IdentityMetadataError:
-        raise
+        bindings = tuple(index.bindings)
+        validated_bindings_list: list[V2IdentityBinding] = []
+        for binding in bindings:
+            if not isinstance(binding, V2IdentityBinding):
+                raise _error("identity_inventory_invalid")
+            validated_bindings_list.append(_validate_v2_entry(_v2_binding_payload(binding)))
+        validated_bindings = tuple(validated_bindings_list)
+        if validated_bindings != bindings:
+            raise _error("identity_inventory_invalid")
+        _validate_v2_index(validated_bindings)
+    except (IdentityMetadataError, AttributeError, KeyError, TypeError, ValueError, OverflowError):
+        raise _error("identity_inventory_invalid") from None
     evidence = tuple(identities)
+    if any(not _valid_identity_evidence(item) for item in evidence):
+        raise _error("identity_evidence_untrusted")
     if len(evidence) != len(bindings):
         raise _error("identity_inventory_incomplete")
-    expected = sorted(bindings, key=lambda item: (item.period_key, item.json_name, item.html_name))
+    expected = sorted(validated_bindings, key=lambda item: (item.period_key, item.json_name, item.html_name))
     actual = sorted((item.binding for item in evidence), key=lambda item: (item.period_key, item.json_name, item.html_name))
     if actual != expected:
         raise _error("identity_inventory_incomplete")
@@ -491,11 +499,21 @@ def allocate_identity(
         _validate_v2_index(bindings)
     except IdentityMetadataError:
         raise
-    exact = [item for item in identities if item.binding.period_key == evidence.period_key and item.report_digest == evidence.fingerprint_digest]
-    if len(exact) > 1:
+    same_period_digest = [
+        item for item in identities
+        if item.binding.period_key == evidence.period_key and item.report_digest == evidence.fingerprint_digest
+    ]
+    if len(same_period_digest) > 1:
         raise _error("identity_digest_conflict")
-    if exact:
-        binding = exact[0].binding
+    if same_period_digest:
+        item = same_period_digest[0]
+        binding = item.binding
+        exact_key = (evidence.period_key, evidence.as_of, evidence.cadence, evidence.schema_version,
+                     evidence.fingerprint_version, evidence.fingerprint_digest)
+        binding_key = (binding.period_key, binding.as_of, binding.cadence, binding.schema_version,
+                       binding.fingerprint_version, binding.fingerprint_digest)
+        if exact_key != binding_key:
+            raise _error("identity_metadata_conflict")
         return AllocatedIdentity(
             binding.period_key, binding.as_of, binding.cadence, binding.schema_version,
             binding.fingerprint_version, binding.fingerprint_digest, binding.json_name, binding.html_name,

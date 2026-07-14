@@ -5,6 +5,7 @@ import json
 import gc
 import pickle
 import weakref
+import datetime as dt
 from dataclasses import replace
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from quant_advisor_research.identity_lifecycle import (
     verify_report_evidence,
 )
 from quant_advisor_research.publisher import report_content_fingerprint
+from quant_advisor_research.time_contract import canonical_reference_time, normalize_aware_datetime
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,12 +42,14 @@ def build_report(*, as_of: str = "2026-06-20", schema_version: str = "5") -> dic
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
     )
     if schema_version == "6":
+        generated_at = normalize_aware_datetime(report["generated_at"])
+        reference_time = canonical_reference_time(dt.date.fromisoformat(as_of))
         report.update(
             {
                 "schema_version": "6",
                 "contract_version": "model_recommendations.v6",
-                "reference_time": "2026-06-21T23:59:59Z",
-                "expires_at": "2026-06-28T12:00:00.123456Z",
+                "reference_time": reference_time.isoformat().replace("+00:00", "Z"),
+                "expires_at": (generated_at + dt.timedelta(days=7)).isoformat().replace("+00:00", "Z"),
                 "freshness": {
                     "ai_signal": {"present": False, "valid": False, "reason": "not_provided"},
                     "theme_momentum": {"present": False, "valid": False, "reason": "not_provided"},
@@ -252,6 +256,41 @@ def test_current_period_with_existing_different_canonical_allocates_variant() ->
     assert allocated.json_name != old_identity.binding.json_name
 
 
+def test_same_period_digest_with_different_as_of_fails_closed_without_new_variant() -> None:
+    old_report = build_report(as_of="2026-06-20")
+    new_report = build_report(as_of="2026-06-21")
+    old_identity = verify_existing_identity(old_report, v2_binding(old_report))
+    new_evidence = verify_report_evidence(new_report)
+    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (old_identity.binding,)), (old_identity,))
+
+    with pytest.raises(IdentityMetadataError, match="identity_metadata_conflict"):
+        allocate_identity(new_evidence, inventory=inventory)
+
+
+def test_same_period_digest_with_different_schema_fails_closed() -> None:
+    old_report = build_report(schema_version="5")
+    new_report = build_report(schema_version="6")
+    old_identity = verify_existing_identity(old_report, v2_binding(old_report))
+    new_evidence = verify_report_evidence(new_report)
+    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (old_identity.binding,)), (old_identity,))
+
+    with pytest.raises(IdentityMetadataError, match="identity_metadata_conflict"):
+        allocate_identity(new_evidence, inventory=inventory)
+
+
+def test_same_digest_across_periods_does_not_reuse_old_identity() -> None:
+    old_report = build_report(as_of="2026-06-20")
+    new_report = build_report(as_of="2026-06-27")
+    old_identity = verify_existing_identity(old_report, v2_binding(old_report))
+    new_evidence = verify_report_evidence(new_report)
+    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (old_identity.binding,)), (old_identity,))
+
+    allocated = allocate_identity(new_evidence, inventory=inventory)
+
+    assert allocated.canonical_identity is False
+    assert allocated.fingerprint_digest == old_identity.report_digest
+
+
 def test_historical_new_content_always_allocates_variant() -> None:
     evidence = verify_report_evidence(build_report())
     inventory = make_complete_identity_inventory(V2IdentityIndex(2, ()), ())
@@ -303,8 +342,25 @@ def test_complete_inventory_rejects_duplicate_or_filtered_bindings() -> None:
     existing = verify_existing_identity(report, v2_binding(report))
     duplicate_index = V2IdentityIndex(2, (existing.binding, existing.binding))
 
-    with pytest.raises(IdentityMetadataError, match="identity_content_conflict"):
+    with pytest.raises(IdentityMetadataError, match="identity_inventory_invalid"):
         make_complete_identity_inventory(duplicate_index, (existing, existing))
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda binding: "malformed",
+        lambda binding: replace(binding, display_order=True),
+        lambda binding: replace(binding, json_name=Path("absolute")),
+        lambda binding: replace(binding, fingerprint_version="other"),
+    ],
+)
+def test_complete_inventory_sanitizes_malformed_public_index_bindings(mutation) -> None:
+    existing = verify_existing_identity(build_report(), v2_binding(build_report()))
+    malformed = mutation(existing.binding)
+
+    with pytest.raises(IdentityMetadataError, match="identity_inventory_invalid"):
+        make_complete_identity_inventory(V2IdentityIndex(2, (malformed,)), (existing,))
 
 
 def test_rehydrated_identity_evidence_requires_binding_revalidation() -> None:
