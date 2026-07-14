@@ -27,6 +27,7 @@ from .identity_v3 import (
 from .period_contract import PeriodContractError, canonical_period_identity
 from .publisher import report_content_fingerprint
 from .time_contract import TimeContractError, contract_version_for_schema
+from .vnext_binding import VNextBindingError, VNextIdentityBinding, validate_vnext_binding
 
 
 class PublicationPlanError(ValueError):
@@ -169,7 +170,7 @@ class PublicationEntry:
     """One selected source bound to one verified v3 public identity."""
 
     candidate: SelectedCandidate
-    binding: V3IdentityBinding
+    binding: V3IdentityBinding | VNextIdentityBinding
     role: PublicationRole
     display_primary: bool
     display_order: int
@@ -227,8 +228,13 @@ def _binding_payload(binding: V3IdentityBinding) -> dict[str, object]:
     return payload
 
 
-def _validate_binding(binding: object) -> V3IdentityBinding:
-    if not isinstance(binding, V3IdentityBinding):
+def _validate_binding(binding: object) -> V3IdentityBinding | VNextIdentityBinding:
+    if type(binding) is VNextIdentityBinding:
+        try:
+            return validate_vnext_binding(binding)
+        except VNextBindingError as exc:
+            raise _error(exc.code) from None
+    if type(binding) is not V3IdentityBinding:
         raise _error("identity_binding_invalid")
     if binding.status != PENDING_ARTIFACT_VALIDATION:
         raise _error("identity_binding_invalid")
