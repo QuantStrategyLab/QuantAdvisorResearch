@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-import weakref
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from .contracts import AdvisoryValidationError, validate_advisory_report
 from .period_contract import PeriodContractError, canonical_period_identity
@@ -43,7 +42,7 @@ class V1ProvisionalBinding:
     status: str = "PROVISIONAL"
 
 
-@dataclass(frozen=True, slots=True, weakref_slot=True)
+@dataclass(frozen=True, slots=True)
 class VerifiedReportEvidence:
     period_key: str
     as_of: str
@@ -84,7 +83,7 @@ class V2IdentityIndex:
     bindings: tuple[V2IdentityBinding, ...]
 
 
-@dataclass(frozen=True, slots=True, weakref_slot=True)
+@dataclass(frozen=True, slots=True)
 class VerifiedIdentityEvidence:
     binding: V2IdentityBinding
     report_digest: str
@@ -106,29 +105,10 @@ class AllocatedIdentity:
     allocation_source: str
 
 
-@dataclass(frozen=True, slots=True, weakref_slot=True)
+@dataclass(frozen=True, slots=True)
 class CompleteVerifiedIdentityInventory:
     identities: tuple[VerifiedIdentityEvidence, ...]
-
-
-_REPORT_CAPABILITIES: dict[int, weakref.ReferenceType[VerifiedReportEvidence]] = {}
-_IDENTITY_CAPABILITIES: dict[int, weakref.ReferenceType[VerifiedIdentityEvidence]] = {}
-_INVENTORY_CAPABILITIES: dict[int, weakref.ReferenceType[CompleteVerifiedIdentityInventory]] = {}
-
-
-def _register_capability(registry: dict[int, weakref.ReferenceType[Any]], value: Any) -> None:
-    key = id(value)
-
-    def discard(reference: weakref.ReferenceType[Any], *, key: int = key) -> None:
-        if registry.get(key) is reference:
-            registry.pop(key, None)
-
-    registry[key] = weakref.ref(value, discard)
-
-
-def _has_capability(registry: dict[int, weakref.ReferenceType[Any]], value: Any) -> bool:
-    reference = registry.get(id(value))
-    return reference is not None and reference() is value
+    reports: tuple[tuple[str, object], ...]
 
 
 def _error(code: str) -> IdentityMetadataError:
@@ -383,7 +363,10 @@ def _compute_report_evidence(report: object, provisional: V1ProvisionalBinding |
         digest = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
     except IdentityMetadataError:
         raise
-    except (AdvisoryValidationError, AttributeError, KeyError, TypeError, ValueError, OverflowError):
+    except (
+        AdvisoryValidationError, AttributeError, KeyError, TypeError, ValueError, OverflowError,
+        UnicodeError, RecursionError,
+    ):
         raise _error("report_invalid") from None
     return period_key, as_of, cadence, schema_version, digest
 
@@ -402,9 +385,7 @@ def verify_report_evidence(
             expected.period_key, expected.as_of, expected.cadence, expected.schema_version, expected.fingerprint_digest
         ):
             raise _error("identity_content_conflict")
-    evidence = VerifiedReportEvidence(period_key, as_of, cadence, schema_version, FINGERPRINT_VERSION, digest)
-    _register_capability(_REPORT_CAPABILITIES, evidence)
-    return evidence
+    return VerifiedReportEvidence(period_key, as_of, cadence, schema_version, FINGERPRINT_VERSION, digest)
 
 
 def verify_existing_identity(report: object, binding: V2IdentityBinding) -> VerifiedIdentityEvidence:
@@ -421,20 +402,19 @@ def verify_existing_identity(report: object, binding: V2IdentityBinding) -> Veri
         raise _error("identity_metadata_mismatch")
     if digest != validated.fingerprint_digest:
         raise _error("identity_content_conflict")
-    evidence = VerifiedIdentityEvidence(validated, digest)
-    _register_capability(_IDENTITY_CAPABILITIES, evidence)
-    return evidence
-
-
-def _valid_identity_evidence(evidence: VerifiedIdentityEvidence) -> bool:
-    return isinstance(evidence, VerifiedIdentityEvidence) and _has_capability(_IDENTITY_CAPABILITIES, evidence)
+    return VerifiedIdentityEvidence(validated, digest)
 
 
 def make_complete_identity_inventory(
     index: V2IdentityIndex,
-    identities: tuple[VerifiedIdentityEvidence, ...] | list[VerifiedIdentityEvidence],
+    reports: Mapping[str, object],
 ) -> CompleteVerifiedIdentityInventory:
-    if not isinstance(index, V2IdentityIndex) or index.schema_version != 2 or type(index.bindings) is not tuple:
+    if (
+        not isinstance(index, V2IdentityIndex)
+        or index.schema_version != 2
+        or type(index.bindings) is not tuple
+        or type(reports) is not dict
+    ):
         raise _error("identity_inventory_invalid")
     try:
         bindings = tuple(index.bindings)
@@ -447,22 +427,59 @@ def make_complete_identity_inventory(
         if validated_bindings != bindings:
             raise _error("identity_inventory_invalid")
         _validate_v2_index(validated_bindings)
+        if any(type(name) is not str for name in reports):
+            raise _error("identity_inventory_invalid")
+        expected_names = {binding.json_name for binding in validated_bindings}
+        if set(reports) != expected_names:
+            raise _error("identity_inventory_incomplete")
+        identities = tuple(
+            verify_existing_identity(reports[binding.json_name], binding)
+            for binding in validated_bindings
+        )
+    except IdentityMetadataError as exc:
+        if exc.code == "identity_inventory_incomplete":
+            raise
+        raise _error("identity_inventory_invalid") from None
+    except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
+        raise _error("identity_inventory_invalid") from None
+    ordered = tuple(sorted(identities, key=lambda item: (
+        item.binding.period_key, item.binding.json_name, item.binding.html_name
+    )))
+    ordered_reports = tuple((name, reports[name]) for name in sorted(reports))
+    return CompleteVerifiedIdentityInventory(ordered, ordered_reports)
+
+
+def _revalidate_inventory(inventory: CompleteVerifiedIdentityInventory) -> tuple[VerifiedIdentityEvidence, ...]:
+    if not isinstance(inventory, CompleteVerifiedIdentityInventory):
+        raise _error("identity_inventory_required")
+    try:
+        if type(inventory.identities) is not tuple or type(inventory.reports) is not tuple:
+            raise _error("identity_inventory_invalid")
+        identities = inventory.identities
+        if any(not isinstance(item, VerifiedIdentityEvidence) for item in identities):
+            raise _error("identity_inventory_invalid")
+        if any(
+            type(item) is not tuple or len(item) != 2 or type(item[0]) is not str
+            for item in inventory.reports
+        ):
+            raise _error("identity_inventory_invalid")
+        if len({item[0] for item in inventory.reports}) != len(inventory.reports):
+            raise _error("identity_inventory_invalid")
+        reports = dict(inventory.reports)
+        bindings = tuple(item.binding for item in identities)
+        validated_bindings = tuple(_validate_v2_entry(_v2_binding_payload(binding)) for binding in bindings)
+        if validated_bindings != bindings or set(reports) != {binding.json_name for binding in bindings}:
+            raise _error("identity_inventory_invalid")
+        _validate_v2_index(validated_bindings)
+        revalidated = tuple(
+            verify_existing_identity(reports[binding.json_name], binding)
+            for binding in validated_bindings
+        )
+        if revalidated != identities:
+            raise _error("identity_inventory_invalid")
+        return revalidated
     except (IdentityMetadataError, AttributeError, KeyError, TypeError, ValueError, OverflowError):
         raise _error("identity_inventory_invalid") from None
-    evidence = tuple(identities)
-    if any(not _valid_identity_evidence(item) for item in evidence):
-        raise _error("identity_evidence_untrusted")
-    if len(evidence) != len(bindings):
-        raise _error("identity_inventory_incomplete")
-    expected = sorted(validated_bindings, key=lambda item: (item.period_key, item.json_name, item.html_name))
-    actual = sorted((item.binding for item in evidence), key=lambda item: (item.period_key, item.json_name, item.html_name))
-    if actual != expected:
-        raise _error("identity_inventory_incomplete")
-    inventory = CompleteVerifiedIdentityInventory(tuple(sorted(evidence, key=lambda item: (
-        item.binding.period_key, item.binding.json_name, item.binding.html_name
-    ))))
-    _register_capability(_INVENTORY_CAPABILITIES, inventory)
-    return inventory
 
 
 def _new_allocated_identity(evidence: VerifiedReportEvidence, *, canonical: bool, source: str) -> AllocatedIdentity:
@@ -477,7 +494,7 @@ def _new_allocated_identity(evidence: VerifiedReportEvidence, *, canonical: bool
 
 
 def allocate_identity(
-    evidence: VerifiedReportEvidence,
+    report: object,
     *,
     inventory: CompleteVerifiedIdentityInventory | None = None,
     existing_identities: object = None,
@@ -485,15 +502,12 @@ def allocate_identity(
 ) -> AllocatedIdentity:
     if existing_identities is not None:
         raise _error("identity_inventory_required")
-    if not isinstance(evidence, VerifiedReportEvidence) or not _has_capability(_REPORT_CAPABILITIES, evidence):
-        raise _error("report_evidence_untrusted")
-    if not isinstance(inventory, CompleteVerifiedIdentityInventory) or not _has_capability(
-        _INVENTORY_CAPABILITIES, inventory
-    ):
+    if inventory is None:
         raise _error("identity_inventory_required")
     if current_period_key is not None and not isinstance(current_period_key, str):
         raise _error("period_mismatch")
-    identities = inventory.identities
+    evidence = verify_report_evidence(report)
+    identities = _revalidate_inventory(inventory)
     bindings = tuple(item.binding for item in identities)
     try:
         _validate_v2_index(bindings)

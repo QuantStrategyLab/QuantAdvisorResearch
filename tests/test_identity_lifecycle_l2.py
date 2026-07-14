@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import gc
 import pickle
-import weakref
 import datetime as dt
 from dataclasses import replace
 from pathlib import Path
@@ -99,6 +97,16 @@ def v2_binding(report: dict, *, variant: bool = False, digest: str | None = None
     return parse_v2_index({"schema_version": 2, "reports": [entry]}).bindings[0]
 
 
+def inventory_for(*items: tuple[V2IdentityBinding, dict]):
+    bindings = tuple(binding for binding, _report in items)
+    reports = {binding.json_name: report for binding, report in items}
+    return make_complete_identity_inventory(V2IdentityIndex(2, bindings), reports)
+
+
+def empty_inventory():
+    return make_complete_identity_inventory(V2IdentityIndex(2, ()), {})
+
+
 def test_v1_verification_returns_evidence_only() -> None:
     report = build_report()
 
@@ -154,12 +162,20 @@ def test_verification_circular_value_is_sanitized() -> None:
         verify_report_evidence(report)
 
 
-def test_forged_or_replaced_evidence_cannot_be_allocated() -> None:
-    evidence = verify_report_evidence(build_report())
-    forged = replace(evidence, fingerprint_digest=DIGEST_B)
+def test_verification_unicode_serialization_failure_is_sanitized() -> None:
+    report = build_report()
+    report["unserializable"] = "\ud800"
 
-    with pytest.raises(IdentityMetadataError, match="report_evidence_untrusted"):
-        allocate_identity(forged, current_period_key=evidence.period_key)
+    with pytest.raises(IdentityMetadataError, match="report_invalid"):
+        verify_report_evidence(report)
+
+
+def test_forged_or_replaced_evidence_cannot_be_allocated() -> None:
+    report = build_report()
+    forged = replace(verify_report_evidence(report), fingerprint_digest=DIGEST_B)
+
+    with pytest.raises(IdentityMetadataError, match="report_invalid"):
+        allocate_identity(forged, inventory=empty_inventory())
 
 
 def test_public_candidate_requires_explicit_report_revalidation_for_trust() -> None:
@@ -169,40 +185,35 @@ def test_public_candidate_requires_explicit_report_revalidation_for_trust() -> N
         fingerprint_digest=digest_for(report),
     )
     assert candidate.status == "UNTRUSTED_REPORT_EVIDENCE_CANDIDATE"
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, ()), ())
+    inventory = empty_inventory()
 
-    with pytest.raises(IdentityMetadataError, match="report_evidence_untrusted"):
+    with pytest.raises(IdentityMetadataError, match="report_invalid"):
         allocate_identity(candidate, inventory=inventory, current_period_key=candidate.period_key)
 
     trusted = verify_report_evidence(report, expected=candidate)
-    assert allocate_identity(trusted, inventory=inventory, current_period_key=trusted.period_key).canonical_identity
+    assert allocate_identity(report, inventory=inventory, current_period_key=trusted.period_key).canonical_identity
 
 
 def test_equal_copy_and_pickle_roundtrip_do_not_retain_ephemeral_trust() -> None:
     trusted = verify_report_evidence(build_report())
     copied = replace(trusted)
     unpickled = pickle.loads(pickle.dumps(trusted))
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, ()), ())
+    inventory = empty_inventory()
 
     for candidate in (copied, unpickled):
-        with pytest.raises(IdentityMetadataError, match="report_evidence_untrusted"):
+        with pytest.raises(IdentityMetadataError, match="report_invalid"):
             allocate_identity(candidate, inventory=inventory)
+    assert verify_report_evidence(build_report(), expected=unpickled)
 
 
 def test_legacy_subset_argument_fails_closed() -> None:
-    trusted = verify_report_evidence(build_report())
-
     with pytest.raises(IdentityMetadataError, match="identity_inventory_required"):
-        allocate_identity(trusted, existing_identities=[])
+        allocate_identity(build_report(), existing_identities=[])
 
 
-def test_report_capability_registry_does_not_keep_evidence_alive() -> None:
-    trusted = verify_report_evidence(build_report())
-    reference = weakref.ref(trusted)
-    del trusted
-    gc.collect()
-
-    assert reference() is None
+def test_evidence_has_no_process_local_capability() -> None:
+    evidence = verify_report_evidence(build_report())
+    assert not hasattr(evidence, "capability")
 
 
 def test_existing_identity_requires_report_bytes_and_digest_match() -> None:
@@ -221,11 +232,10 @@ def replace_report_content(report: dict) -> dict:
 
 def test_exact_verified_identity_is_reused_immutably() -> None:
     report = build_report()
-    evidence = verify_report_evidence(report)
     existing = verify_existing_identity(report, v2_binding(report))
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (existing.binding,)), (existing,))
+    inventory = inventory_for((existing.binding, report))
 
-    allocated = allocate_identity(evidence, inventory=inventory)
+    allocated = allocate_identity(report, inventory=inventory)
 
     assert allocated.json_name == existing.binding.json_name
     assert allocated.html_name == existing.binding.html_name
@@ -233,10 +243,11 @@ def test_exact_verified_identity_is_reused_immutably() -> None:
 
 
 def test_current_period_without_existing_canonical_allocates_canonical() -> None:
-    evidence = verify_report_evidence(build_report())
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, ()), ())
+    report = build_report()
+    evidence = verify_report_evidence(report)
+    inventory = empty_inventory()
 
-    allocated = allocate_identity(evidence, inventory=inventory, current_period_key=evidence.period_key)
+    allocated = allocate_identity(report, inventory=inventory, current_period_key=evidence.period_key)
 
     assert allocated.canonical_identity is True
     assert ".variant-" not in allocated.json_name
@@ -247,9 +258,9 @@ def test_current_period_with_existing_different_canonical_allocates_variant() ->
     new_report = replace_report_content(old_report)
     old_identity = verify_existing_identity(old_report, v2_binding(old_report))
     new_evidence = verify_report_evidence(new_report)
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (old_identity.binding,)), (old_identity,))
+    inventory = inventory_for((old_identity.binding, old_report))
 
-    allocated = allocate_identity(new_evidence, inventory=inventory, current_period_key=new_evidence.period_key)
+    allocated = allocate_identity(new_report, inventory=inventory, current_period_key=new_evidence.period_key)
 
     assert allocated.canonical_identity is False
     assert f".variant-{new_evidence.fingerprint_digest}" in allocated.json_name
@@ -260,42 +271,40 @@ def test_same_period_digest_with_different_as_of_fails_closed_without_new_varian
     old_report = build_report(as_of="2026-06-20")
     new_report = build_report(as_of="2026-06-21")
     old_identity = verify_existing_identity(old_report, v2_binding(old_report))
-    new_evidence = verify_report_evidence(new_report)
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (old_identity.binding,)), (old_identity,))
+    inventory = inventory_for((old_identity.binding, old_report))
 
     with pytest.raises(IdentityMetadataError, match="identity_metadata_conflict"):
-        allocate_identity(new_evidence, inventory=inventory)
+        allocate_identity(new_report, inventory=inventory)
 
 
 def test_same_period_digest_with_different_schema_fails_closed() -> None:
     old_report = build_report(schema_version="5")
     new_report = build_report(schema_version="6")
     old_identity = verify_existing_identity(old_report, v2_binding(old_report))
-    new_evidence = verify_report_evidence(new_report)
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (old_identity.binding,)), (old_identity,))
+    inventory = inventory_for((old_identity.binding, old_report))
 
     with pytest.raises(IdentityMetadataError, match="identity_metadata_conflict"):
-        allocate_identity(new_evidence, inventory=inventory)
+        allocate_identity(new_report, inventory=inventory)
 
 
 def test_same_digest_across_periods_does_not_reuse_old_identity() -> None:
     old_report = build_report(as_of="2026-06-20")
     new_report = build_report(as_of="2026-06-27")
     old_identity = verify_existing_identity(old_report, v2_binding(old_report))
-    new_evidence = verify_report_evidence(new_report)
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (old_identity.binding,)), (old_identity,))
+    inventory = inventory_for((old_identity.binding, old_report))
 
-    allocated = allocate_identity(new_evidence, inventory=inventory)
+    allocated = allocate_identity(new_report, inventory=inventory)
 
     assert allocated.canonical_identity is False
     assert allocated.fingerprint_digest == old_identity.report_digest
 
 
 def test_historical_new_content_always_allocates_variant() -> None:
-    evidence = verify_report_evidence(build_report())
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, ()), ())
+    report = build_report()
+    evidence = verify_report_evidence(report)
+    inventory = empty_inventory()
 
-    allocated = allocate_identity(evidence, inventory=inventory)
+    allocated = allocate_identity(report, inventory=inventory)
 
     assert allocated.canonical_identity is False
     assert f".variant-{evidence.fingerprint_digest}" in allocated.html_name
@@ -314,14 +323,11 @@ def test_allocation_is_input_order_independent() -> None:
         canonical_identity=False,
     )
     second_identity = verify_existing_identity(second, second_binding)
-    evidence = verify_report_evidence(build_report(as_of="2026-06-27"))
-    inventory = make_complete_identity_inventory(
-        V2IdentityIndex(2, (first_identity.binding, second_identity.binding)),
-        [first_identity, second_identity],
-    )
+    report = build_report(as_of="2026-06-27")
+    inventory = inventory_for((first_identity.binding, first), (second_identity.binding, second))
 
-    one = allocate_identity(evidence, inventory=inventory)
-    two = allocate_identity(evidence, inventory=inventory)
+    one = allocate_identity(report, inventory=inventory)
+    two = allocate_identity(report, inventory=inventory)
 
     assert one == two
 
@@ -332,9 +338,22 @@ def test_complete_inventory_requires_one_to_one_full_index_coverage() -> None:
     full_index = V2IdentityIndex(2, (existing.binding,))
 
     with pytest.raises(IdentityMetadataError, match="identity_inventory_incomplete"):
-        make_complete_identity_inventory(full_index, ())
+        make_complete_identity_inventory(full_index, {})
     with pytest.raises(IdentityMetadataError, match="identity_inventory_incomplete"):
-        make_complete_identity_inventory(V2IdentityIndex(2, ()), (existing,))
+        make_complete_identity_inventory(V2IdentityIndex(2, ()), {existing.binding.json_name: report})
+
+
+def test_complete_inventory_requires_exact_source_report_mapping() -> None:
+    report = build_report()
+    binding = v2_binding(report)
+    index = V2IdentityIndex(2, (binding,))
+
+    with pytest.raises(IdentityMetadataError, match="identity_inventory_incomplete"):
+        make_complete_identity_inventory(index, {})
+    with pytest.raises(IdentityMetadataError, match="identity_inventory_incomplete"):
+        make_complete_identity_inventory(index, {"unexpected.json": report})
+    with pytest.raises(IdentityMetadataError, match="identity_inventory_invalid"):
+        make_complete_identity_inventory(index, {binding.json_name: replace_report_content(report)})
 
 
 def test_complete_inventory_rejects_duplicate_or_filtered_bindings() -> None:
@@ -343,7 +362,7 @@ def test_complete_inventory_rejects_duplicate_or_filtered_bindings() -> None:
     duplicate_index = V2IdentityIndex(2, (existing.binding, existing.binding))
 
     with pytest.raises(IdentityMetadataError, match="identity_inventory_invalid"):
-        make_complete_identity_inventory(duplicate_index, (existing, existing))
+        make_complete_identity_inventory(duplicate_index, {existing.binding.json_name: report})
 
 
 @pytest.mark.parametrize(
@@ -356,21 +375,27 @@ def test_complete_inventory_rejects_duplicate_or_filtered_bindings() -> None:
     ],
 )
 def test_complete_inventory_sanitizes_malformed_public_index_bindings(mutation) -> None:
-    existing = verify_existing_identity(build_report(), v2_binding(build_report()))
+    report = build_report()
+    existing = verify_existing_identity(report, v2_binding(report))
     malformed = mutation(existing.binding)
 
     with pytest.raises(IdentityMetadataError, match="identity_inventory_invalid"):
-        make_complete_identity_inventory(V2IdentityIndex(2, (malformed,)), (existing,))
+        make_complete_identity_inventory(
+            V2IdentityIndex(2, (malformed,)),
+            {getattr(malformed, "json_name", existing.binding.json_name): report},
+        )
 
 
 def test_rehydrated_identity_evidence_requires_binding_revalidation() -> None:
     report = build_report()
     trusted = verify_existing_identity(report, v2_binding(report))
-    reconstructed = pickle.loads(pickle.dumps(trusted))
+    _reconstructed = pickle.loads(pickle.dumps(trusted))
 
-    with pytest.raises(IdentityMetadataError, match="identity_evidence_untrusted"):
-        make_complete_identity_inventory(V2IdentityIndex(2, (trusted.binding,)), (reconstructed,))
+    # Reconstructed evidence is descriptive only; inventory uses the real report.
+    inventory = make_complete_identity_inventory(
+        V2IdentityIndex(2, (trusted.binding,)), {trusted.binding.json_name: report}
+    )
 
     revalidated = verify_existing_identity(report, trusted.binding)
-    inventory = make_complete_identity_inventory(V2IdentityIndex(2, (revalidated.binding,)), (revalidated,))
-    assert allocate_identity(verify_report_evidence(report), inventory=inventory).json_name == revalidated.binding.json_name
+    assert inventory.identities[0] == revalidated
+    assert allocate_identity(report, inventory=inventory).json_name == revalidated.binding.json_name
