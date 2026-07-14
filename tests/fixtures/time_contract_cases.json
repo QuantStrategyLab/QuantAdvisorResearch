@@ -1,0 +1,30 @@
+[
+  {
+    "report_as_of": "2026-05-30",
+    "report_generated_at": "2026-05-31T12:00:00Z",
+    "payload": {"as_of": "2026-05-31", "generated_at": "2026-05-30T12:00:00Z", "expires_at": "2026-06-30"},
+    "valid": false,
+    "reason": "as_of_in_future"
+  },
+  {
+    "report_as_of": "2026-05-30",
+    "report_generated_at": "2026-05-31T12:00:00Z",
+    "payload": {"as_of": "2026-05-30", "generated_at": "2026-05-31T00:00:00Z", "expires_at": "2026-06-30"},
+    "valid": false,
+    "reason": "generated_after_reference"
+  },
+  {
+    "report_as_of": "2026-05-30",
+    "report_generated_at": "2026-05-31T12:00:00Z",
+    "payload": {"as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00Z", "expires_at": "2026-05-29"},
+    "valid": false,
+    "reason": "expires_before_generated"
+  },
+  {
+    "report_as_of": "2026-05-30",
+    "report_generated_at": "2026-05-31T12:00:00Z",
+    "payload": {"as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00Z"},
+    "valid": false,
+    "reason": "missing_expires_at"
+  }
+]
