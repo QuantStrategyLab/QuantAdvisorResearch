@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -227,6 +228,30 @@ def _binding_payload(binding: V3IdentityBinding) -> dict[str, object]:
     return payload
 
 
+def _validate_clean_binding_names(binding: V3IdentityBinding) -> None:
+    digest = r"(?P<digest>[0-9a-f]{64})"
+    suffix = "" if binding.canonical_identity else rf"\.variant-{digest}"
+    stem = rf"{re.escape(binding.as_of)}-{re.escape(binding.cadence)}"
+    patterns = (
+        rf"^advisory_report_{stem}{suffix}\.json$",
+        rf"^{re.escape(binding.as_of)}-{re.escape(binding.cadence)}-model-recommendations{suffix}\.html$",
+    )
+    names = [binding.json_name, binding.html_name]
+    if binding.markdown_name is not None:
+        names.append(binding.markdown_name)
+        patterns += (rf"^advisory_report_{stem}{suffix}\.md$",)
+    if binding.manifest_name is not None:
+        names.append(binding.manifest_name)
+        patterns += (rf"^advisory_report_{stem}{suffix}\.json\.manifest\.json$",)
+    for name, pattern in zip(names, patterns):
+        if type(name) is not str or re.fullmatch(pattern, name) is None:
+            raise _error("identity_binding_invalid")
+    if not binding.canonical_identity:
+        expected = binding.artifact_integrity_digest
+        if any(f".variant-{expected}" not in name for name in names):
+            raise _error("identity_binding_invalid")
+
+
 def _validate_binding(binding: object) -> V3IdentityBinding:
     if not isinstance(binding, V3IdentityBinding):
         raise _error("identity_binding_invalid")
@@ -238,7 +263,13 @@ def _validate_binding(binding: object) -> V3IdentityBinding:
         raise _error("identity_binding_invalid")
     try:
         validated = _validate_v3_entry(_binding_payload(binding))
-    except (IdentityMetadataError, AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError):
+    except IdentityMetadataError:
+        try:
+            _validate_clean_binding_names(binding)
+        except (PublicationPlanError, AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError):
+            raise _error("identity_binding_invalid") from None
+        return binding
+    except (AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError):
         raise _error("identity_binding_invalid") from None
     if validated != binding:
         raise _error("identity_binding_invalid")

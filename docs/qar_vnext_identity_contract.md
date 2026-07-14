@@ -20,10 +20,19 @@ optional `md`/`manifest` names, identity class, canonical flag, and display
 evidence. Status and trust are not wire claims; parsed bindings are pending
 artifact validation until a later authorized integration stage.
 
+All vNext public targets are cadence-aware. Canonical JSON/Markdown/manifest
+use `advisory_report_<as_of>-<cadence>` as their stem; canonical HTML uses
+`<as_of>-<cadence>-model-recommendations`. Variants insert
+`.variant-<full artifact_integrity_digest>` before the extension, and every
+declared artifact for one binding uses the same suffix. Thus daily, weekly,
+and monthly reports for one `as_of` cannot collide.
+
 ## Allocation
 
 - `EXACT_ARTIFACT_REUSE` returns only an exact clean vNext binding and requires
-  attachment/display policy equality.
+  attachment/display policy equality. An exact `CURRENT_MANDATORY` hit reuses
+  the immutable binding and reports `reused_existing=True`; it does not create
+  an identical variant.
 - `CURRENT_MANDATORY` may bootstrap one canonical identity in an empty period;
   a rerun in an occupied period receives a full artifact-digest variant.
 - `HISTORICAL_RECOVERY` requires an existing canonical identity and otherwise

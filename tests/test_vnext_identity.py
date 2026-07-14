@@ -35,10 +35,10 @@ REQUESTED = RequestedArtifactSet(False, False)
 DISPLAY = DisplayPlacement(False, 0)
 
 
-def report(*, as_of: str = "2026-06-20", generated_at: str | None = None) -> dict:
+def report(*, as_of: str = "2026-06-20", cadence: str = "weekly", generated_at: str | None = None) -> dict:
     value = build_advisory_report(
         as_of=as_of,
-        cadence="weekly",
+        cadence=cadence,
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
     )
@@ -47,14 +47,20 @@ def report(*, as_of: str = "2026-06-20", generated_at: str | None = None) -> dic
     return value
 
 
-def binding_payload(value: dict, *, canonical: bool) -> dict[str, object]:
+def binding_payload(
+    value: dict,
+    *,
+    canonical: bool,
+    include_markdown: bool = False,
+    include_manifest: bool = False,
+) -> dict[str, object]:
     as_of = value["as_of"]
     cadence = value["cadence"]
     schema = value["schema_version"]
     semantic = hashlib.sha256(report_content_fingerprint(value).encode("utf-8")).hexdigest()
     artifact = artifact_integrity_digest(value)
     suffix = "" if canonical else f".variant-{artifact}"
-    return {
+    payload = {
         "period_key": canonical_period_identity(cadence, as_of).key,
         "as_of": as_of,
         "cadence": cadence,
@@ -64,13 +70,19 @@ def binding_payload(value: dict, *, canonical: bool) -> dict[str, object]:
         "semantic_digest": semantic,
         "artifact_integrity_version": ARTIFACT_VERSION,
         "artifact_integrity_digest": artifact,
-        "json": f"advisory_report_{as_of}{suffix}.json",
+        "json": f"advisory_report_{as_of}-{cadence}{suffix}.json",
         "html": f"{as_of}-{cadence}-model-recommendations{suffix}.html",
         "identity_class": V3_CANONICAL if canonical else V3_VARIANT,
         "canonical_identity": canonical,
         "display_primary": False,
         "display_order": 0,
     }
+    stem = f"advisory_report_{as_of}-{cadence}"
+    if include_markdown:
+        payload["md"] = f"{stem}{suffix}.md"
+    if include_manifest:
+        payload["manifest"] = f"{stem}{suffix}.json.manifest.json"
+    return payload
 
 
 def index_for(*pairs: tuple[dict, bool]) -> VNextIdentityIndex:
@@ -100,6 +112,40 @@ def test_empty_current_bootstraps_clean_canonical_and_publication_plan() -> None
     assert result.publication_plan is not None
     assert result.publication_entry is not None
     assert result.publication_entry.role is PublicationRole.MANDATORY_CURRENT
+
+
+def test_current_exact_hit_reuses_the_same_canonical_binding() -> None:
+    value = report()
+    index = index_for((value, True))
+    result = allocate(value, index, AllocationContext.current_mandatory(index.bindings[0].period_key))
+
+    assert result.reused_existing is True
+    assert result.binding == index.bindings[0]
+    assert result.binding.identity_class == V3_CANONICAL
+    assert ".variant-" not in result.binding.json_name
+    assert result.publication_plan is not None
+    assert len(result.publication_plan.entries) == 1
+
+
+def test_same_as_of_daily_weekly_monthly_targets_do_not_collide() -> None:
+    values = [report(cadence=cadence) for cadence in ("daily", "weekly", "monthly")]
+    payloads = [
+        binding_payload(value, canonical=True, include_markdown=True, include_manifest=True)
+        for value in values
+    ]
+    index = parse_vnext_index({"schema_version": VNEXT_INDEX_SCHEMA, "entries": payloads})
+    names = [
+        name
+        for binding in index.bindings
+        for name in (binding.json_name, binding.html_name, binding.markdown_name, binding.manifest_name)
+        if name is not None
+    ]
+    assert len(names) == len(set(names)) == 12
+    for binding in index.bindings:
+        assert binding.cadence in binding.json_name
+        assert binding.cadence in binding.html_name
+        assert binding.cadence in binding.markdown_name
+        assert binding.cadence in binding.manifest_name
 
 
 def test_current_rerun_allocates_artifact_digest_variant() -> None:
