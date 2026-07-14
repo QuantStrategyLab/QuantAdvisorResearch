@@ -112,7 +112,7 @@ def _validate_v6_freshness(
             raise AdvisoryValidationError("freshness_reason_invalid")
         legacy = reason == "legacy_expiry_compatibility" and item.get("compatibility_warning") == "missing_expires_at"
         if not item["present"]:
-            if item["valid"] or any(item.get(key) for key in ("as_of", "generated_at", "expires_at")):
+            if item["valid"] or any(key in item for key in ("as_of", "generated_at", "expires_at")):
                 raise AdvisoryValidationError("freshness_state_incoherent")
             result = assess_context_freshness(
                 None,

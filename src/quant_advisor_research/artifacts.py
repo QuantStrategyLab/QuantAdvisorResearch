@@ -37,6 +37,10 @@ def sha256_file(path: str | Path) -> str:
     return hasher.hexdigest()
 
 
+def sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
 def write_json(path: str | Path, payload: Mapping[str, Any]) -> Path:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,12 +65,19 @@ def write_report_manifest(
         raise FileNotFoundError(f"report JSON artifact not found: {resolved_report}")
     if not resolved_markdown.exists():
         raise FileNotFoundError(f"Markdown report artifact not found: {resolved_markdown}")
-    validate_advisory_report(report)
+    try:
+        report_bytes = resolved_report.read_bytes()
+        on_disk_report = json.loads(report_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("report_payload_invalid") from exc
+    if not isinstance(on_disk_report, Mapping) or on_disk_report != report:
+        raise ValueError("report_payload_mismatch")
+    validate_advisory_report(on_disk_report)
 
     version_parts = [
-        str(report.get("as_of") or "unknown"),
-        str(report.get("cadence") or "unknown"),
-        f"schema-{report.get('schema_version') or 'unknown'}",
+        str(on_disk_report.get("as_of") or "unknown"),
+        str(on_disk_report.get("cadence") or "unknown"),
+        f"schema-{on_disk_report.get('schema_version') or 'unknown'}",
     ]
     if run_id:
         version_parts.append(f"run-{run_id}")
@@ -80,12 +91,12 @@ def write_report_manifest(
     payload = {
         "manifest_type": "model_recommendation_report",
         "artifact_type": "model_recommendations",
-        "contract_version": contract_version_for_report(report),
-        "schema_version": str(report.get("schema_version") or ""),
+        "contract_version": contract_version_for_report(on_disk_report),
+        "schema_version": str(on_disk_report.get("schema_version") or ""),
         "version": "-".join(version_parts),
-        "mode": str(report.get("mode") or ""),
-        "cadence": str(report.get("cadence") or ""),
-        "as_of": str(report.get("as_of") or ""),
+        "mode": str(on_disk_report.get("mode") or ""),
+        "cadence": str(on_disk_report.get("cadence") or ""),
+        "as_of": str(on_disk_report.get("as_of") or ""),
         "audience_scope": str(report.get("audience_scope") or ""),
         "source_project": SOURCE_PROJECT,
         "producer": {
@@ -94,19 +105,19 @@ def write_report_manifest(
             "github_run_id": run_id or "",
             "github_run_attempt": run_attempt or "",
         },
-        "source_artifacts": dict(report.get("source_artifacts") or {}),
-        "summary": dict(report.get("summary") or {}),
+        "source_artifacts": dict(on_disk_report.get("source_artifacts") or {}),
+        "summary": dict(on_disk_report.get("summary") or {}),
         "artifacts": {
             "json": {
                 "path": str(resolved_report),
-                "sha256": sha256_file(resolved_report),
+                "sha256": sha256_bytes(report_bytes),
             },
             "markdown": {
                 "path": str(resolved_markdown),
                 "sha256": sha256_file(resolved_markdown),
             },
         },
-        "policy": dict(report.get("policy") or {}),
+        "policy": dict(on_disk_report.get("policy") or {}),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     return write_json(manifest_path, payload)

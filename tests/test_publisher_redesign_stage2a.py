@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -105,6 +106,14 @@ def test_v6_freshness_rejects_reason_and_present_valid_incoherence() -> None:
     with pytest.raises(AdvisoryValidationError):
         validate_advisory_report(report)
 
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_v6_present_false_rejects_timestamp_keys_even_when_falsey(value) -> None:
+    report = build_v6()
+    report["freshness"]["ai_signal"]["as_of"] = value
+    with pytest.raises(AdvisoryValidationError, match="freshness_state_incoherent"):
+        validate_advisory_report(report)
+
     report = build_v6()
     report["freshness"]["ai_signal"] = {"present": False, "valid": False, "reason": "fresh"}
     with pytest.raises(AdvisoryValidationError):
@@ -176,3 +185,56 @@ def test_manifest_rejects_incomplete_v6_but_keeps_v5_legacy_omission(tmp_path: P
                     markdown_path=markdown_path,
                     manifest_path=tmp_path / f"{name}.manifest.json",
                 )
+
+
+def test_manifest_uses_exact_on_disk_payload_and_bytes(tmp_path: Path) -> None:
+    report = build_v5()
+    report_path = tmp_path / "report.json"
+    markdown_path = tmp_path / "report.md"
+    raw = (json.dumps(report, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+    report_path.write_bytes(raw)
+    markdown_path.write_text("# report\n", encoding="utf-8")
+
+    manifest = write_report_manifest(
+        report=report,
+        report_path=report_path,
+        markdown_path=markdown_path,
+        manifest_path=tmp_path / "report.manifest.json",
+    )
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert payload["artifacts"]["json"]["sha256"] == hashlib.sha256(raw).hexdigest()
+
+    stale = dict(report, as_of="2026-06-06")
+    with pytest.raises(ValueError, match="report_payload_mismatch"):
+        write_report_manifest(
+            report=stale,
+            report_path=report_path,
+            markdown_path=markdown_path,
+            manifest_path=tmp_path / "stale.manifest.json",
+        )
+
+
+def test_manifest_rejects_malformed_or_mismatched_on_disk_payload(tmp_path: Path) -> None:
+    report = build_v5()
+    markdown_path = tmp_path / "report.md"
+    markdown_path.write_text("# report\n", encoding="utf-8")
+    report_path = tmp_path / "report.json"
+    report_path.write_text("{not-json\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="report_payload_invalid"):
+        write_report_manifest(
+            report=report,
+            report_path=report_path,
+            markdown_path=markdown_path,
+            manifest_path=tmp_path / "malformed.manifest.json",
+        )
+
+    on_disk = build_v6()
+    on_disk.pop("contract_version")
+    report_path.write_text(json.dumps(on_disk), encoding="utf-8")
+    with pytest.raises(ValueError, match="report_payload_mismatch"):
+        write_report_manifest(
+            report=report,
+            report_path=report_path,
+            markdown_path=markdown_path,
+            manifest_path=tmp_path / "mismatch.manifest.json",
+        )
