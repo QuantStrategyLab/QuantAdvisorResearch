@@ -189,6 +189,7 @@ def test_exact_artifact_reuse_is_immutable_and_requires_full_match() -> None:
         inventory=inventory,
         context=AllocationContext.exact_artifact_reuse(),
         requested_artifacts=RequestedArtifactSet(False, False),
+        display_placement=DisplayPlacement(True, 2),
     )
 
     assert result.reused_existing is True
@@ -204,7 +205,75 @@ def test_exact_artifact_reuse_is_immutable_and_requires_full_match() -> None:
             inventory=inventory,
             context=AllocationContext.exact_artifact_reuse(),
             requested_artifacts=REQUESTED,
+            display_placement=DISPLAY,
         )
+
+
+@pytest.mark.parametrize(
+    ("requested", "display"),
+    [
+        (RequestedArtifactSet(True, False), DisplayPlacement(True, 2)),
+        (RequestedArtifactSet(False, True), DisplayPlacement(True, 2)),
+        (RequestedArtifactSet(False, False), DisplayPlacement(False, 2)),
+        (RequestedArtifactSet(False, False), DisplayPlacement(True, 3)),
+    ],
+)
+def test_exact_reuse_rejects_publication_policy_mismatch(
+    requested: RequestedArtifactSet, display: DisplayPlacement
+) -> None:
+    report = build_report()
+    binding = binding_for(report, display_primary=True, display_order=2)
+
+    with pytest.raises(IdentityMetadataError, match="identity_reuse_mismatch"):
+        allocate_v3_identity(
+            report,
+            inventory=inventory_for((binding, report)),
+            context=AllocationContext.exact_artifact_reuse(),
+            requested_artifacts=requested,
+            display_placement=display,
+        )
+
+
+@pytest.mark.parametrize(
+    "display",
+    [None, DisplayPlacement(True, True), DisplayPlacement(True, -1)],
+)
+def test_exact_reuse_requires_valid_matching_display_placement(display: object) -> None:
+    report = build_report()
+    binding = binding_for(report, display_primary=True, display_order=2)
+
+    with pytest.raises(IdentityMetadataError, match="display_placement"):
+        allocate_v3_identity(
+            report,
+            inventory=inventory_for((binding, report)),
+            context=AllocationContext.exact_artifact_reuse(),
+            requested_artifacts=REQUESTED,
+            display_placement=display,  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize("schema_version", [2, 4, True, "3"])
+def test_inventory_rejects_declared_schema_version_other_than_v3(schema_version: object) -> None:
+    report = build_report()
+    binding = binding_for(report)
+
+    with pytest.raises(IdentityMetadataError, match="identity_inventory_invalid"):
+        make_complete_source_inventory(
+            V3IdentityIndex(schema_version, (binding,)),  # type: ignore[arg-type]
+            {binding.json_name: report},
+        )
+
+
+def test_inventory_accepts_declared_v3_schema_version() -> None:
+    report = build_report()
+    binding = binding_for(report)
+
+    inventory = make_complete_source_inventory(
+        V3IdentityIndex(3, (binding,)),
+        {binding.json_name: report},
+    )
+
+    assert inventory.index.schema_version == 3
 
 
 def test_semantic_same_artifact_different_is_not_reused() -> None:
@@ -279,6 +348,7 @@ def test_display_and_identity_ownership_are_independent() -> None:
         inventory=inventory,
         context=AllocationContext.exact_artifact_reuse(),
         requested_artifacts=REQUESTED,
+        display_placement=DisplayPlacement(False, 0),
     )
 
     assert result.binding.canonical_identity is True

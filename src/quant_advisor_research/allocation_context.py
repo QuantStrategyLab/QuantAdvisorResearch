@@ -22,6 +22,7 @@ from .identity_v3 import (
     V3_VARIANT,
     V3IdentityBinding,
     V3IdentityIndex,
+    V3_SCHEMA_VERSION,
     parse_v3_index,
 )
 from .period_contract import canonical_period_identity
@@ -127,12 +128,19 @@ def _binding_payload(binding: V3IdentityBinding) -> dict[str, object]:
 
 
 def _validated_index(index: object) -> V3IdentityIndex:
-    if not isinstance(index, V3IdentityIndex) or type(index.schema_version) is not int:
+    if (
+        not isinstance(index, V3IdentityIndex)
+        or type(index.schema_version) is not int
+        or index.schema_version != V3_SCHEMA_VERSION
+    ):
         raise _error("identity_inventory_invalid")
     try:
         if type(index.bindings) is not tuple:
             raise _error("identity_inventory_invalid")
-        payload = {"schema_version": 3, "reports": [_binding_payload(binding) for binding in index.bindings]}
+        payload = {
+            "schema_version": index.schema_version,
+            "reports": [_binding_payload(binding) for binding in index.bindings],
+        }
         validated = parse_v3_index(payload)
         if len(validated.bindings) != len(index.bindings):
             raise _error("identity_inventory_invalid")
@@ -258,6 +266,21 @@ def _validate_display(display: object) -> DisplayPlacement:
     return display
 
 
+def _validate_reuse_policy(
+    binding: V3IdentityBinding,
+    requested: RequestedArtifactSet,
+    display_placement: object,
+) -> None:
+    display = _validate_display(display_placement)
+    if (
+        (binding.markdown_name is not None) != requested.include_markdown
+        or (binding.manifest_name is not None) != requested.include_manifest
+        or binding.display_primary != display.display_primary
+        or binding.display_order != display.display_order
+    ):
+        raise _error("identity_reuse_mismatch")
+
+
 def _exact_key(binding: V3IdentityBinding) -> tuple[str, ...]:
     return (
         binding.period_key, binding.as_of, binding.cadence, binding.report_schema_version,
@@ -317,6 +340,7 @@ def allocate_v3_identity(
         raise _error("identity_integrity_conflict")
     if exact_matches:
         binding = exact_matches[0]
+        _validate_reuse_policy(binding, requested, display_placement)
         return V3AllocationPlan(binding, context.mode, True)
     if context.mode is AllocationMode.EXACT_ARTIFACT_REUSE:
         raise _error("identity_reuse_mismatch" if same_artifact else "identity_reuse_not_found")
