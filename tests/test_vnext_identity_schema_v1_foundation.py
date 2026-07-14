@@ -71,6 +71,7 @@ def test_schema_v1_roundtrip_and_input_permutation_are_deterministic():
     left = parse_vnext_identity_index(payload(canonical, variant))
     right = parse_vnext_identity_index(payload(variant, canonical))
     assert left == right
+    assert hash(left) == hash(right)
     assert serialize_vnext_identity_index(left) == serialize_vnext_identity_index(right)
     assert parse_vnext_identity_index(serialize_vnext_identity_index(left)) == left
 
@@ -132,6 +133,8 @@ def test_index_requires_one_canonical_and_enforces_display_policy():
 def test_full_artifact_identity_and_target_collisions_fail_closed():
     with pytest.raises(VNextIdentityError, match="identity_duplicate"):
         VNextIdentityIndex((binding(), binding(md=True)))
+    with pytest.raises(VNextIdentityError, match="artifact_digest_conflict"):
+        VNextIdentityIndex((binding(), binding(cls=V3_VARIANT, semantic=B, order=1)))
 
 
 def test_display_order_is_safe_json_integer_and_not_bool():

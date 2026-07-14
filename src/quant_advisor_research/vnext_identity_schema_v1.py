@@ -117,6 +117,7 @@ class VNextIdentityIndex:
         if type(self.bindings) is not tuple or not all(isinstance(item, VNextIdentityBinding) for item in self.bindings):
             raise _error("index_invalid")
         _validate_index(self.bindings)
+        object.__setattr__(self, "bindings", tuple(sorted(self.bindings, key=_binding_sort_key)))
 
 
 def _validate_binding(binding: VNextIdentityBinding) -> None:
@@ -169,7 +170,7 @@ def _validate_index(bindings: tuple[VNextIdentityBinding, ...]) -> None:
     canonical_periods: set[str] = set()
     names: set[str] = set()
     artifact_identities: set[tuple[str, str, str, str, str, str, str]] = set()
-    digest_periods: dict[str, tuple[str, str, str]] = {}
+    artifact_digests: set[str] = set()
     display: dict[str, tuple[bool, set[int]]] = {}
     for binding in bindings:
         _validate_binding(binding)
@@ -195,11 +196,9 @@ def _validate_index(bindings: tuple[VNextIdentityBinding, ...]) -> None:
                 if name in names:
                     raise _error("target_collision")
                 names.add(name)
-        period = (binding.period_key, binding.as_of, binding.cadence)
-        previous = digest_periods.get(binding.artifact_integrity_digest)
-        if previous is not None and previous != period:
+        if binding.artifact_integrity_digest in artifact_digests:
             raise _error("artifact_digest_conflict")
-        digest_periods[binding.artifact_integrity_digest] = period
+        artifact_digests.add(binding.artifact_integrity_digest)
     if {item.period_key for item in bindings} - canonical_periods:
         raise _error("canonical_missing")
 
