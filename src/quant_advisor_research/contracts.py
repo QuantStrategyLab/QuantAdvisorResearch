@@ -4,6 +4,14 @@ import datetime as dt
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from .time_contract import (
+    REPORT_EXPIRY_DAYS,
+    TimeContractError,
+    canonical_reference_time,
+    contract_version_for_schema,
+    normalize_aware_datetime,
+)
+
 
 class AdvisoryValidationError(ValueError):
     """Raised when an advisory artifact violates the stable contract."""
@@ -76,6 +84,13 @@ def _require_iso_datetime(value: Any, name: str) -> None:
         raise AdvisoryValidationError(f"{name} must be an ISO datetime") from exc
 
 
+def _require_contract_datetime(value: Any, name: str) -> dt.datetime:
+    try:
+        return normalize_aware_datetime(_require_string(value, name))
+    except (TimeContractError, ValueError) as exc:
+        raise AdvisoryValidationError(f"{name} must be timezone-aware ISO datetime") from exc
+
+
 def _require_number_0_1(value: Any, name: str) -> None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise AdvisoryValidationError(f"{name} must be numeric")
@@ -100,10 +115,64 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     if missing:
         raise AdvisoryValidationError(f"missing required keys: {', '.join(missing)}")
 
-    if payload["schema_version"] != "5":
-        raise AdvisoryValidationError("schema_version must be '5'")
+    schema_version = str(payload["schema_version"])
+    try:
+        expected_contract = contract_version_for_schema(schema_version)
+    except TimeContractError as exc:
+        raise AdvisoryValidationError(str(exc)) from exc
+    actual_contract = payload.get("contract_version")
+    if actual_contract is not None and actual_contract != expected_contract:
+        raise AdvisoryValidationError("schema_version and contract_version must match")
+    if schema_version == "5":
+        if actual_contract is not None and actual_contract != "model_recommendations.v5":
+            raise AdvisoryValidationError("schema 5 contract_version must be model_recommendations.v5")
+        v6_only_keys = {"reference_time", "expires_at", "freshness"} & set(payload)
+        if v6_only_keys:
+            raise AdvisoryValidationError("schema 5 must not contain v6-only keys")
+    elif schema_version == "6":
+        if actual_contract != "model_recommendations.v6":
+            raise AdvisoryValidationError("schema 6 requires model_recommendations.v6")
+        for key in ("reference_time", "expires_at", "freshness"):
+            if key not in payload:
+                raise AdvisoryValidationError(f"schema 6 missing required key: {key}")
+    else:
+        raise AdvisoryValidationError("schema_version must be '5' or '6'")
     _require_iso_date(payload["as_of"], "as_of")
-    _require_iso_datetime(payload["generated_at"], "generated_at")
+    if schema_version == "5":
+        _require_iso_datetime(payload["generated_at"], "generated_at")
+    else:
+        reference_time = _require_contract_datetime(payload["reference_time"], "reference_time")
+        generated_at = _require_contract_datetime(payload["generated_at"], "generated_at")
+        expires_at = _require_contract_datetime(payload["expires_at"], "expires_at")
+        expected_reference = canonical_reference_time(dt.date.fromisoformat(str(payload["as_of"])))
+        if reference_time != expected_reference:
+            raise AdvisoryValidationError("reference_time must equal canonical as_of cutoff")
+        if generated_at < reference_time:
+            raise AdvisoryValidationError("generated_at must not precede reference_time")
+        if expires_at != generated_at + dt.timedelta(days=REPORT_EXPIRY_DAYS) or expires_at < reference_time:
+            raise AdvisoryValidationError("expires_at violates v6 report time bounds")
+        freshness = payload["freshness"]
+        if not isinstance(freshness, Mapping):
+            raise AdvisoryValidationError("freshness must be an object")
+        for name in ("ai_signal", "theme_momentum"):
+            item = freshness.get(name)
+            if not isinstance(item, Mapping):
+                raise AdvisoryValidationError(f"freshness[{name}] must be an object")
+            if type(item.get("present")) is not bool or type(item.get("valid")) is not bool:
+                raise AdvisoryValidationError(f"freshness[{name}] status fields must be boolean")
+            reason = item.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                raise AdvisoryValidationError(f"freshness[{name}].reason must be non-empty")
+            if item["valid"]:
+                for key in ("as_of", "generated_at", "expires_at"):
+                    if not item.get(key):
+                        raise AdvisoryValidationError(f"freshness[{name}] valid entry missing {key}")
+                    if key == "as_of":
+                        _require_iso_date(item[key], f"freshness[{name}].as_of")
+                    else:
+                        _require_contract_datetime(item[key], f"freshness[{name}].{key}")
+            elif not item.get("present") and reason == "":
+                raise AdvisoryValidationError(f"freshness[{name}].reason must be non-empty")
     if payload["mode"] != "model_recommendations":
         raise AdvisoryValidationError("mode must be model_recommendations")
     if payload["cadence"] not in ALLOWED_CADENCES:

@@ -60,8 +60,19 @@ def load_report(path: str | Path) -> dict[str, Any]:
 
 
 def report_content_fingerprint(report: dict[str, Any]) -> str:
-    ignored_top_level_keys = {"as_of", "generated_at", "source_artifacts"}
+    ignored_top_level_keys = {
+        "schema_version", "contract_version", "as_of", "generated_at", "reference_time", "expires_at", "freshness", "source_artifacts",
+    }
     normalized = {key: value for key, value in report.items() if key not in ignored_top_level_keys}
+    summary = normalized.get("summary")
+    if isinstance(summary, dict) and isinstance(summary.get("data_quality_warnings"), list):
+        freshness_prefixes = ("ai_signal:", "theme_momentum:", "freshness:", "context_freshness:")
+        summary = dict(summary)
+        summary["data_quality_warnings"] = [
+            warning for warning in summary["data_quality_warnings"]
+            if not isinstance(warning, str) or not warning.startswith(freshness_prefixes)
+        ]
+        normalized["summary"] = summary
     return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 

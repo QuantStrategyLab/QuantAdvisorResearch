@@ -6,7 +6,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from .contracts import REPORT_CONTRACT_VERSION, SOURCE_PROJECT
+from .contracts import SOURCE_PROJECT
+from .time_contract import TimeContractError, contract_version_for_schema
+
+
+def contract_version_for_report(report: Mapping[str, Any]) -> str:
+    schema_version = str(report.get("schema_version") or "")
+    try:
+        expected = contract_version_for_schema(schema_version)
+    except TimeContractError as exc:
+        raise ValueError(str(exc)) from exc
+    actual = report.get("contract_version")
+    if actual is not None and actual != expected:
+        raise ValueError("report schema_version and contract_version do not match")
+    return expected
 
 
 def sha256_file(path: str | Path) -> str:
@@ -62,7 +75,7 @@ def write_report_manifest(
     payload = {
         "manifest_type": "model_recommendation_report",
         "artifact_type": "model_recommendations",
-        "contract_version": REPORT_CONTRACT_VERSION,
+        "contract_version": contract_version_for_report(report),
         "schema_version": str(report.get("schema_version") or ""),
         "version": "-".join(version_parts),
         "mode": str(report.get("mode") or ""),
