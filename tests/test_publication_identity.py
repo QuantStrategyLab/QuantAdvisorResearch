@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -190,6 +192,68 @@ def test_v2_duplicate_identity_or_digest_conflicts_fail_closed() -> None:
         parse_reports_index({"schema_version": 2, "reports": [first, same_identity]})
     with pytest.raises(IdentityMetadataError, match="identity_digest_conflict"):
         parse_reports_index({"schema_version": 2, "reports": [first, same_digest]})
+
+
+def test_same_digest_is_allowed_across_different_periods() -> None:
+    first_report = build_report(as_of="2026-06-20")
+    second_report = build_report(as_of="2026-06-27")
+    digest = digest_for(first_report)
+
+    index = parse_reports_index(
+        {
+            "schema_version": 2,
+            "reports": [v2_entry(first_report, digest=digest), v2_entry(second_report, digest=digest)],
+        }
+    )
+
+    assert {binding.period_key for binding in index.bindings} == {
+        "weekly:2026-06-15:2026-06-21",
+        "weekly:2026-06-22:2026-06-28",
+    }
+
+
+def test_v1_verified_binding_cannot_be_serialized_as_incomplete_v2() -> None:
+    report = build_report()
+    binding = parse_reports_index({"schema_version": 1, "reports": [v1_entry()]}).bindings[0]
+    verified_v1 = verify_identity_binding(binding, report)
+
+    with pytest.raises(IdentityMetadataError, match="v2_serialization_invalid_binding"):
+        serialize_reports_index_v2(ReportsIndex(2, (verified_v1,)))
+
+
+def test_complete_v2_binding_serializes_and_parses_round_trip() -> None:
+    report = build_report()
+    parsed = parse_reports_index({"schema_version": 2, "reports": [v2_entry(report)]})
+    verified = verify_identity_binding(parsed.bindings[0], report)
+
+    round_tripped = parse_reports_index(
+        json.loads(serialize_reports_index_v2(ReportsIndex(2, (verified,))))
+    ).bindings[0]
+
+    assert round_tripped.period_key == verified.period_key
+    assert round_tripped.fingerprint_digest == verified.fingerprint_digest
+    assert round_tripped.json_name == verified.json_name
+    assert round_tripped.verification_status == "PENDING_REPORT_VALIDATION"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda binding: replace(binding, display_order=None),
+        lambda binding: replace(binding, display_order=-1),
+        lambda binding: replace(binding, display_order=True),
+        lambda binding: replace(binding, fingerprint_version=None),
+        lambda binding: replace(binding, fingerprint_digest=None),
+        lambda binding: replace(binding, schema_version=None),
+    ],
+)
+def test_serializer_revalidates_complete_v2_invariants(mutation) -> None:
+    report = build_report()
+    parsed = parse_reports_index({"schema_version": 2, "reports": [v2_entry(report)]})
+    verified = verify_identity_binding(parsed.bindings[0], report)
+
+    with pytest.raises(IdentityMetadataError, match="v2_serialization"):
+        serialize_reports_index_v2(ReportsIndex(2, (mutation(verified),)))
 
 
 @pytest.mark.parametrize("key", ["md", "manifest"])

@@ -221,18 +221,20 @@ def parse_reports_index(payload: object) -> ReportsIndex:
         bindings = tuple(_validate_v2_entry(entry) for entry in reports)
     else:
         raise _error("unsupported_index_version")
-    identity_map: dict[tuple[str, str, str | None, str | None], str | None] = {}
-    digest_map: dict[str, tuple[str, str, str | None, str | None]] = {}
+    identity_map: dict[tuple[str, tuple[str, str, str | None, str | None]], str | None] = {}
+    digest_map: dict[tuple[str, str, str], tuple[str, str, str | None, str | None]] = {}
     for binding in bindings:
         identity = (binding.json_name, binding.html_name, binding.markdown_name, binding.manifest_name)
-        if identity in identity_map and identity_map[identity] != binding.fingerprint_digest:
+        identity_key = (binding.period_key, identity)
+        if identity_key in identity_map and identity_map[identity_key] != binding.fingerprint_digest:
             raise _error("identity_content_conflict")
-        identity_map[identity] = binding.fingerprint_digest
+        identity_map[identity_key] = binding.fingerprint_digest
         if binding.fingerprint_digest is not None:
-            previous = digest_map.get(binding.fingerprint_digest)
+            digest_key = (binding.period_key, binding.fingerprint_version or "", binding.fingerprint_digest)
+            previous = digest_map.get(digest_key)
             if previous is not None and previous != identity:
                 raise _error("identity_digest_conflict")
-            digest_map[binding.fingerprint_digest] = identity
+            digest_map[digest_key] = identity
     return ReportsIndex(schema_version=schema_version, bindings=bindings)
 
 
@@ -280,6 +282,15 @@ def serialize_reports_index_v2(index: ReportsIndex) -> str:
         ),
     )
     for binding in ordered:
+        if (
+            binding.schema_version not in {"5", "6"}
+            or binding.fingerprint_version != FINGERPRINT_VERSION
+            or binding.fingerprint_digest is None
+            or type(binding.display_order) is not int
+            or type(binding.canonical_identity) is not bool
+            or type(binding.display_primary) is not bool
+        ):
+            raise _error("v2_serialization_invalid_binding")
         item: dict[str, Any] = {
             "period_key": binding.period_key,
             "as_of": binding.as_of,
@@ -297,5 +308,9 @@ def serialize_reports_index_v2(index: ReportsIndex) -> str:
             item["md"] = binding.markdown_name
         if binding.manifest_name is not None:
             item["manifest"] = binding.manifest_name
+        try:
+            _validate_v2_entry(item)
+        except IdentityMetadataError as exc:
+            raise _error("v2_serialization_invalid_binding") from exc
         reports.append(item)
     return json.dumps({"schema_version": 2, "reports": reports}, ensure_ascii=False, indent=2) + "\n"
