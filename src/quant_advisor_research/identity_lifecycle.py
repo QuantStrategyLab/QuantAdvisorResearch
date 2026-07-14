@@ -94,8 +94,8 @@ def _require_exact_type(value: object, expected: type, code: str) -> Any:
 def _period_key(as_of: str, cadence: str) -> str:
     try:
         return canonical_period_identity(cadence, as_of).key
-    except (PeriodContractError, TypeError, ValueError, OverflowError) as exc:
-        raise _error("period_mismatch") from exc
+    except (PeriodContractError, TypeError, ValueError, OverflowError):
+        raise _error("period_mismatch") from None
 
 
 def _is_basename(value: object) -> bool:

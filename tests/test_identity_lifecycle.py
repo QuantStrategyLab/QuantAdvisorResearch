@@ -266,3 +266,42 @@ def test_report_evidence_digest_is_strict(digest: object) -> None:
             schema_version="5",
             fingerprint_digest=digest,
         )
+
+
+@pytest.mark.parametrize("parser", [parse_v1_index, parse_v2_index])
+def test_malformed_as_of_error_is_sanitized_in_index_parser(parser) -> None:
+    marker = "UNTRUSTED_PERIOD_MARKER"
+    payload = {
+        "schema_version": 1 if parser is parse_v1_index else 2,
+        "reports": [v1_entry(as_of=marker) if parser is parse_v1_index else v2_entry(as_of=marker)],
+    }
+
+    with pytest.raises(IdentityMetadataError) as error:
+        parser(payload)
+
+    assert error.value.code == "period_mismatch"
+    assert error.value.__suppress_context__ is True
+    assert marker not in repr(error.value)
+    assert marker not in format_error_traceback(error.value)
+
+
+def format_error_traceback(error: BaseException) -> str:
+    import traceback
+
+    return "".join(traceback.format_exception(error))
+
+
+def test_malformed_as_of_error_is_sanitized_in_evidence_factory() -> None:
+    marker = "UNTRUSTED_EVIDENCE_MARKER"
+
+    with pytest.raises(IdentityMetadataError) as error:
+        make_verified_report_evidence(
+            as_of=marker,
+            cadence="weekly",
+            schema_version="5",
+            fingerprint_digest=DIGEST_A,
+        )
+
+    assert error.value.code == "period_mismatch"
+    assert error.value.__suppress_context__ is True
+    assert marker not in format_error_traceback(error.value)
