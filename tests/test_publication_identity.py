@@ -162,6 +162,15 @@ def test_v2_variant_digest_must_match_every_public_variant_name() -> None:
         parse_reports_index({"schema_version": 2, "reports": [entry]})
 
 
+def test_v2_variant_suffix_must_equal_fingerprint_digest() -> None:
+    report = build_report()
+    entry = v2_entry(report, variant=True)
+    entry["fingerprint_digest"] = "b" * 64
+
+    with pytest.raises(IdentityMetadataError, match="identity_digest_mismatch"):
+        parse_reports_index({"schema_version": 2, "reports": [entry]})
+
+
 @pytest.mark.parametrize("mutation", ["missing", "unknown", "bool_int"])
 def test_v2_missing_unknown_and_bool_int_fields_fail_closed(mutation: str) -> None:
     report = build_report()
@@ -221,6 +230,16 @@ def test_v1_verified_binding_cannot_be_serialized_as_incomplete_v2() -> None:
         serialize_reports_index_v2(ReportsIndex(2, (verified_v1,)))
 
 
+def test_verified_binding_with_variant_suffix_digest_mismatch_cannot_serialize() -> None:
+    report = build_report()
+    parsed = parse_reports_index({"schema_version": 2, "reports": [v2_entry(report, variant=True)]})
+    verified = verify_identity_binding(parsed.bindings[0], report)
+    invalid = replace(verified, fingerprint_digest="b" * 64)
+
+    with pytest.raises(IdentityMetadataError, match="v2_serialization_invalid_binding"):
+        serialize_reports_index_v2(ReportsIndex(2, (invalid,)))
+
+
 def test_complete_v2_binding_serializes_and_parses_round_trip() -> None:
     report = build_report()
     parsed = parse_reports_index({"schema_version": 2, "reports": [v2_entry(report)]})
@@ -254,6 +273,23 @@ def test_serializer_revalidates_complete_v2_invariants(mutation) -> None:
 
     with pytest.raises(IdentityMetadataError, match="v2_serialization"):
         serialize_reports_index_v2(ReportsIndex(2, (mutation(verified),)))
+
+
+def test_serializer_rejects_cross_record_public_basename_collision() -> None:
+    first_report = build_report(as_of="2026-06-20")
+    second_report = build_report(as_of="2026-06-27")
+    first = verify_identity_binding(
+        parse_reports_index({"schema_version": 2, "reports": [v2_entry(first_report)]}).bindings[0],
+        first_report,
+    )
+    second = verify_identity_binding(
+        parse_reports_index({"schema_version": 2, "reports": [v2_entry(second_report)]}).bindings[0],
+        second_report,
+    )
+    invalid = replace(second, json_name=first.json_name)
+
+    with pytest.raises(IdentityMetadataError, match="v2_serialization"):
+        serialize_reports_index_v2(ReportsIndex(2, (first, invalid)))
 
 
 @pytest.mark.parametrize("key", ["md", "manifest"])

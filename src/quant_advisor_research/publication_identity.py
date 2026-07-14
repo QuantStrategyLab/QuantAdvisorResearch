@@ -182,6 +182,8 @@ def _validate_v2_entry(entry: object) -> IdentityBinding:
     if manifest_name is not None:
         if _validated_name_digest(manifest_name, _MANIFEST_PATTERN, as_of=as_of) != suffix:
             raise _error("identity_name_mismatch")
+    if suffix is not None and suffix != fingerprint_digest:
+        raise _error("identity_digest_mismatch")
     expected_html = f"{as_of}-{cadence}-model-recommendations.html"
     expected_html = expected_html if suffix is None else expected_html.replace(".html", f".variant-{suffix}.html")
     if html_name != expected_html:
@@ -223,6 +225,7 @@ def parse_reports_index(payload: object) -> ReportsIndex:
         raise _error("unsupported_index_version")
     identity_map: dict[tuple[str, tuple[str, str, str | None, str | None]], str | None] = {}
     digest_map: dict[tuple[str, str, str], tuple[str, str, str | None, str | None]] = {}
+    artifact_map: dict[str, tuple[str, str, str]] = {}
     for binding in bindings:
         identity = (binding.json_name, binding.html_name, binding.markdown_name, binding.manifest_name)
         identity_key = (binding.period_key, identity)
@@ -235,6 +238,14 @@ def parse_reports_index(payload: object) -> ReportsIndex:
             if previous is not None and previous != identity:
                 raise _error("identity_digest_conflict")
             digest_map[digest_key] = identity
+            logical_key = digest_key
+            for name in identity:
+                if name is None:
+                    continue
+                previous = artifact_map.get(name)
+                if previous is not None and previous != logical_key:
+                    raise _error("identity_artifact_conflict")
+                artifact_map[name] = logical_key
     return ReportsIndex(schema_version=schema_version, bindings=bindings)
 
 
@@ -313,4 +324,9 @@ def serialize_reports_index_v2(index: ReportsIndex) -> str:
         except IdentityMetadataError as exc:
             raise _error("v2_serialization_invalid_binding") from exc
         reports.append(item)
-    return json.dumps({"schema_version": 2, "reports": reports}, ensure_ascii=False, indent=2) + "\n"
+    payload = {"schema_version": 2, "reports": reports}
+    try:
+        parse_reports_index(payload)
+    except IdentityMetadataError as exc:
+        raise _error("v2_serialization_invalid_binding") from exc
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
