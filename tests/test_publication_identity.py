@@ -203,6 +203,86 @@ def test_v2_duplicate_identity_or_digest_conflicts_fail_closed() -> None:
         parse_reports_index({"schema_version": 2, "reports": [first, same_digest]})
 
 
+@pytest.mark.parametrize("field", ["display_primary", "display_order", "schema_version", "canonical_identity"])
+def test_duplicate_v2_identity_rejects_metadata_differences(field: str) -> None:
+    report = build_report()
+    first = v2_entry(report)
+    duplicate = dict(first)
+    duplicate[field] = {
+        "display_primary": False,
+        "display_order": 1,
+        "schema_version": "6",
+        "canonical_identity": False,
+    }[field]
+
+    expected = "identity_metadata_mismatch" if field == "canonical_identity" else "identity_content_conflict"
+    with pytest.raises(IdentityMetadataError, match=expected):
+        parse_reports_index({"schema_version": 2, "reports": [first, duplicate]})
+
+
+def test_duplicate_v2_identity_with_same_digest_is_rejected() -> None:
+    report = build_report()
+    entry = v2_entry(report)
+
+    with pytest.raises(IdentityMetadataError, match="identity_content_conflict"):
+        parse_reports_index({"schema_version": 2, "reports": [entry, dict(entry)]})
+
+
+def test_only_one_canonical_binding_is_allowed_per_period() -> None:
+    first_report = build_report(as_of="2026-06-20")
+    second_report = build_report(as_of="2026-06-21")
+    first = v2_entry(first_report)
+    second = v2_entry(second_report)
+    second["fingerprint_digest"] = "b" * 64
+
+    with pytest.raises(IdentityMetadataError, match="identity_canonical_conflict"):
+        parse_reports_index({"schema_version": 2, "reports": [first, second]})
+
+
+def test_same_period_canonical_and_multiple_variants_are_allowed() -> None:
+    first_report = build_report(as_of="2026-06-20")
+    second_report = build_report(as_of="2026-06-21")
+    canonical = v2_entry(first_report)
+    variant_a = v2_entry(second_report, digest="a" * 64, variant=True)
+    variant_b = v2_entry(second_report, digest="b" * 64, variant=True)
+
+    parsed = parse_reports_index({"schema_version": 2, "reports": [canonical, variant_a, variant_b]})
+
+    assert sum(binding.canonical_identity for binding in parsed.bindings) == 1
+
+
+def test_v1_reused_artifact_basename_is_rejected_across_bindings() -> None:
+    shared_json = "advisory_report_2026-06-20.json"
+    entries = [
+        {"as_of": "2026-06-20", "cadence": "daily", "json": shared_json, "html": "2026-06-20-daily-model-recommendations.html"},
+        {"as_of": "2026-06-20", "cadence": "weekly", "json": shared_json, "html": "2026-06-20-weekly-model-recommendations.html"},
+    ]
+
+    with pytest.raises(IdentityMetadataError, match="identity_artifact_conflict"):
+        parse_reports_index({"schema_version": 1, "reports": entries})
+
+
+@pytest.mark.parametrize("bad_value", [set(["unserializable"]), Path("unserializable")])
+def test_fingerprint_serialization_errors_are_sanitized(bad_value: object) -> None:
+    report = build_report()
+    report["unserializable"] = bad_value
+    binding = parse_reports_index({"schema_version": 1, "reports": [v1_entry()]}).bindings[0]
+
+    with pytest.raises(IdentityMetadataError, match="report_invalid"):
+        verify_identity_binding(binding, report)
+
+
+def test_circular_fingerprint_value_is_sanitized() -> None:
+    report = build_report()
+    cycle: list[object] = []
+    cycle.append(cycle)
+    report["circular"] = cycle
+    binding = parse_reports_index({"schema_version": 1, "reports": [v1_entry()]}).bindings[0]
+
+    with pytest.raises(IdentityMetadataError, match="report_invalid"):
+        verify_identity_binding(binding, report)
+
+
 def test_same_digest_is_allowed_across_different_periods() -> None:
     first_report = build_report(as_of="2026-06-20")
     second_report = build_report(as_of="2026-06-27")
@@ -320,7 +400,8 @@ def test_schema_evidence_accepts_v5_and_v6_but_not_bool_or_int() -> None:
     v5 = v2_entry(build_report(schema_version="5"))
     v6 = v2_entry(build_report(schema_version="6"))
 
-    assert len(parse_reports_index({"schema_version": 2, "reports": [v5, v6]}).bindings) == 2
+    assert parse_reports_index({"schema_version": 2, "reports": [v5]}).bindings[0].schema_version == "5"
+    assert parse_reports_index({"schema_version": 2, "reports": [v6]}).bindings[0].schema_version == "6"
     v5["schema_version"] = True
     with pytest.raises(IdentityMetadataError, match="invalid_schema_version"):
         parse_reports_index({"schema_version": 2, "reports": [v5]})

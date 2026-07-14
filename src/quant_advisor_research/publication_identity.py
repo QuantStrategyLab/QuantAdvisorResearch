@@ -223,29 +223,34 @@ def parse_reports_index(payload: object) -> ReportsIndex:
         bindings = tuple(_validate_v2_entry(entry) for entry in reports)
     else:
         raise _error("unsupported_index_version")
-    identity_map: dict[tuple[str, tuple[str, str, str | None, str | None]], str | None] = {}
+    identity_map: set[tuple[str, tuple[str, str, str | None, str | None]]] = set()
     digest_map: dict[tuple[str, str, str], tuple[str, str, str | None, str | None]] = {}
-    artifact_map: dict[str, tuple[str, str, str]] = {}
+    artifact_map: dict[str, tuple[str, tuple[str, str, str | None, str | None]]] = {}
+    canonical_periods: set[str] = set()
     for binding in bindings:
         identity = (binding.json_name, binding.html_name, binding.markdown_name, binding.manifest_name)
         identity_key = (binding.period_key, identity)
-        if identity_key in identity_map and identity_map[identity_key] != binding.fingerprint_digest:
+        if identity_key in identity_map:
             raise _error("identity_content_conflict")
-        identity_map[identity_key] = binding.fingerprint_digest
+        identity_map.add(identity_key)
+        if binding.canonical_identity:
+            if binding.period_key in canonical_periods:
+                raise _error("identity_canonical_conflict")
+            canonical_periods.add(binding.period_key)
+        logical_key = (binding.period_key, identity)
+        for name in identity:
+            if name is None:
+                continue
+            previous = artifact_map.get(name)
+            if previous is not None and previous != logical_key:
+                raise _error("identity_artifact_conflict")
+            artifact_map[name] = logical_key
         if binding.fingerprint_digest is not None:
             digest_key = (binding.period_key, binding.fingerprint_version or "", binding.fingerprint_digest)
             previous = digest_map.get(digest_key)
             if previous is not None and previous != identity:
                 raise _error("identity_digest_conflict")
             digest_map[digest_key] = identity
-            logical_key = digest_key
-            for name in identity:
-                if name is None:
-                    continue
-                previous = artifact_map.get(name)
-                if previous is not None and previous != logical_key:
-                    raise _error("identity_artifact_conflict")
-                artifact_map[name] = logical_key
     return ReportsIndex(schema_version=schema_version, bindings=bindings)
 
 
@@ -262,9 +267,12 @@ def verify_identity_binding(binding: IdentityBinding, report: object) -> Identit
         raise _error("identity_metadata_mismatch")
     if _period_key(binding.as_of, binding.cadence) != binding.period_key:
         raise _error("period_mismatch")
-    from .publisher import report_content_fingerprint
+    try:
+        from .publisher import report_content_fingerprint
 
-    digest = hashlib.sha256(report_content_fingerprint(report).encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(report_content_fingerprint(report).encode("utf-8")).hexdigest()
+    except (AttributeError, KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise _error("report_invalid") from exc
     if binding.fingerprint_digest is not None and digest != binding.fingerprint_digest:
         raise _error("identity_content_conflict")
     return replace(
