@@ -164,23 +164,51 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
             reason = item.get("reason")
             if not isinstance(reason, str) or not reason.strip():
                 raise AdvisoryValidationError(f"freshness[{name}].reason must be non-empty")
-            if item["valid"] and not item["present"]:
-                raise AdvisoryValidationError(f"freshness[{name}] valid entries must be present")
-            if item["valid"]:
-                for key in ("as_of", "generated_at", "expires_at"):
-                    if not item.get(key):
-                        raise AdvisoryValidationError(f"freshness[{name}] valid entry missing {key}")
-            freshness_result = assess_context_freshness(
-                item,
-                report_as_of=dt.date.fromisoformat(str(payload["as_of"])),
-                reference_time=reference_time,
-                report_generated_at=generated_at,
-                max_age_days=REPORT_EXPIRY_DAYS,
-                allow_legacy_expiry=False,
+            legacy_marker = (
+                reason == "legacy_expiry_compatibility"
+                and item.get("compatibility_warning") == "missing_expires_at"
             )
-            if item["valid"] and not freshness_result.valid:
+            if not item["present"]:
+                if item["valid"]:
+                    raise AdvisoryValidationError(f"freshness[{name}] valid entries must be present")
+                if any(item.get(key) for key in ("as_of", "generated_at", "expires_at")):
+                    raise AdvisoryValidationError(f"freshness[{name}] not_provided entry contains timestamps")
+                freshness_result = assess_context_freshness(
+                    None,
+                    report_as_of=dt.date.fromisoformat(str(payload["as_of"])),
+                    reference_time=reference_time,
+                    report_generated_at=generated_at,
+                    max_age_days=REPORT_EXPIRY_DAYS,
+                )
+            else:
+                if item["valid"]:
+                    required_keys = ("as_of", "generated_at") + (() if legacy_marker else ("expires_at",))
+                    for key in required_keys:
+                        if not item.get(key):
+                            raise AdvisoryValidationError(f"freshness[{name}] valid entry missing {key}")
+                freshness_result = assess_context_freshness(
+                    item,
+                    report_as_of=dt.date.fromisoformat(str(payload["as_of"])),
+                    reference_time=reference_time,
+                    report_generated_at=generated_at,
+                    max_age_days=REPORT_EXPIRY_DAYS,
+                    allow_legacy_expiry=True,
+                )
+            if freshness_result.reason not in {
+                "not_provided", "expired", "stale_as_of", "missing_expires_at",
+            } and not freshness_result.valid:
                 raise AdvisoryValidationError(
                     f"freshness[{name}] invalid: {freshness_result.reason}"
+                )
+            if item["present"] != freshness_result.present:
+                raise AdvisoryValidationError(f"freshness[{name}] present does not match assessment")
+            if item["valid"] != freshness_result.valid:
+                raise AdvisoryValidationError(
+                    f"freshness[{name}] valid does not match assessment: {freshness_result.reason}"
+                )
+            if reason != freshness_result.reason:
+                raise AdvisoryValidationError(
+                    f"freshness[{name}] reason does not match assessment: {freshness_result.reason}"
                 )
     if payload["mode"] != "model_recommendations":
         raise AdvisoryValidationError("mode must be model_recommendations")

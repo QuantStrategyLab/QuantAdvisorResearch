@@ -164,15 +164,87 @@ def test_v6_valid_freshness_requires_coherent_source_window() -> None:
     validate_advisory_report(report)
 
 
+def test_v6_allows_well_formed_expired_context_as_invalid() -> None:
+    report = build_v6_from_v5()
+    report["freshness"]["ai_signal"] = {
+        "present": True,
+        "valid": False,
+        "reason": "expired",
+        "as_of": "2026-05-30",
+        "generated_at": "2026-05-30T12:00:00Z",
+        "expires_at": "2026-05-30T23:59:59Z",
+    }
+    validate_advisory_report(report)
+
+
+@pytest.mark.parametrize(
+    ("item", "reason"),
+    [
+        (
+            {
+                "present": True, "valid": False, "reason": "as_of_in_future",
+                "as_of": "2026-05-31", "generated_at": "2026-05-30T12:00:00Z",
+                "expires_at": "2026-06-30",
+            },
+            "as_of_in_future",
+        ),
+        (
+            {
+                "present": True, "valid": False, "reason": "invalid_generated_at",
+                "as_of": "2026-05-30", "generated_at": "malformed",
+                "expires_at": "2026-06-30",
+            },
+            "invalid_generated_at",
+        ),
+        (
+            {
+                "present": True, "valid": False, "reason": "expired",
+                "as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00Z",
+                "expires_at": "2026-06-30",
+            },
+            "fresh",
+        ),
+    ],
+)
+def test_v6_invalid_freshness_rejects_future_malformed_and_reason_mismatch(
+    item: dict[str, object], reason: str
+) -> None:
+    report = build_v6_from_v5()
+    report["freshness"]["ai_signal"] = item
+    with pytest.raises(AdvisoryValidationError, match=reason):
+        validate_advisory_report(report)
+
+
+def test_v6_allows_only_explicit_legacy_expiry_compatibility() -> None:
+    report = build_v6_from_v5()
+    report["freshness"]["ai_signal"] = {
+        "present": True,
+        "valid": True,
+        "reason": "legacy_expiry_compatibility",
+        "compatibility_warning": "missing_expires_at",
+        "as_of": "2026-05-30",
+        "generated_at": "2026-05-30T12:00:00Z",
+    }
+    validate_advisory_report(report)
+
+
 def test_v5_v6_same_content_fingerprint_ignores_only_volatile_metadata() -> None:
     v5 = build_legacy_v5()
     v6 = build_v6_from_v5()
-    v5["summary"]["data_quality_warnings"] = ["ai_signal:compatibility_missing_expires_at", "operator warning"]
-    v6["summary"]["data_quality_warnings"] = ["theme_momentum:stale_as_of", "operator warning"]
+    v5["summary"]["data_quality_warnings"] = ["compatibility:missing_expires_at", "operator warning"]
+    v6["summary"]["data_quality_warnings"] = ["schema_compatibility:v6_freshness", "operator warning"]
     assert report_content_fingerprint(v5) == report_content_fingerprint(v6)
 
     v6["summary"]["data_quality_warnings"] = ["theme_momentum:stale_as_of", "different operator warning"]
     assert report_content_fingerprint(v5) != report_content_fingerprint(v6)
+
+
+def test_substantive_source_warning_changes_fingerprint() -> None:
+    first = build_legacy_v5()
+    second = build_legacy_v5()
+    first["summary"]["data_quality_warnings"] = ["ai_signal:stale_as_of"]
+    second["summary"]["data_quality_warnings"] = ["ai_signal:future_source"]
+    assert report_content_fingerprint(first) != report_content_fingerprint(second)
 
 
 def test_archive_index_and_feed_order_are_deterministic_and_use_actual_pubdate() -> None:

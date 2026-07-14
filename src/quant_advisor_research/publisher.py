@@ -66,14 +66,19 @@ def report_content_fingerprint(report: dict[str, Any]) -> str:
     normalized = {key: value for key, value in report.items() if key not in ignored_top_level_keys}
     summary = normalized.get("summary")
     if isinstance(summary, dict) and isinstance(summary.get("data_quality_warnings"), list):
-        freshness_prefixes = ("ai_signal:", "theme_momentum:", "freshness:", "context_freshness:")
         summary = dict(summary)
         summary["data_quality_warnings"] = [
             warning for warning in summary["data_quality_warnings"]
-            if not isinstance(warning, str) or not warning.startswith(freshness_prefixes)
+            if not _is_compatibility_warning(warning)
         ]
         normalized["summary"] = summary
     return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _is_compatibility_warning(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    return value.startswith(("compatibility:", "compatibility_", "schema_compatibility:", "schema_compatibility_"))
 
 
 def report_as_of_date(report: dict[str, Any]) -> dt.date | None:
