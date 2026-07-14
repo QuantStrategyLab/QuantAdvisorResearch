@@ -9,6 +9,7 @@ from typing import Any
 
 from .contracts import AdvisoryValidationError, validate_advisory_report
 from .period_contract import PeriodContractError, canonical_period_identity
+from .time_contract import TimeContractError
 
 
 ARTIFACT_INTEGRITY_VERSION = "validated_report.v1.canonical-json.sha256"
@@ -90,9 +91,18 @@ def _validated_snapshot(report: Mapping[str, Any]) -> dict[str, object]:
     snapshot = snapshot_json_wire(report)
     try:
         validate_advisory_report(snapshot)
-    except AdvisoryValidationError:
-        raise ArtifactIntegrityError("report_invalid") from None
-    except (AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
+    except (
+        AdvisoryValidationError,
+        TimeContractError,
+        PeriodContractError,
+        AttributeError,
+        KeyError,
+        TypeError,
+        ValueError,
+        OverflowError,
+        UnicodeError,
+        RecursionError,
+    ):
         raise ArtifactIntegrityError("report_invalid") from None
     return snapshot
 

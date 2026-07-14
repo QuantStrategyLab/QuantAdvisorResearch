@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import traceback
 from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
@@ -9,6 +10,7 @@ from types import MappingProxyType
 
 import pytest
 
+import quant_advisor_research.artifact_integrity as artifact_integrity
 from quant_advisor_research.advisory_report import build_advisory_report
 from quant_advisor_research.artifact_integrity import (
     ARTIFACT_INTEGRITY_VERSION,
@@ -18,7 +20,8 @@ from quant_advisor_research.artifact_integrity import (
     make_artifact_integrity_evidence,
 )
 from quant_advisor_research.publisher import report_content_fingerprint
-from quant_advisor_research.time_contract import canonical_reference_time, normalize_aware_datetime
+from quant_advisor_research.period_contract import PeriodContractError
+from quant_advisor_research.time_contract import TimeContractError, canonical_reference_time, normalize_aware_datetime
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -203,3 +206,36 @@ def test_snapshot_happens_before_validation_and_hashing() -> None:
     evidence = make_artifact_integrity_evidence(MutatingMapping(report))
     assert report["generated_at"] != original
     assert evidence.digest == artifact_integrity_digest(dict(report, generated_at=original))
+
+
+@pytest.mark.parametrize("exception_type", [artifact_integrity.AdvisoryValidationError, TimeContractError, PeriodContractError])
+@pytest.mark.parametrize("operation", ["canonicalize", "digest", "evidence"])
+def test_known_validator_exceptions_are_sanitized(monkeypatch, exception_type, operation: str) -> None:
+    marker = "UNTRUSTED_VALIDATOR_EXCEPTION"
+
+    def raise_known(_report) -> None:
+        raise exception_type(marker)
+
+    monkeypatch.setattr(artifact_integrity, "validate_advisory_report", raise_known)
+    report = build_report()
+    call = {
+        "canonicalize": artifact_integrity.canonicalize_validated_report,
+        "digest": artifact_integrity_digest,
+        "evidence": make_artifact_integrity_evidence,
+    }[operation]
+
+    with pytest.raises(ArtifactIntegrityError, match="report_invalid") as error:
+        call(report)
+    assert error.value.__suppress_context__ is True
+    assert marker not in repr(error.value)
+    assert marker not in "".join(traceback.format_exception(error.value))
+
+
+def test_unexpected_runtime_error_is_not_swallowed(monkeypatch) -> None:
+    def raise_unexpected(_report) -> None:
+        raise RuntimeError("programming failure")
+
+    monkeypatch.setattr(artifact_integrity, "validate_advisory_report", raise_unexpected)
+
+    with pytest.raises(RuntimeError, match="programming failure"):
+        artifact_integrity_digest(build_report())
