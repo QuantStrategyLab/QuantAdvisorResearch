@@ -368,18 +368,32 @@ def build_publication_plan(
         for index, path in enumerate(selected_paths)
     ]
     valid_candidates = [candidate for candidate in candidates if candidate.report is not None]
-    groups: dict[tuple[str, str], list[_ReportCandidate]] = {}
+    groups: dict[str, list[_ReportCandidate]] = {}
     for candidate in valid_candidates:
-        groups.setdefault((str(candidate.report["as_of"]), str(candidate.report["cadence"])), []).append(candidate)
+        assert candidate.period is not None
+        groups.setdefault(candidate.period.key, []).append(candidate)
     mandatory_resolved = Path(mandatory_current).resolve() if mandatory_current is not None else None
     entries_by_path: dict[Path, PublicationEntry] = {}
+    ordered_groups: list[tuple[CanonicalPeriod, list[_ReportCandidate]]] = []
     for group in groups.values():
         ranked = _publication_rank(group)
         owner = next(
             (candidate for candidate in ranked if candidate.path.resolve() == mandatory_resolved),
             ranked[0],
         )
-        for candidate in ranked:
+        assert owner.period is not None
+        ordered_groups.append(
+            (owner.period, [owner, *(candidate for candidate in ranked if candidate is not owner)])
+        )
+    ordered_groups.sort(
+        key=lambda item: (item[0].period_end, item[0].period_start, item[0].cadence),
+        reverse=True,
+    )
+    ordered_candidates: list[_ReportCandidate] = []
+    for _, group in ordered_groups:
+        ordered_candidates.extend(group)
+        owner = group[0]
+        for candidate in group:
             assert candidate.report is not None and candidate.fingerprint is not None and candidate.generated_at is not None
             as_of = str(candidate.report["as_of"])
             canonical_html = report_filename(candidate.report)
@@ -405,7 +419,7 @@ def build_publication_plan(
                 canonical_owner=canonical_owner,
                 generated_at=candidate.generated_at,
             )
-    entries = [entries_by_path[candidate.path] for candidate in _publication_rank(valid_candidates)]
+    entries = [entries_by_path[candidate.path] for candidate in ordered_candidates]
     return PublicationPlan(tuple(entries))
 
 

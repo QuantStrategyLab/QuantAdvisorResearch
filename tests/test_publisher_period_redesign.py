@@ -10,6 +10,7 @@ import pytest
 from quant_advisor_research.advisory_report import build_advisory_report
 from quant_advisor_research.archive_backfill import discover_report_paths
 from quant_advisor_research.publisher import (
+    build_publication_plan,
     classify_report_path,
     main as publisher_main,
     publish_reports,
@@ -81,6 +82,71 @@ def test_same_day_schema_precedes_generated_at(tmp_path: Path) -> None:
 
     assert unique_report_paths_by_content([v5_path, v6_path]) == [v6_path]
     assert unique_report_paths_by_content([v6_path, v5_path]) == [v6_path]
+
+
+@pytest.mark.parametrize(
+    ("cadence", "as_of_values"),
+    [
+        ("weekly", ("2026-06-15", "2026-06-21")),
+        ("monthly", ("2026-06-01", "2026-06-30")),
+    ],
+)
+def test_publication_plan_groups_same_canonical_period_variants(
+    tmp_path: Path, cadence: str, as_of_values: tuple[str, str]
+) -> None:
+    first = build_v5(as_of_values[0])
+    second = build_v5(as_of_values[1])
+    first["cadence"] = second["cadence"] = cadence
+    second["recommendations"][0]["reasons"] = ["different semantic content"]
+    first_path = write_report(tmp_path / "first.json", first)
+    second_path = write_report(tmp_path / "second.json", second)
+
+    plan = build_publication_plan([first_path, second_path])
+    reversed_plan = build_publication_plan([second_path, first_path])
+
+    assert len(plan.entries) == 2
+    assert sum(entry.canonical_owner for entry in plan.entries) == 1
+    assert plan.entries[0].canonical_owner is True
+    assert ".variant-" in plan.entries[1].json_name
+    assert [(entry.json_name, entry.source_path.name) for entry in plan.entries] == [
+        (entry.json_name, entry.source_path.name) for entry in reversed_plan.entries
+    ]
+
+
+def test_publication_plan_pins_mandatory_current_as_group_owner_and_first(
+    tmp_path: Path,
+) -> None:
+    current = build_v5("2026-06-21")
+    recovered = build_v6("2026-06-15")
+    recovered["summary"]["top_theme_ids"] = ["different-theme"]
+    recovered["generated_at"] = "2026-06-16T12:00:00Z"
+    recovered["expires_at"] = "2026-06-23T12:00:00Z"
+    current_path = write_report(tmp_path / "advisory_report_2026-06-21.json", current)
+    recovered_path = write_report(tmp_path / "recovered.json", recovered)
+
+    plan = build_publication_plan(
+        [current_path], mandatory_current=current_path, recovered_history=[recovered_path]
+    )
+
+    assert len(plan.entries) == 2
+    assert plan.entries[0].source_path == current_path
+    assert plan.entries[0].canonical_owner is True
+    assert ".variant-" in plan.entries[1].json_name
+
+    output = tmp_path / "site"
+    publish_reports(
+        [current_path],
+        output,
+        site_url="https://example.invalid",
+        feed_title="Test",
+        mandatory_current=current_path,
+        recovered_history=[recovered_path],
+    )
+    reports_index = json.loads((output / "reports_index.json").read_text(encoding="utf-8"))
+    feed = (output / "feed.xml").read_text(encoding="utf-8")
+    assert reports_index["reports"][0]["json"] == "advisory_report_2026-06-21.json"
+    assert feed.index("2026-06-21") < feed.index("2026-06-15")
+    assert "Tue, 16 Jun 2026 12:00:00 GMT" in feed
 
 
 def test_invalid_v6_cannot_shadow_valid_v5(tmp_path: Path) -> None:
