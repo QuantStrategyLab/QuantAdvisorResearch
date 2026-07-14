@@ -4,7 +4,10 @@ import datetime as dt
 import json
 from pathlib import Path
 
+import pytest
+
 from quant_advisor_research.archive_backfill import backfill_site_archive, discover_report_paths
+from quant_advisor_research import build_pipeline as build_pipeline_module
 from quant_advisor_research.build_pipeline import build_advisory_artifacts, default_weekly_as_of
 from quant_advisor_research.cross_repo_smoke import run_cross_repo_smoke
 
@@ -109,6 +112,66 @@ def test_archive_backfill_discovers_dedupes_and_publishes_reports(tmp_path: Path
     assert (tmp_path / "site" / duplicate.name).exists()
     assert (tmp_path / "site" / second.name).exists()
     assert first.name == duplicate.name
+
+
+def test_archive_backfill_collision_fails_before_existing_site_write(tmp_path: Path) -> None:
+    first = build_fixture_report(tmp_path / "artifacts-a", dt.date(2026, 5, 31))
+    second = build_fixture_report(tmp_path / "artifacts-b", dt.date(2026, 5, 31))
+    first_payload = json.loads(first.read_text(encoding="utf-8"))
+    second_payload = json.loads(second.read_text(encoding="utf-8"))
+    second_payload["recommendations"][0]["reasons"] = ["different semantic content"]
+    second.write_text(json.dumps(second_payload), encoding="utf-8")
+    output = tmp_path / "site"
+    output.mkdir()
+    sentinel = output / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="archive_destination_collision"):
+        backfill_site_archive(
+            report_paths=[first, second],
+            output_dir=output,
+            site_url="https://example.invalid/advisor",
+            feed_title="Test",
+        )
+    assert list(output.iterdir()) == [sentinel]
+    assert first_payload["as_of"] == second_payload["as_of"]
+
+
+def test_build_pipeline_collision_fails_before_site_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    recovered = build_fixture_report(tmp_path / "recovered", dt.date(2026, 5, 31))
+    recovered_payload = json.loads(recovered.read_text(encoding="utf-8"))
+    recovered_payload["recommendations"][0]["reasons"] = ["different semantic content"]
+    recovered.write_text(json.dumps(recovered_payload), encoding="utf-8")
+    site = tmp_path / "site"
+    site.mkdir()
+    sentinel = site / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+    monkeypatch.setattr(build_pipeline_module, "recover_published_reports", lambda **_: [recovered])
+
+    with pytest.raises(ValueError, match="archive_destination_collision"):
+        build_advisory_artifacts(
+            as_of=dt.date(2026, 5, 31),
+            cadence="weekly",
+            political_events_path=example_path("political_events.example.csv"),
+            political_watchlist_path=example_path("political_watchlist.example.csv"),
+            ai_signal_path=example_path("research_signal_context.example.json"),
+            theme_momentum_path=example_path("theme_momentum_snapshot.example.json"),
+            market_confirmation_path=None,
+            output_dir=tmp_path / "artifacts",
+            max_candidates=12,
+            market_benchmark="SPY",
+            market_max_symbols=80,
+            market_request_pause_seconds=0,
+            market_proxy_list=None,
+            market_proxy_urls="",
+            market_proxy_pool_url="",
+            market_use_network=False,
+            market_cache_dir=None,
+            market_cache_max_age_days=14,
+            site_output_dir=site,
+            recover_site_archive=True,
+        )
+    assert list(site.iterdir()) == [sentinel]
 
 
 def test_cross_repo_smoke_uses_fixture_artifacts_without_network(tmp_path: Path) -> None:

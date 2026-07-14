@@ -117,6 +117,24 @@ def test_discovery_returns_valid_and_malformed_siblings_for_later_validation(tmp
     assert set(discovered) == {valid, malformed}
 
 
+def test_discovery_keeps_explicit_priority_and_root_candidates_newest_first(tmp_path: Path) -> None:
+    oldest = write_report(
+        tmp_path / "root-a" / "advisory_report_2026-06-18.json", build_v5("2026-06-18")
+    )
+    newest = write_report(
+        tmp_path / "root-b" / "advisory_report_2026-06-20.json", build_v5("2026-06-20")
+    )
+    same_day_sibling = write_report(
+        tmp_path / "root-c" / "advisory_report_2026-06-20.json", build_v5("2026-06-20")
+    )
+
+    discovered = discover_report_paths([tmp_path / "root-a", tmp_path / "root-b", tmp_path / "root-c"], [oldest])
+
+    assert discovered[0] == oldest
+    assert [path.name for path in discovered[1:]] == [newest.name, same_day_sibling.name]
+    assert discovered[1].parent < discovered[2].parent
+
+
 def test_mandatory_current_is_pinned_over_higher_schema_history_duplicate(tmp_path: Path) -> None:
     current = write_report(tmp_path / "current.json", build_v5())
     recovered = write_report(tmp_path / "recovered.json", build_v6())
@@ -162,6 +180,22 @@ def test_valid_current_with_invalid_history_publishes_current(tmp_path: Path) ->
     )
 
     assert (output / "2026-06-20-weekly-model-recommendations.html").exists()
+
+
+def test_selected_fingerprint_collision_fails_before_site_write(tmp_path: Path) -> None:
+    first = build_v5()
+    second = copy.deepcopy(first)
+    second["recommendations"][0]["reasons"] = ["different semantic content"]
+    first_path = write_report(tmp_path / "first.json", first)
+    second_path = write_report(tmp_path / "second.json", second)
+    output = tmp_path / "site"
+    output.mkdir()
+    sentinel = output / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="archive_destination_collision"):
+        publish_reports([first_path, second_path], output, site_url="https://example.invalid", feed_title="Test")
+    assert list(output.iterdir()) == [sentinel]
 
 
 def test_missing_mandatory_current_is_stable_and_history_only_all_invalid_fails(tmp_path: Path) -> None:

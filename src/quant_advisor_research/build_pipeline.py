@@ -21,7 +21,12 @@ from .market_confirmation import (
     write_market_confirmation_csv,
 )
 from .monthly_review import build_monthly_review, render_monthly_review_markdown
-from .publisher import publish_reports, require_publish_candidates, unique_report_paths_by_content
+from .publisher import (
+    preflight_publish_destinations,
+    publish_reports,
+    require_publish_candidates,
+    unique_report_paths_by_content,
+)
 from .recommendation_review import build_recommendation_review, render_recommendation_review_markdown
 
 
@@ -287,6 +292,7 @@ def build_advisory_artifacts(
         report_paths = [report_json]
     if site_output:
         report_paths = list(require_publish_candidates(report_json, recovered_report_paths).selected_paths)
+        preflight_publish_destinations(report_paths)
     else:
         report_paths = unique_report_paths_by_content(report_paths)
 

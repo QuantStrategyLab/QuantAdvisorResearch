@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .build_pipeline import DEFAULT_FEED_TITLE, DEFAULT_SITE_URL, copy_if_different
-from .publisher import publish_reports, require_publish_candidates
+from .publisher import preflight_publish_destinations, publish_reports, require_publish_candidates
 
 
 REPORT_JSON_PATTERN = re.compile(r"advisory_report_\d{4}-\d{2}-\d{2}\.json")
@@ -24,16 +24,17 @@ def load_report(path: Path) -> dict[str, Any] | None:
 
 
 def discover_report_paths(artifact_roots: list[str | Path], explicit_reports: list[str | Path]) -> list[Path]:
-    candidates: list[Path] = []
+    explicit_candidates: list[Path] = []
     for report in explicit_reports:
         path = Path(report)
         if path.exists() and path.name.startswith("advisory_report_") and path.suffix == ".json":
-            candidates.append(path)
+            explicit_candidates.append(path)
+    root_candidates: list[Path] = []
     for root in artifact_roots:
         root_path = Path(root)
         if not root_path.exists():
             continue
-        candidates.extend(
+        root_candidates.extend(
             path
             for path in root_path.rglob("advisory_report_*.json")
             if path.is_file() and REPORT_JSON_PATTERN.fullmatch(path.name)
@@ -41,7 +42,10 @@ def discover_report_paths(artifact_roots: list[str | Path], explicit_reports: li
 
     unique_paths: list[Path] = []
     seen: set[Path] = set()
-    for path in sorted(candidates, key=lambda item: (item.name, str(item))):
+    root_candidates.sort(key=lambda item: str(item))
+    root_candidates.sort(key=lambda item: item.name, reverse=True)
+    candidates = explicit_candidates + root_candidates
+    for path in candidates:
         resolved = path.resolve()
         if resolved in seen:
             continue
@@ -62,6 +66,7 @@ def backfill_site_archive(
         raise ValueError("No advisory_report_YYYY-MM-DD.json files found for backfill.")
     selection = require_publish_candidates(current_report, report_paths)
     report_paths = list(selection.selected_paths)
+    preflight_publish_destinations(report_paths)
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     written = publish_reports(

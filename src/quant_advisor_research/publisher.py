@@ -290,6 +290,26 @@ def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]
     return list(require_publish_candidates(None, report_paths).selected_paths)
 
 
+def preflight_publish_destinations(report_paths: list[str | Path]) -> None:
+    destinations: dict[tuple[str, str], tuple[Path, str]] = {}
+    for raw_path in report_paths:
+        path = Path(raw_path)
+        report = load_report(path)
+        fingerprint = report_content_fingerprint(report)
+        names = (
+            ("html", report_filename(report)),
+            ("json", path.name),
+            ("markdown", path.with_suffix(".md").name),
+            ("manifest", f"{path.name}.manifest.json"),
+        )
+        for kind, name in names:
+            identity = (kind, name)
+            previous = destinations.get(identity)
+            if previous is not None and (previous[0] != path.resolve() or previous[1] != fingerprint):
+                raise ValueError("archive_destination_collision")
+            destinations[identity] = (path.resolve(), fingerprint)
+
+
 def format_datetime(value: str) -> str:
     normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
     parsed = dt.datetime.fromisoformat(normalized)
@@ -1435,6 +1455,7 @@ def publish_reports(
             path for path in report_paths if Path(path).resolve() != Path(mandatory_current).resolve()
         ]
         selection = require_publish_candidates(mandatory_current, history)
+    preflight_publish_destinations(list(selection.selected_paths))
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     report_paths = list(selection.selected_paths)
