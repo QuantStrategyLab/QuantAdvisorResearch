@@ -18,6 +18,7 @@ from .contracts import validate_advisory_report
 from .identity_lifecycle import FINGERPRINT_VERSION, IdentityMetadataError
 from .identity_v3 import (
     PENDING_ARTIFACT_VALIDATION,
+    LEGACY_V2,
     V3_CANONICAL,
     V3_VARIANT,
     V3IdentityBinding,
@@ -329,9 +330,16 @@ def allocate_v3_identity(
         raise _error("allocation_context_mismatch")
     verified_inventory = _revalidate_inventory(inventory)
     bindings = verified_inventory.index.bindings
-    exact_matches = [binding for binding in bindings if _exact_key(binding) == _exact_key_from_metadata(metadata)]
-    same_artifact = [
+    v3_bindings = [
         binding for binding in bindings
+        if binding.identity_class in {V3_CANONICAL, V3_VARIANT}
+    ]
+    exact_matches = [
+        binding for binding in v3_bindings
+        if _exact_key(binding) == _exact_key_from_metadata(metadata)
+    ]
+    same_artifact = [
+        binding for binding in v3_bindings
         if binding.period_key == period_key
         and binding.artifact_integrity_version == ARTIFACT_INTEGRITY_VERSION
         and binding.artifact_integrity_digest == artifact_digest
@@ -343,10 +351,10 @@ def allocate_v3_identity(
         _validate_reuse_policy(binding, requested, display_placement)
         return V3AllocationPlan(binding, context.mode, True)
     if context.mode is AllocationMode.EXACT_ARTIFACT_REUSE:
-        raise _error("identity_reuse_mismatch" if same_artifact else "identity_reuse_not_found")
+        raise _error("exact_artifact_not_found")
     if same_artifact:
         raise _error("identity_reuse_mismatch")
-    period_bindings = [binding for binding in bindings if binding.period_key == period_key]
+    period_bindings = [binding for binding in v3_bindings if binding.period_key == period_key]
     canonical_exists = any(binding.canonical_identity for binding in period_bindings)
     if context.mode is AllocationMode.HISTORICAL_RECOVERY and not canonical_exists:
         raise _error("canonical_bootstrap_required")
@@ -371,9 +379,13 @@ def _exact_key_from_metadata(metadata: tuple[dict[str, object], str, str, str, s
 
 def _simulate(index: V3IdentityIndex, candidate: V3IdentityBinding) -> None:
     try:
+        # LEGACY_V2 entries remain dual-read migration evidence. The candidate
+        # must satisfy the complete v3 ledger invariants without rewriting or
+        # treating legacy canonical metadata as a v3 canonical owner.
+        v3_bindings = tuple(binding for binding in index.bindings if binding.identity_class != LEGACY_V2)
         parse_v3_index({
             "schema_version": 3,
-            "reports": [_binding_payload(binding) for binding in (*index.bindings, candidate)],
+            "reports": [_binding_payload(binding) for binding in (*v3_bindings, candidate)],
         })
     except IdentityMetadataError as exc:
         raise _error(exc.code) from None

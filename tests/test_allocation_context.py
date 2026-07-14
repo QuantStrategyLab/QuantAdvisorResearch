@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import OrderedDict
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 
@@ -61,13 +62,15 @@ def binding_for(
     display_order: int = 0,
     include_md: bool = False,
     include_manifest: bool = False,
+    identity_class: str | None = None,
 ):
     period_key, semantic, artifact, contract = metadata(report)
     artifact_digest = artifact_digest or artifact
     semantic_digest = semantic_digest or semantic
     as_of = report["as_of"]
     cadence = report["cadence"]
-    suffix = "" if canonical else f".variant-{artifact_digest}"
+    identity_class = identity_class or ("V3_CANONICAL" if canonical else "V3_VARIANT")
+    suffix = "" if canonical else f".variant-{semantic_digest if identity_class == 'LEGACY_V2' else artifact_digest}"
     entry = {
         "period_key": period_key,
         "as_of": as_of,
@@ -80,7 +83,7 @@ def binding_for(
         "artifact_integrity_digest": artifact_digest,
         "json": f"advisory_report_{as_of}{suffix}.json",
         "html": f"{as_of}-{cadence}-model-recommendations{suffix}.html",
-        "identity_class": "V3_CANONICAL" if canonical else "V3_VARIANT",
+        "identity_class": identity_class,
         "canonical_identity": canonical,
         "display_primary": display_primary,
         "display_order": display_order,
@@ -199,7 +202,7 @@ def test_exact_artifact_reuse_is_immutable_and_requires_full_match() -> None:
 
     changed = dict(report)
     changed["generated_at"] = "2026-07-15T00:00:00Z"
-    with pytest.raises(IdentityMetadataError, match="identity_reuse_not_found|identity_reuse_mismatch"):
+    with pytest.raises(IdentityMetadataError, match="exact_artifact_not_found"):
         allocate_v3_identity(
             changed,
             inventory=inventory,
@@ -276,6 +279,83 @@ def test_inventory_accepts_declared_v3_schema_version() -> None:
     assert inventory.index.schema_version == 3
 
 
+def test_legacy_exact_match_is_not_reused_or_migrated() -> None:
+    report = build_report()
+    legacy = binding_for(report, identity_class="LEGACY_V2")
+
+    with pytest.raises(IdentityMetadataError, match="exact_artifact_not_found"):
+        allocate_v3_identity(
+            report,
+            inventory=inventory_for((legacy, report)),
+            context=AllocationContext.exact_artifact_reuse(),
+            requested_artifacts=REQUESTED,
+            display_placement=DISPLAY,
+        )
+
+
+def test_legacy_only_current_bootstraps_v3_canonical() -> None:
+    report = build_report()
+    legacy = binding_for(report, identity_class="LEGACY_V2")
+    period_key = metadata(report)[0]
+
+    result = allocate_v3_identity(
+        report,
+        inventory=inventory_for((legacy, report)),
+        context=AllocationContext.current_mandatory(period_key),
+        requested_artifacts=REQUESTED,
+        display_placement=DISPLAY,
+    )
+
+    assert result.reused_existing is False
+    assert result.binding.identity_class == "V3_CANONICAL"
+    assert result.binding.canonical_identity is True
+
+
+def test_legacy_only_historical_recovery_requires_v3_canonical() -> None:
+    report = build_report()
+    legacy = binding_for(report, identity_class="LEGACY_V2")
+
+    with pytest.raises(IdentityMetadataError, match="canonical_bootstrap_required"):
+        allocate_v3_identity(
+            report,
+            inventory=inventory_for((legacy, report)),
+            context=AllocationContext.historical_recovery(),
+            requested_artifacts=REQUESTED,
+            display_placement=DISPLAY,
+        )
+
+
+def test_mixed_legacy_and_v3_uses_v3_canonical_for_variant_allocation() -> None:
+    legacy_report = build_report()
+    current_report = dict(legacy_report)
+    current_report["generated_at"] = "2026-07-15T00:00:00Z"
+    candidate_report = dict(current_report)
+    candidate_report["generated_at"] = "2026-07-16T00:00:00Z"
+    legacy_canonical = binding_for(legacy_report, identity_class="LEGACY_V2")
+    legacy = replace(
+        legacy_canonical,
+        canonical_identity=False,
+        json_name=f"advisory_report_{legacy_report['as_of']}.variant-{metadata(legacy_report)[1]}.json",
+        html_name=(
+            f"{legacy_report['as_of']}-{legacy_report['cadence']}-model-recommendations"
+            f".variant-{metadata(legacy_report)[1]}.html"
+        ),
+    )
+    canonical = binding_for(current_report)
+    period_key = metadata(candidate_report)[0]
+
+    result = allocate_v3_identity(
+        candidate_report,
+        inventory=inventory_for((legacy, legacy_report), (canonical, current_report)),
+        context=AllocationContext.current_mandatory(period_key),
+        requested_artifacts=REQUESTED,
+        display_placement=DISPLAY,
+    )
+
+    assert result.binding.identity_class == "V3_VARIANT"
+    assert result.reused_existing is False
+
+
 def test_semantic_same_artifact_different_is_not_reused() -> None:
     report = build_report()
     changed = dict(report)
@@ -284,7 +364,7 @@ def test_semantic_same_artifact_different_is_not_reused() -> None:
     period_key, semantic, artifact, _contract = metadata(changed)
 
     assert semantic == metadata(report)[1]
-    with pytest.raises(IdentityMetadataError, match="identity_reuse_not_found|identity_reuse_mismatch"):
+    with pytest.raises(IdentityMetadataError, match="exact_artifact_not_found"):
         allocate_v3_identity(
             changed,
             inventory=inventory,
