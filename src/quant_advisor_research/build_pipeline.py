@@ -21,7 +21,7 @@ from .market_confirmation import (
     write_market_confirmation_csv,
 )
 from .monthly_review import build_monthly_review, render_monthly_review_markdown
-from .publisher import publish_reports, unique_report_paths_by_content
+from .publisher import publish_reports, require_publish_candidates, unique_report_paths_by_content
 from .recommendation_review import build_recommendation_review, render_recommendation_review_markdown
 
 
@@ -285,7 +285,10 @@ def build_advisory_artifacts(
         report_paths = [report_json, *recovered_report_paths]
     else:
         report_paths = [report_json]
-    report_paths = unique_report_paths_by_content(report_paths)
+    if site_output:
+        report_paths = list(require_publish_candidates(report_json, recovered_report_paths).selected_paths)
+    else:
+        report_paths = unique_report_paths_by_content(report_paths)
 
     recommendation_review_json: Path | None = None
     recommendation_review_md: Path | None = None
@@ -304,7 +307,14 @@ def build_advisory_artifacts(
         write_text(recommendation_review_md, render_recommendation_review_markdown(review))
 
     if site_output:
-        publish_reports(report_paths, site_output, site_url=site_url, feed_title=feed_title)
+        publish_reports(
+            report_paths,
+            site_output,
+            site_url=site_url,
+            feed_title=feed_title,
+            mandatory_current=report_json,
+            recovered_history=recovered_report_paths,
+        )
         for path in report_paths:
             copy_if_different(Path(path), site_output / Path(path).name)
         copy_if_different(report_md, site_output / report_md.name)

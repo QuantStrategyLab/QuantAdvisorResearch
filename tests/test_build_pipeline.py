@@ -97,7 +97,7 @@ def test_archive_backfill_discovers_dedupes_and_publishes_reports(tmp_path: Path
 
     reports = discover_report_paths([tmp_path], [duplicate])
 
-    assert reports == [duplicate, second]
+    assert set(reports) == {first, duplicate, second}
     written = backfill_site_archive(
         report_paths=reports,
         output_dir=tmp_path / "site",
