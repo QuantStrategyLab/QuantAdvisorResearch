@@ -17,8 +17,12 @@ from .artifact_integrity import (
 from .contracts import AdvisoryValidationError, validate_advisory_report
 from .identity_lifecycle import FINGERPRINT_VERSION, IdentityMetadataError
 from .identity_v3 import (
+    LEGACY_V2,
     PENDING_ARTIFACT_VALIDATION,
+    V3_CANONICAL,
+    V3_VARIANT,
     V3IdentityBinding,
+    _validate_v3_entry,
 )
 from .period_contract import PeriodContractError, canonical_period_identity
 from .publisher import report_content_fingerprint
@@ -170,6 +174,7 @@ class PublicationEntry:
     role: PublicationRole
     display_primary: bool
     display_order: int
+    identity_namespace: str = "legacy"
 
     def __post_init__(self) -> None:
         _validate_entry(self)
@@ -224,17 +229,26 @@ def _binding_payload(binding: V3IdentityBinding) -> dict[str, object]:
     return payload
 
 
-def _validate_binding(binding: object) -> V3IdentityBinding:
+def _validate_binding(binding: object, *, strict_vnext: bool) -> V3IdentityBinding:
     if not isinstance(binding, V3IdentityBinding):
         raise _error("identity_binding_invalid")
     if binding.status != PENDING_ARTIFACT_VALIDATION:
         raise _error("identity_binding_invalid")
-    if binding.identity_class == "LEGACY_V2":
+    if strict_vnext and binding.identity_class == LEGACY_V2:
         raise _error("legacy_binding_not_migrated")
     try:
-        validated = validate_vnext_binding(binding, allow_legacy_names=True)
+        if strict_vnext:
+            validated = validate_vnext_binding(binding)
+        else:
+            if binding.identity_class == LEGACY_V2:
+                raise _error("legacy_binding_not_migrated")
+            if binding.identity_class not in {V3_CANONICAL, V3_VARIANT}:
+                raise _error("identity_binding_invalid")
+            validated = _validate_v3_entry(_binding_payload(binding))
     except VNextBindingError as exc:
         raise _error(exc.code) from None
+    except IdentityMetadataError:
+        raise _error("identity_binding_invalid") from None
     if validated != binding:
         raise _error("identity_binding_invalid")
     return binding
@@ -247,9 +261,11 @@ def _validate_entry(entry: PublicationEntry) -> None:
         raise _error("candidate_invalid")
     if type(entry.role) is not PublicationRole:
         raise _error("publication_role_invalid")
+    if type(entry.identity_namespace) is not str or entry.identity_namespace not in {"legacy", "vnext"}:
+        raise _error("identity_namespace_invalid")
     if type(entry.display_primary) is not bool or type(entry.display_order) is not int or entry.display_order < 0:
         raise _error("display_evidence_invalid")
-    binding = _validate_binding(entry.binding)
+    binding = _validate_binding(entry.binding, strict_vnext=entry.identity_namespace == "vnext")
     candidate = entry.candidate
     try:
         rebuilt = SelectedCandidate.from_report(

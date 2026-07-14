@@ -314,7 +314,7 @@ def allocate_vnext_identity(
         publication_entry = None
         publication_plan = None
         if context.mode is AllocationMode.CURRENT_MANDATORY:
-            publication_entry = PublicationEntry(candidate, binding, PublicationRole.MANDATORY_CURRENT, display.display_primary, display.display_order)
+            publication_entry = PublicationEntry(candidate, binding, PublicationRole.MANDATORY_CURRENT, display.display_primary, display.display_order, "vnext")
             publication_plan = PublicationPlan((publication_entry,))
         return AllocationResult(binding, True, publication_entry, publication_plan)
     if context.mode is AllocationMode.EXACT_ARTIFACT_REUSE:
@@ -328,7 +328,7 @@ def allocate_vnext_identity(
     publication_entry = None
     publication_plan = None
     if context.mode is AllocationMode.CURRENT_MANDATORY:
-        publication_entry = PublicationEntry(candidate, binding, PublicationRole.MANDATORY_CURRENT, display.display_primary, display.display_order)
+        publication_entry = PublicationEntry(candidate, binding, PublicationRole.MANDATORY_CURRENT, display.display_primary, display.display_order, "vnext")
         publication_plan = PublicationPlan((publication_entry,))
     return AllocationResult(binding, False, publication_entry, publication_plan)
 

@@ -28,11 +28,6 @@ _MD_PATTERN = re.compile(rf"^advisory_report_{_DATE}-{_CADENCE}(?:\.variant-{_DI
 _MANIFEST_PATTERN = re.compile(
     rf"^advisory_report_{_DATE}-{_CADENCE}(?:\.variant-{_DIGEST})?\.json\.manifest\.json$"
 )
-_LEGACY_JSON_PATTERN = re.compile(rf"^advisory_report_{_DATE}(?:\.variant-{_DIGEST})?\.json$")
-_LEGACY_MD_PATTERN = re.compile(rf"^advisory_report_{_DATE}(?:\.variant-{_DIGEST})?\.md$")
-_LEGACY_MANIFEST_PATTERN = re.compile(
-    rf"^advisory_report_{_DATE}(?:\.variant-{_DIGEST})?\.json\.manifest\.json$"
-)
 
 
 def binding_payload(binding: V3IdentityBinding) -> dict[str, object]:
@@ -81,7 +76,7 @@ def _name_digest(
     raise _error("identity_name_mismatch")
 
 
-def validate_vnext_binding(entry: object, *, allow_legacy_names: bool = False) -> V3IdentityBinding:
+def validate_vnext_binding(entry: object) -> V3IdentityBinding:
     """Validate a wire mapping or binding with the complete vNext contract."""
 
     if isinstance(entry, V3IdentityBinding):
@@ -109,7 +104,7 @@ def validate_vnext_binding(entry: object, *, allow_legacy_names: bool = False) -
         raise _error("period_mismatch")
     schema = entry["report_schema_version"]
     contract = entry["contract_version"]
-    if type(schema) is not str or schema not in {"5", "6"}:
+    if type(schema) is not str:
         raise _error("invalid_schema_version")
     if type(contract) is not str:
         raise _error("invalid_contract_version")
@@ -139,19 +134,16 @@ def validate_vnext_binding(entry: object, *, allow_legacy_names: bool = False) -
         raise _error("identity_binding_invalid")
     if (identity_class == V3_CANONICAL) != canonical:
         raise _error("identity_metadata_mismatch")
-    json_patterns = (_JSON_PATTERN, _LEGACY_JSON_PATTERN) if allow_legacy_names else (_JSON_PATTERN,)
-    md_patterns = (_MD_PATTERN, _LEGACY_MD_PATTERN) if allow_legacy_names else (_MD_PATTERN,)
-    manifest_patterns = (_MANIFEST_PATTERN, _LEGACY_MANIFEST_PATTERN) if allow_legacy_names else (_MANIFEST_PATTERN,)
     names = [
-        (_name_digest(entry["json"], json_patterns, as_of=as_of, cadence=cadence), entry["json"]),
+        (_name_digest(entry["json"], (_JSON_PATTERN,), as_of=as_of, cadence=cadence), entry["json"]),
         (_name_digest(entry["html"], (_HTML_PATTERN,), as_of=as_of, cadence=cadence), entry["html"]),
     ]
     md = None if "md" not in entry else entry["md"]
     manifest = None if "manifest" not in entry else entry["manifest"]
     if md is not None:
-        names.append((_name_digest(md, md_patterns, as_of=as_of, cadence=cadence), md))
+        names.append((_name_digest(md, (_MD_PATTERN,), as_of=as_of, cadence=cadence), md))
     if manifest is not None:
-        names.append((_name_digest(manifest, manifest_patterns, as_of=as_of, cadence=cadence), manifest))
+        names.append((_name_digest(manifest, (_MANIFEST_PATTERN,), as_of=as_of, cadence=cadence), manifest))
     expected_suffix = None if canonical else artifact_digest
     if any(name_digest != expected_suffix for name_digest, _name in names):
         raise _error("identity_digest_mismatch")

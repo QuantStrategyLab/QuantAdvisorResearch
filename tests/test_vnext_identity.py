@@ -308,6 +308,26 @@ def test_cadence_aware_names_do_not_bypass_full_binding_validation(field: str, r
         parse_vnext_index({"schema_version": VNEXT_INDEX_SCHEMA, "entries": [payload]})
 
 
+@pytest.mark.parametrize("field", ["json", "html", "md", "manifest"])
+def test_legacy_filenames_are_rejected_by_vnext_path(field: str) -> None:
+    value = report()
+    payload = binding_payload(value, canonical=True, include_markdown=True, include_manifest=True)
+    payload["json"] = f"advisory_report_{value['as_of']}.json"
+    payload["html"] = f"{value['as_of']}-model-recommendations.html"
+    payload["md"] = f"advisory_report_{value['as_of']}.md"
+    payload["manifest"] = f"advisory_report_{value['as_of']}.json.manifest.json"
+    if field != "json":
+        payload["json"] = binding_payload(value, canonical=True)["json"]
+    if field != "html":
+        payload["html"] = binding_payload(value, canonical=True)["html"]
+    if field != "md":
+        payload.pop("md")
+    if field != "manifest":
+        payload.pop("manifest")
+    with pytest.raises(VNextIdentityError):
+        parse_vnext_index({"schema_version": VNEXT_INDEX_SCHEMA, "entries": [payload]})
+
+
 def test_duplicate_target_and_digest_conflicts_fail_closed() -> None:
     value = report()
     binding = index_for((value, True)).bindings[0]

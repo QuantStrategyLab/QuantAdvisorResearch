@@ -13,6 +13,9 @@ The vNext index uses the exact top-level shape:
 `entries` contain only clean `V3_CANONICAL` or `V3_VARIANT` identities. The
 codec does not read, migrate, or silently fall back to legacy index versions.
 `LEGACY_V2` is not a valid vNext entry.
+The vNext binding validator accepts only the cadence-aware filename grammar;
+old runtime/index validation remains a separate path and is not a vNext
+compatibility mode.
 
 The entry fields are the validated period/as-of/cadence and report/contract
 evidence, semantic and artifact digest versions/digests, `json`/`html` names,
