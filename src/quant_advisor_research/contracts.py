@@ -4,6 +4,16 @@ import datetime as dt
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from .time_contract import (
+    REPORT_EXPIRY_DAYS,
+    TimeContractError,
+    assess_context_freshness,
+    canonical_reference_time,
+    contract_version_for_schema,
+    context_expiry_instant,
+    normalize_aware_datetime,
+)
+
 
 class AdvisoryValidationError(ValueError):
     """Raised when an advisory artifact violates the stable contract."""
@@ -76,6 +86,99 @@ def _require_iso_datetime(value: Any, name: str) -> None:
         raise AdvisoryValidationError(f"{name} must be an ISO datetime") from exc
 
 
+def _require_contract_datetime(value: Any, name: str) -> dt.datetime:
+    try:
+        return normalize_aware_datetime(_require_string(value, name))
+    except (TimeContractError, ValueError) as exc:
+        raise AdvisoryValidationError(f"{name}_invalid") from exc
+
+
+def _validate_v6_freshness(
+    freshness: Any,
+    *,
+    report_as_of: dt.date,
+    reference_time: dt.datetime,
+    report_generated_at: dt.datetime,
+    source_artifacts: Mapping[str, Any],
+) -> None:
+    if not isinstance(freshness, Mapping):
+        raise AdvisoryValidationError("freshness_invalid")
+    if not isinstance(source_artifacts, Mapping):
+        raise AdvisoryValidationError("source_artifacts_invalid")
+    if set(freshness) != {"ai_signal", "theme_momentum"}:
+        raise AdvisoryValidationError("freshness_keys_invalid")
+    for name in ("ai_signal", "theme_momentum"):
+        item = freshness.get(name)
+        if not isinstance(item, Mapping):
+            raise AdvisoryValidationError("freshness_entry_invalid")
+        base_keys = {"present", "valid", "reason", "as_of", "generated_at", "expires_at"}
+        legacy_key = "compatibility_warning"
+        if set(item) - base_keys - {legacy_key}:
+            raise AdvisoryValidationError("freshness_keys_invalid")
+        if type(item.get("present")) is not bool or type(item.get("valid")) is not bool:
+            raise AdvisoryValidationError("freshness_status_invalid")
+        reason = item.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise AdvisoryValidationError("freshness_reason_invalid")
+        legacy = reason == "legacy_expiry_compatibility" and item.get("compatibility_warning") == "missing_expires_at"
+        if legacy_key in item and not legacy:
+            raise AdvisoryValidationError("freshness_keys_invalid")
+        declared_artifact = source_artifacts.get(name)
+        if declared_artifact is not None and not isinstance(declared_artifact, str):
+            raise AdvisoryValidationError("source_artifact_value_invalid")
+        declared = isinstance(declared_artifact, str) and bool(declared_artifact.strip())
+        if declared != item["present"]:
+            raise AdvisoryValidationError("source_artifact_freshness_mismatch")
+        if not item["present"]:
+            if item["valid"] or any(key in item for key in ("as_of", "generated_at", "expires_at")):
+                raise AdvisoryValidationError("freshness_state_incoherent")
+            result = assess_context_freshness(
+                None,
+                report_as_of=report_as_of,
+                reference_time=reference_time,
+                report_generated_at=report_generated_at,
+                max_age_days=REPORT_EXPIRY_DAYS,
+            )
+        else:
+            required = ("as_of", "generated_at") + (() if legacy else ("expires_at",))
+            if any(not item.get(key) for key in required):
+                raise AdvisoryValidationError("freshness_timestamps_incomplete")
+            for key in required:
+                if not isinstance(item[key], str):
+                    raise AdvisoryValidationError("freshness_timestamp_type_invalid")
+            result = assess_context_freshness(
+                item,
+                report_as_of=report_as_of,
+                reference_time=reference_time,
+                report_generated_at=report_generated_at,
+                max_age_days=REPORT_EXPIRY_DAYS,
+                allow_legacy_expiry=True,
+            )
+        structural_reasons = {
+            "missing_as_of", "missing_generated_at", "missing_expires_at",
+            "invalid_as_of", "invalid_generated_at", "invalid_expires_at",
+        }
+        if result.reason in structural_reasons:
+            raise AdvisoryValidationError("freshness_assessment_invalid")
+        if item["present"] != result.present or item["valid"] != result.valid:
+            raise AdvisoryValidationError("freshness_state_incoherent")
+        if reason != result.reason:
+            raise AdvisoryValidationError("freshness_reason_mismatch")
+        if result.as_of is not None and dt.date.fromisoformat(item["as_of"]) != result.as_of:
+            raise AdvisoryValidationError("freshness_timestamp_mismatch")
+        if result.generated_at is not None and normalize_aware_datetime(item["generated_at"]) != result.generated_at:
+            raise AdvisoryValidationError("freshness_timestamp_mismatch")
+        if result.expires_at is not None:
+            if "expires_at" not in item:
+                raise AdvisoryValidationError("freshness_timestamp_mismatch")
+            try:
+                expires_at = context_expiry_instant(item["expires_at"], item["generated_at"])
+            except (TimeContractError, TypeError, ValueError) as exc:
+                raise AdvisoryValidationError("freshness_assessment_invalid") from exc
+            if expires_at != result.expires_at:
+                raise AdvisoryValidationError("freshness_timestamp_mismatch")
+
+
 def _require_number_0_1(value: Any, name: str) -> None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise AdvisoryValidationError(f"{name} must be numeric")
@@ -100,10 +203,49 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     if missing:
         raise AdvisoryValidationError(f"missing required keys: {', '.join(missing)}")
 
-    if payload["schema_version"] != "5":
-        raise AdvisoryValidationError("schema_version must be '5'")
+    schema_version = payload["schema_version"]
+    if not isinstance(schema_version, str) or not schema_version.strip():
+        raise AdvisoryValidationError("schema_version_type_invalid")
+    try:
+        expected_contract = contract_version_for_schema(schema_version)
+    except TimeContractError as exc:
+        raise AdvisoryValidationError("schema_version_unsupported") from exc
+    actual_contract = payload.get("contract_version")
+    if actual_contract is not None and actual_contract != expected_contract:
+        raise AdvisoryValidationError("contract_version_mismatch")
+    if schema_version == "5":
+        v6_only_keys = {"reference_time", "expires_at", "freshness"} & set(payload)
+        if v6_only_keys:
+            raise AdvisoryValidationError("v6_fields_on_v5")
+    elif schema_version == "6":
+        if actual_contract != "model_recommendations.v6":
+            raise AdvisoryValidationError("v6_contract_version_required")
+        for key in ("reference_time", "expires_at", "freshness"):
+            if key not in payload:
+                raise AdvisoryValidationError("v6_fields_incomplete")
+    else:
+        raise AdvisoryValidationError("schema_version_unsupported")
     _require_iso_date(payload["as_of"], "as_of")
-    _require_iso_datetime(payload["generated_at"], "generated_at")
+    report_as_of = dt.date.fromisoformat(payload["as_of"])
+    if schema_version == "5":
+        _require_iso_datetime(payload["generated_at"], "generated_at")
+    else:
+        reference_time = _require_contract_datetime(payload["reference_time"], "reference_time")
+        report_generated_at = _require_contract_datetime(payload["generated_at"], "generated_at")
+        expires_at = _require_contract_datetime(payload["expires_at"], "expires_at")
+        if reference_time != canonical_reference_time(report_as_of):
+            raise AdvisoryValidationError("reference_time_mismatch")
+        if report_generated_at < reference_time:
+            raise AdvisoryValidationError("generated_at_before_reference")
+        if expires_at != report_generated_at + dt.timedelta(days=REPORT_EXPIRY_DAYS):
+            raise AdvisoryValidationError("expires_at_mismatch")
+        _validate_v6_freshness(
+            payload["freshness"],
+            report_as_of=report_as_of,
+            reference_time=reference_time,
+            report_generated_at=report_generated_at,
+            source_artifacts=payload["source_artifacts"],
+        )
     if payload["mode"] != "model_recommendations":
         raise AdvisoryValidationError("mode must be model_recommendations")
     if payload["cadence"] not in ALLOWED_CADENCES:

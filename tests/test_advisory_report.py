@@ -234,7 +234,7 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
     )
     report_path = tmp_path / "advisory_report.json"
     markdown_path = tmp_path / "advisory_report.md"
-    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+    report_path.write_text(json.dumps(report, ensure_ascii=False), encoding="utf-8")
     markdown_path.write_text("# Report\n", encoding="utf-8")
 
     manifest_path = write_report_manifest(
