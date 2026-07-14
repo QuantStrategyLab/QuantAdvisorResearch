@@ -11,7 +11,9 @@ from .time_contract import TimeContractError, contract_version_for_schema
 
 
 def contract_version_for_report(report: Mapping[str, Any]) -> str:
-    schema_version = str(report.get("schema_version") or "")
+    schema_version = report.get("schema_version")
+    if not isinstance(schema_version, str) or not schema_version.strip():
+        raise ValueError("schema_version must be a non-empty string")
     try:
         expected = contract_version_for_schema(schema_version)
     except TimeContractError as exc:

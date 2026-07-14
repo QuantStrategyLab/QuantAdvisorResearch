@@ -116,7 +116,9 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     if missing:
         raise AdvisoryValidationError(f"missing required keys: {', '.join(missing)}")
 
-    schema_version = str(payload["schema_version"])
+    schema_version = payload["schema_version"]
+    if not isinstance(schema_version, str) or not schema_version.strip():
+        raise AdvisoryValidationError("schema_version must be a non-empty string")
     try:
         expected_contract = contract_version_for_schema(schema_version)
     except TimeContractError as exc:
@@ -181,11 +183,10 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
                     max_age_days=REPORT_EXPIRY_DAYS,
                 )
             else:
-                if item["valid"]:
-                    required_keys = ("as_of", "generated_at") + (() if legacy_marker else ("expires_at",))
-                    for key in required_keys:
-                        if not item.get(key):
-                            raise AdvisoryValidationError(f"freshness[{name}] valid entry missing {key}")
+                required_keys = ("as_of", "generated_at") + (() if legacy_marker else ("expires_at",))
+                for key in required_keys:
+                    if not item.get(key):
+                        raise AdvisoryValidationError(f"freshness[{name}] present entry missing {key}")
                 freshness_result = assess_context_freshness(
                     item,
                     report_as_of=dt.date.fromisoformat(str(payload["as_of"])),
@@ -195,7 +196,7 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
                     allow_legacy_expiry=True,
                 )
             if freshness_result.reason not in {
-                "not_provided", "expired", "stale_as_of", "missing_expires_at",
+                "not_provided", "expired", "stale_as_of",
             } and not freshness_result.valid:
                 raise AdvisoryValidationError(
                     f"freshness[{name}] invalid: {freshness_result.reason}"

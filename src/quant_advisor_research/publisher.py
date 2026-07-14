@@ -100,19 +100,61 @@ def is_same_period_duplicate(report: dict[str, Any], previous_report: dict[str, 
     return as_of == previous_as_of
 
 
+def _generated_at_sort_value(report: dict[str, Any]) -> tuple[bool, dt.datetime]:
+    value = report.get("generated_at")
+    if not isinstance(value, str) or not value.strip():
+        return False, dt.datetime.min.replace(tzinfo=dt.UTC)
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = dt.datetime.fromisoformat(normalized)
+    except ValueError:
+        return False, dt.datetime.min.replace(tzinfo=dt.UTC)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        parsed = parsed.replace(tzinfo=dt.UTC)
+    return True, parsed.astimezone(dt.UTC)
+
+
+def _schema_rank(report: dict[str, Any]) -> int:
+    value = report.get("schema_version")
+    return {"5": 5, "6": 6}.get(value, -1) if isinstance(value, str) else -1
+
+
+def _prefer_report(candidate: tuple[Path, dict[str, Any]], current: tuple[Path, dict[str, Any]]) -> bool:
+    candidate_path, candidate_report = candidate
+    current_path, current_report = current
+    candidate_schema = _schema_rank(candidate_report)
+    current_schema = _schema_rank(current_report)
+    if candidate_schema != current_schema:
+        return candidate_schema > current_schema
+    candidate_valid, candidate_generated = _generated_at_sort_value(candidate_report)
+    current_valid, current_generated = _generated_at_sort_value(current_report)
+    if candidate_valid != current_valid:
+        return candidate_valid
+    if candidate_generated != current_generated:
+        return candidate_generated > current_generated
+    return candidate_path.as_posix() < current_path.as_posix()
+
+
 def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]:
-    unique_paths: list[Path] = []
-    seen_reports_by_fingerprint: dict[str, list[dict[str, Any]]] = {}
+    unique_reports: list[tuple[Path, dict[str, Any], str]] = []
     for report_path in report_paths:
         path = Path(report_path)
         report = load_report(path)
         fingerprint = report_content_fingerprint(report)
-        previous_reports = seen_reports_by_fingerprint.setdefault(fingerprint, [])
-        if any(is_same_period_duplicate(report, previous) for previous in previous_reports):
+        duplicate_index = next(
+            (
+                index for index, (previous_path, previous, previous_fingerprint) in enumerate(unique_reports)
+                if previous_fingerprint == fingerprint and is_same_period_duplicate(report, previous)
+            ),
+            None,
+        )
+        if duplicate_index is None:
+            unique_reports.append((path, report, fingerprint))
             continue
-        previous_reports.append(report)
-        unique_paths.append(path)
-    return unique_paths
+        current = unique_reports[duplicate_index]
+        if _prefer_report((path, report), (current[0], current[1])):
+            unique_reports[duplicate_index] = (path, report, fingerprint)
+    return [path for path, _, _ in unique_reports]
 
 
 def format_datetime(value: str) -> str:

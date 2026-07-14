@@ -13,6 +13,7 @@ from quant_advisor_research.publisher import (
     render_feed_xml,
     render_reports_index_json,
     report_content_fingerprint,
+    unique_report_paths_by_content,
 )
 from quant_advisor_research.time_contract import canonical_reference_time, contract_version_for_schema
 
@@ -204,6 +205,13 @@ def test_v6_allows_well_formed_expired_context_as_invalid() -> None:
             },
             "fresh",
         ),
+        (
+            {
+                "present": True, "valid": False, "reason": "missing_expires_at",
+                "as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00Z",
+            },
+            "present entry missing expires_at",
+        ),
     ],
 )
 def test_v6_invalid_freshness_rejects_future_malformed_and_reason_mismatch(
@@ -226,6 +234,40 @@ def test_v6_allows_only_explicit_legacy_expiry_compatibility() -> None:
         "generated_at": "2026-05-30T12:00:00Z",
     }
     validate_advisory_report(report)
+
+
+def test_duplicate_selection_prefers_v6_regardless_of_input_order(tmp_path: Path) -> None:
+    v5 = build_legacy_v5()
+    v6 = build_v6_from_v5()
+    paths = []
+    for name, report in (("v6.json", v6), ("v5.json", v5)):
+        path = tmp_path / name
+        path.write_text(json.dumps(report), encoding="utf-8")
+        paths.append(path)
+    assert unique_report_paths_by_content(paths) == [tmp_path / "v6.json"]
+    assert unique_report_paths_by_content(list(reversed(paths))) == [tmp_path / "v6.json"]
+
+
+def test_duplicate_selection_prefers_newer_valid_time_then_stable_path(tmp_path: Path) -> None:
+    reports = []
+    for name, generated_at in (
+        ("old.json", "2026-05-31T12:00:00Z"),
+        ("new.json", "2026-06-01T12:00:00Z"),
+        ("malformed.json", "not-a-time"),
+    ):
+        report = build_legacy_v5()
+        report["generated_at"] = generated_at
+        path = tmp_path / name
+        path.write_text(json.dumps(report), encoding="utf-8")
+        reports.append(path)
+    assert unique_report_paths_by_content([reports[2], reports[0], reports[1]]) == [tmp_path / "new.json"]
+
+
+def test_numeric_schema_version_is_rejected_before_resolution() -> None:
+    report = build_legacy_v5()
+    report["schema_version"] = 5
+    with pytest.raises(AdvisoryValidationError, match="non-empty string"):
+        validate_advisory_report(report)
 
 
 def test_v5_v6_same_content_fingerprint_ignores_only_volatile_metadata() -> None:
