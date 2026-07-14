@@ -142,6 +142,12 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
         generated_at = _parse_timezone_aware_iso_datetime(payload["generated_at"], "generated_at")
         reference_time = _parse_timezone_aware_iso_datetime(payload["reference_time"], "reference_time")
         expires_at = _parse_timezone_aware_iso_datetime(payload["expires_at"], "expires_at")
+        report_as_of = dt.date.fromisoformat(str(payload["as_of"]))
+        expected_reference_time = dt.datetime.combine(report_as_of, dt.time(23, 59, 59), tzinfo=dt.UTC)
+        if reference_time != expected_reference_time:
+            raise AdvisoryValidationError("reference_time must equal deterministic UTC EOD derived from as_of")
+        if generated_at < reference_time:
+            raise AdvisoryValidationError("generated_at must not precede reference_time")
         if expires_at < reference_time:
             raise AdvisoryValidationError("expires_at must not precede reference_time")
         if expires_at != generated_at + dt.timedelta(days=REPORT_EXPIRY_DAYS):

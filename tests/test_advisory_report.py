@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_v6_report_time_contract_preserves_precision_and_fields() -> None:
     report = build_advisory_report(
-        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00.123456Z",
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-31T12:00:00.123456Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
     )
@@ -36,8 +36,8 @@ def test_v6_report_time_contract_preserves_precision_and_fields() -> None:
     assert report["schema_version"] == "6"
     assert report["contract_version"] == "model_recommendations.v6"
     assert report["reference_time"] == "2026-05-30T23:59:59Z"
-    assert report["generated_at"] == "2026-05-30T12:00:00.123456Z"
-    assert report["expires_at"] == "2026-06-06T12:00:00.123456Z"
+    assert report["generated_at"] == "2026-05-31T12:00:00.123456Z"
+    assert report["expires_at"] == "2026-06-07T12:00:00.123456Z"
     validate_advisory_report(report)
 
 
@@ -117,13 +117,13 @@ def test_v6_freshness_entries_are_complete_and_typed(mutation) -> None:
 
 def test_v6_validator_rejects_expired_report_and_invalid_freshness_time_fields() -> None:
     report = build_advisory_report(
-        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00Z",
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-31T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=ROOT / "examples/research_signal_context.example.json",
     )
     report["expires_at"] = "2026-05-30T11:59:59Z"
-    with pytest.raises(AdvisoryValidationError, match="expires_at"):
+    with pytest.raises(AdvisoryValidationError, match="generated_at|expires_at"):
         validate_advisory_report(report)
 
     report = build_advisory_report(
@@ -156,7 +156,7 @@ def test_date_only_expiry_uses_source_timezone_and_utc_cutoff(tmp_path: Path) ->
     path = tmp_path / "local_expiry.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     report = build_advisory_report(
-        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00Z",
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-31T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=path,
@@ -166,7 +166,7 @@ def test_date_only_expiry_uses_source_timezone_and_utc_cutoff(tmp_path: Path) ->
     payload["expires_at"] = "2026-05-30"
     path.write_text(json.dumps(payload), encoding="utf-8")
     report = build_advisory_report(
-        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-30T12:00:00Z",
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-31T12:00:00Z",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         ai_signal_path=path,
@@ -175,12 +175,39 @@ def test_date_only_expiry_uses_source_timezone_and_utc_cutoff(tmp_path: Path) ->
 
 
 def test_injected_build_time_cannot_publish_already_expired_report() -> None:
-    with pytest.raises(AdvisoryValidationError, match="expires_at"):
+    with pytest.raises(AdvisoryValidationError, match="generated_at|expires_at"):
         build_advisory_report(
             as_of="2026-05-30", cadence="weekly", generated_at="2026-05-20T12:00:00Z",
             political_events_path=ROOT / "examples/political_events.example.csv",
             political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
         )
+
+
+def test_v6_reference_time_is_recomputed_from_as_of_and_generated_order_is_strict() -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-31T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report["reference_time"] = "2026-05-30T23:59:58Z"
+    with pytest.raises(AdvisoryValidationError, match="reference_time"):
+        validate_advisory_report(report)
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-31T12:00:00Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    report["generated_at"] = "2026-05-30T12:00:00Z"
+    with pytest.raises(AdvisoryValidationError, match="generated_at"):
+        validate_advisory_report(report)
+
+    report = build_advisory_report(
+        as_of="2026-05-30", cadence="weekly", generated_at="2026-05-31T23:59:59Z",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+    )
+    validate_advisory_report(report)
 
     report = build_advisory_report(
         as_of="2026-05-30", cadence="weekly",
@@ -193,9 +220,12 @@ def test_injected_build_time_cannot_publish_already_expired_report() -> None:
 
 
 def test_time_metadata_is_normalized_for_content_fingerprint() -> None:
-    first = {"schema_version": "6", "as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00.1Z", "reference_time": "2026-05-30T23:59:59Z", "expires_at": "2026-06-06T12:00:00.1Z", "freshness": {"ai_signal": {"generated_at": "2026-05-30T12:00:00Z"}}, "recommendations": []}
-    second = {**first, "generated_at": "2026-05-30T13:00:00.9Z", "expires_at": "2026-06-06T13:00:00.9Z", "freshness": {"ai_signal": {"generated_at": "2026-05-30T13:00:00Z"}}}
+    first = {"schema_version": "6", "as_of": "2026-05-30", "generated_at": "2026-05-30T12:00:00.1Z", "reference_time": "2026-05-30T23:59:59Z", "expires_at": "2026-06-06T12:00:00.1Z", "freshness": {"ai_signal": {"generated_at": "2026-05-30T12:00:00Z"}}, "summary": {"data_quality_warnings": ["ai_signal:stale_as_of", "operator warning"]}, "recommendations": []}
+    second = {**first, "generated_at": "2026-05-30T13:00:00.9Z", "expires_at": "2026-06-06T13:00:00.9Z", "freshness": {"ai_signal": {"generated_at": "2026-05-30T13:00:00Z"}}, "summary": {"data_quality_warnings": ["theme_momentum:compatibility_missing_expires_at", "operator warning"]}}
     assert report_content_fingerprint(first) == report_content_fingerprint(second)
+
+    second["summary"] = {"data_quality_warnings": ["ai_signal:stale_as_of", "different operator warning"]}
+    assert report_content_fingerprint(first) != report_content_fingerprint(second)
 
 
 def test_build_advisory_report_blocks_execution_and_allocation() -> None:
