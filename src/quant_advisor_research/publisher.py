@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 from .advisory_report import display_number, display_percent, sector_label, theme_label
 from .contracts import AdvisoryValidationError, validate_advisory_report
-from .time_contract import TimeContractError, normalize_aware_datetime
+from .time_contract import TimeContractError
 
 
 CADENCE_LABELS_ZH = {
@@ -74,6 +74,12 @@ class CandidateClassification:
 
 
 @dataclass(frozen=True)
+class CandidateSelection:
+    selected_paths: tuple[Path, ...]
+    quarantined: tuple[CandidateClassification, ...]
+
+
+@dataclass(frozen=True)
 class _ReportCandidate:
     path: Path
     report: dict[str, Any] | None
@@ -95,19 +101,28 @@ def _classify_loaded_report(path: Path, report: Any, artifact_id: str) -> _Repor
     if not isinstance(report, dict):
         classification = CandidateClassification(artifact_id, "INVALID", "report_object_invalid")
         return _ReportCandidate(path, None, artifact_id, classification)
-    schema_version = report.get("schema_version") if report.get("schema_version") in {"5", "6"} else None
-    cadence = report.get("cadence") if report.get("cadence") in {"daily", "weekly", "monthly"} else None
+    raw_schema_version = report.get("schema_version")
+    raw_cadence = report.get("cadence")
+    schema_version = raw_schema_version if isinstance(raw_schema_version, str) and raw_schema_version in {"5", "6"} else None
+    cadence = raw_cadence if isinstance(raw_cadence, str) and raw_cadence in {"daily", "weekly", "monthly"} else None
     as_of = report.get("as_of") if isinstance(report.get("as_of"), str) and report_as_of_date(report) else None
     try:
         validate_advisory_report(report)
-    except AdvisoryValidationError:
+    except (AdvisoryValidationError, AttributeError, KeyError, TypeError, ValueError):
         classification = CandidateClassification(
             artifact_id, "INVALID", "contract_invalid", schema_version, cadence, as_of
         )
         return _ReportCandidate(path, None, artifact_id, classification)
     try:
-        generated_at = normalize_aware_datetime(report["generated_at"])
-    except (KeyError, TimeContractError, TypeError, ValueError):
+        generated_text = report["generated_at"]
+        normalized = generated_text[:-1] + "+00:00" if generated_text.endswith("Z") else generated_text
+        parsed_generated_at = dt.datetime.fromisoformat(normalized)
+        if parsed_generated_at.tzinfo is None:
+            if schema_version != "5":
+                raise TimeContractError("datetime must be timezone-aware")
+            parsed_generated_at = parsed_generated_at.replace(tzinfo=dt.UTC)
+        generated_at = parsed_generated_at.astimezone(dt.UTC)
+    except (AttributeError, KeyError, TypeError, TimeContractError, ValueError):
         classification = CandidateClassification(
             artifact_id, "INVALID", "generated_at_invalid", schema_version, cadence, as_of
         )
@@ -192,18 +207,6 @@ def _schema_rank(candidate: _ReportCandidate) -> int:
     return {"5": 5, "6": 6}.get(candidate.classification.schema_version, -1)
 
 
-def _prefer_candidate(candidate: _ReportCandidate, current: _ReportCandidate) -> bool:
-    candidate_schema = _schema_rank(candidate)
-    current_schema = _schema_rank(current)
-    if candidate_schema != current_schema:
-        return candidate_schema > current_schema
-    candidate_time = candidate.generated_at or dt.datetime.min.replace(tzinfo=dt.UTC)
-    current_time = current.generated_at or dt.datetime.min.replace(tzinfo=dt.UTC)
-    if candidate_time != current_time:
-        return candidate_time > current_time
-    return candidate.artifact_id < current.artifact_id
-
-
 def _load_candidate(path: Path, artifact_id: str) -> _ReportCandidate:
     try:
         report = load_report(path)
@@ -214,33 +217,42 @@ def _load_candidate(path: Path, artifact_id: str) -> _ReportCandidate:
     return _classify_loaded_report(path, report, artifact_id)
 
 
-def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]:
+def select_report_candidates(report_paths: list[str | Path]) -> CandidateSelection:
     paths = [Path(path) for path in report_paths]
     artifact_ids = _relative_artifact_ids(paths)
     candidates = [_load_candidate(path, artifact_ids[path]) for path in paths]
+    quarantined = tuple(candidate.classification for candidate in candidates if candidate.classification.status != "VALID")
     selected: list[_ReportCandidate] = []
+    valid_candidates: list[_ReportCandidate] = []
     for candidate in candidates:
-        if candidate.classification.status != "VALID" or candidate.report is None:
-            continue
-        fingerprint = report_content_fingerprint(candidate.report)
-        candidate = _ReportCandidate(
-            candidate.path, candidate.report, candidate.artifact_id, candidate.classification,
-            fingerprint=fingerprint, generated_at=candidate.generated_at,
-        )
-        duplicate_index = next(
-            (
-                index for index, previous in enumerate(selected)
-                if previous.fingerprint == fingerprint
-                and previous.report is not None
-                and is_same_period_duplicate(candidate.report, previous.report)
-            ),
-            None,
-        )
-        if duplicate_index is None:
+        if candidate.classification.status == "VALID" and candidate.report is not None:
+            fingerprint = report_content_fingerprint(candidate.report)
+            valid_candidates.append(
+                _ReportCandidate(
+                    candidate.path, candidate.report, candidate.artifact_id, candidate.classification,
+                    fingerprint=fingerprint, generated_at=candidate.generated_at,
+                )
+            )
+    valid_candidates.sort(key=lambda candidate: candidate.artifact_id)
+    valid_candidates.sort(
+        key=lambda candidate: candidate.generated_at or dt.datetime.min.replace(tzinfo=dt.UTC),
+        reverse=True,
+    )
+    valid_candidates.sort(key=_schema_rank, reverse=True)
+    for candidate in valid_candidates:
+        fingerprint = candidate.fingerprint
+        if not any(
+            previous.fingerprint == fingerprint
+            and previous.report is not None
+            and is_same_period_duplicate(candidate.report, previous.report)
+            for previous in selected
+        ):
             selected.append(candidate)
-        elif _prefer_candidate(candidate, selected[duplicate_index]):
-            selected[duplicate_index] = candidate
-    return [candidate.path for candidate in selected]
+    return CandidateSelection(tuple(candidate.path for candidate in selected), quarantined)
+
+
+def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]:
+    return list(select_report_candidates(report_paths).selected_paths)
 
 
 def format_datetime(value: str) -> str:
@@ -1373,9 +1385,12 @@ def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title:
 
 
 def publish_reports(report_paths: list[str | Path], output_dir: str | Path, *, site_url: str, feed_title: str) -> list[Path]:
+    selection = select_report_candidates(report_paths)
+    if report_paths and not selection.selected_paths:
+        raise ValueError("no_valid_report_candidates")
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    report_paths = unique_report_paths_by_content(report_paths)
+    report_paths = list(selection.selected_paths)
     reports = [load_report(path) for path in report_paths]
     written: list[Path] = []
     for report in reports:

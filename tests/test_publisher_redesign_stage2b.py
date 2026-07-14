@@ -9,6 +9,7 @@ import pytest
 from quant_advisor_research.advisory_report import build_advisory_report
 from quant_advisor_research.publisher import (
     classify_report_path,
+    publish_reports,
     report_content_fingerprint,
     unique_report_paths_by_content,
 )
@@ -166,3 +167,81 @@ def test_repeated_reads_are_deterministic(tmp_path: Path) -> None:
     first = unique_report_paths_by_content([v5, v6])
     second = unique_report_paths_by_content([v5, v6])
     assert first == second == [v6]
+
+
+def test_all_invalid_input_fails_before_site_write(tmp_path: Path) -> None:
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text("{not-json", encoding="utf-8")
+    output = tmp_path / "site"
+    output.mkdir()
+    sentinel = output / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+    with pytest.raises(ValueError, match="no_valid_report_candidates"):
+        publish_reports([invalid], output, site_url="https://example.invalid", feed_title="Test")
+    assert sentinel.read_text(encoding="utf-8") == "keep"
+    assert list(output.iterdir()) == [sentinel]
+
+
+def test_mixed_valid_invalid_publishes_only_valid_candidates(tmp_path: Path) -> None:
+    valid = write_report(tmp_path / "valid.json", build_v5())
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text("[]", encoding="utf-8")
+    output = tmp_path / "site"
+    written = publish_reports(
+        [invalid, valid], output, site_url="https://example.invalid", feed_title="Test"
+    )
+    assert written
+    assert (output / "2026-05-30-weekly-model-recommendations.html").exists()
+
+
+def test_v5_naive_generated_at_is_utc_but_v6_naive_is_invalid(tmp_path: Path) -> None:
+    v5 = build_v5()
+    v5["generated_at"] = "2026-05-31T12:00:00"
+    v5_path = write_report(tmp_path / "v5.json", v5)
+    assert classify_report_path(v5_path).status == "VALID"
+
+    v6 = build_v6()
+    v6["generated_at"] = "2026-05-31T12:00:00"
+    v6_path = write_report(tmp_path / "v6.json", v6)
+    assert classify_report_path(v6_path).status == "INVALID"
+
+
+def test_weekly_overlapping_duplicates_are_pairwise_consistent(tmp_path: Path) -> None:
+    reports = []
+    for name, as_of, generated_at in (
+        ("a.json", "2026-06-20", "2026-06-20T12:00:00Z"),
+        ("b.json", "2026-06-21", "2026-06-21T12:00:00Z"),
+        ("c.json", "2026-06-27", "2026-06-27T12:00:00Z"),
+    ):
+        report = build_v5()
+        report["as_of"] = as_of
+        report["generated_at"] = generated_at
+        reports.append(write_report(tmp_path / name, report))
+    first = unique_report_paths_by_content([reports[2], reports[0], reports[1]])
+    second = unique_report_paths_by_content([reports[1], reports[2], reports[0]])
+    assert set(first) == set(second)
+    assert len(first) == 2
+    for left, right in ((first[0], first[1]), (second[0], second[1])):
+        left_report = json.loads(left.read_text(encoding="utf-8"))
+        right_report = json.loads(right.read_text(encoding="utf-8"))
+        assert not (left_report["as_of"] == right_report["as_of"])
+
+
+@pytest.mark.parametrize("field", ["schema_version", "cadence"])
+@pytest.mark.parametrize("value", [[], {}])
+def test_malformed_metadata_types_are_quarantined(tmp_path: Path, field: str, value) -> None:
+    report = build_v5()
+    report[field] = value
+    classification = classify_report_path(write_report(tmp_path / "bad.json", report))
+    assert classification.status == "INVALID"
+    assert classification.reason == "contract_invalid"
+
+
+def test_nested_invalid_action_types_are_quarantined_without_raw_payload(tmp_path: Path) -> None:
+    report = build_v5()
+    report["recommendations"][0]["rating"] = []
+    report["recommendations"][0]["horizon_actions"] = {"short": []}
+    classification = classify_report_path(write_report(tmp_path / "bad.json", report))
+    assert classification.status == "INVALID"
+    assert classification.reason == "contract_invalid"
+    assert "[]" not in repr(classification)
