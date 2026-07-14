@@ -100,6 +100,12 @@ def test_clean_schema_v1_canonical_and_variant_roundtrip():
     assert json.dumps(payload, sort_keys=True, separators=(",", ":")) == json.dumps(
         serialize_vnext_index(parse_vnext_index(payload)), sort_keys=True, separators=(",", ":")
     )
+    reversed_payload = wire(
+        entry(current, V3_VARIANT, order=1),
+        entry(old, order=0),
+    )
+    assert parse_vnext_index(payload) == parse_vnext_index(reversed_payload)
+    assert serialize_vnext_index(parse_vnext_index(payload)) == serialize_vnext_index(parse_vnext_index(reversed_payload))
 
 
 def test_daily_weekly_monthly_same_as_of_have_distinct_clean_targets():
@@ -179,6 +185,14 @@ def test_exactly_one_canonical_and_display_policy_per_period():
         VNextIdentityIndex((binding(c), duplicate_order))
 
 
+def test_same_exact_artifact_cannot_have_two_public_identities():
+    c = candidate(report())
+    canonical = binding(c, md=False)
+    different_policy = binding(c, md=True)
+    with pytest.raises(VNextIdentityError, match="identity_duplicate"):
+        VNextIdentityIndex((canonical, different_policy))
+
+
 def test_display_order_safe_integer_boundaries_and_bool_rejection():
     c = candidate(report())
     assert binding(c, order=MAX_SAFE_JSON_INTEGER).display_order == MAX_SAFE_JSON_INTEGER
@@ -204,7 +218,10 @@ def test_allocation_modes_bootstrap_rerun_exact_and_historical():
     assert first.binding.identity_class == V3_CANONICAL and not first.reused_existing
     rerun = allocate_identity(VNextIdentityIndex((first.binding,)), old, current_context)
     assert rerun.reused_existing and rerun.binding == first.binding
-    changed = allocate_identity(VNextIdentityIndex((first.binding,)), current, current_context)
+    changed = allocate_identity(
+        VNextIdentityIndex((first.binding,)), current,
+        AllocationContext(AllocationMode.CURRENT_MANDATORY, RequestedArtifacts(), DisplayPlacement(False, 1), old.period_key),
+    )
     assert changed.binding.identity_class == V3_VARIANT
     with pytest.raises(VNextPublicationError, match="canonical_bootstrap_required"):
         allocate_identity(empty, old, AllocationContext(AllocationMode.HISTORICAL_RECOVERY, RequestedArtifacts(), DisplayPlacement(False, 0)))

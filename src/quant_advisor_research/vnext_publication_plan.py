@@ -254,13 +254,7 @@ def allocate_identity(index: VNextIdentityIndex, candidate: SelectedCandidate, c
     if context.mode is AllocationMode.HISTORICAL_RECOVERY and not canonical:
         raise _error("canonical_bootstrap_required")
     identity_class = V3_VARIANT if canonical else V3_CANONICAL
-    next_order = max((item.display_order for item in index.bindings if item.period_key == candidate.period_key), default=-1) + 1
-    binding = _new_binding(
-        candidate,
-        identity_class,
-        context.requested_artifacts,
-        DisplayPlacement(False, next_order),
-    )
+    binding = _new_binding(candidate, identity_class, context.requested_artifacts, context.display)
     _simulate(index, candidate, binding)
     return AllocationResult(binding, False)
 

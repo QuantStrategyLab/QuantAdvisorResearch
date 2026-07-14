@@ -195,8 +195,16 @@ def _validate_index(bindings: tuple[VNextIdentityBinding, ...]) -> None:
     canonical_by_period: set[str] = set()
     display_by_period: dict[str, tuple[bool, set[int]]] = {}
     artifact_digests: dict[str, tuple[str, str, str]] = {}
+    artifact_identities: set[tuple[str, str, str, str, str, str, str]] = set()
     for binding in bindings:
         _validate_binding(binding)
+        artifact_identity = (
+            binding.period_key, binding.as_of, binding.cadence, binding.report_schema_version,
+            binding.contract_version, binding.semantic_digest, binding.artifact_integrity_digest,
+        )
+        if artifact_identity in artifact_identities:
+            raise _error("identity_duplicate")
+        artifact_identities.add(artifact_identity)
         identity = (binding.period_key, binding.json_name, binding.html_name, binding.markdown_name, binding.manifest_name)
         if binding.canonical_identity:
             if binding.period_key in canonical_by_period:
@@ -272,12 +280,27 @@ def parse_vnext_index(payload: Mapping[str, Any]) -> VNextIdentityIndex:
     if type(snapshot["reports"]) is not list:
         raise _error("invalid_wire")
     try:
-        bindings = tuple(_entry_from_wire(item) for item in snapshot["reports"])
+        bindings = tuple(sorted((_entry_from_wire(item) for item in snapshot["reports"]), key=_binding_sort_key))
         return VNextIdentityIndex(bindings)
     except VNextIdentityError:
         raise
     except (AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
         raise _error("invalid_wire") from None
+
+
+def _binding_sort_key(binding: VNextIdentityBinding) -> tuple[object, ...]:
+    return (
+        binding.period_key,
+        not binding.canonical_identity,
+        binding.artifact_integrity_digest,
+        binding.semantic_digest,
+        binding.as_of,
+        binding.cadence,
+        binding.json_name,
+        binding.html_name,
+        binding.markdown_name or "",
+        binding.manifest_name or "",
+    )
 
 
 def _binding_wire(binding: VNextIdentityBinding) -> dict[str, object]:
@@ -302,8 +325,9 @@ def serialize_vnext_index(index: VNextIdentityIndex) -> dict[str, object]:
     if not isinstance(index, VNextIdentityIndex):
         raise _error("identity_index_invalid")
     _validate_index(index.bindings)
+    bindings = tuple(sorted(index.bindings, key=_binding_sort_key))
     payload = {"schema_version": VNEXT_SCHEMA_VERSION, "namespace": VNEXT_WIRE_NAMESPACE,
-               "reports": [_binding_wire(binding) for binding in index.bindings]}
+               "reports": [_binding_wire(binding) for binding in bindings]}
     parse_vnext_index(payload)
     return payload
 
