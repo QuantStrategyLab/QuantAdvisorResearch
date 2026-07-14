@@ -27,7 +27,7 @@ from .identity_v3 import (
 from .period_contract import PeriodContractError, canonical_period_identity
 from .publisher import report_content_fingerprint
 from .time_contract import TimeContractError, contract_version_for_schema
-from .vnext_binding import VNextBindingError, VNextIdentityBinding, validate_vnext_binding
+from .vnext_binding import VNextBindingError, VNextIdentityBinding, binding_payload as vnext_binding_payload, validate_vnext_binding
 
 
 class PublicationPlanError(ValueError):
@@ -203,7 +203,11 @@ class PublicationPlan:
         object.__setattr__(self, "preflight_targets", normalized.preflight_targets)
 
 
-def _binding_payload(binding: V3IdentityBinding) -> dict[str, object]:
+def _binding_payload(binding: V3IdentityBinding | VNextIdentityBinding) -> dict[str, object]:
+    if type(binding) is VNextIdentityBinding:
+        return vnext_binding_payload(binding)
+    if type(binding) is not V3IdentityBinding:
+        raise _error("identity_binding_invalid")
     payload: dict[str, object] = {
         "period_key": binding.period_key,
         "as_of": binding.as_of,

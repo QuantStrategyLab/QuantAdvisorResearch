@@ -12,7 +12,7 @@ from quant_advisor_research.artifact_integrity import artifact_integrity_digest
 from quant_advisor_research.identity_lifecycle import FINGERPRINT_VERSION, IdentityMetadataError
 from quant_advisor_research.identity_v3 import V3_CANONICAL, V3_VARIANT, V3IdentityBinding, parse_v3_index
 from quant_advisor_research.period_contract import canonical_period_identity
-from quant_advisor_research.publication_plan import PublicationEntry, PublicationPlan, PublicationRole, SelectedCandidate
+from quant_advisor_research.publication_plan import PublicationEntry, PublicationPlan, PublicationRole, SelectedCandidate, _binding_payload
 from quant_advisor_research.publisher import report_content_fingerprint
 from quant_advisor_research.time_contract import contract_version_for_schema
 from quant_advisor_research.vnext_binding import (
@@ -107,14 +107,21 @@ def test_empty_current_bootstraps_typed_canonical_and_plan() -> None:
     assert result.publication_entry is not None
 
 
-def test_exact_current_reuses_typed_canonical_with_new_display() -> None:
+def test_exact_current_reuses_typed_canonical_with_stored_display() -> None:
     value = report()
     index = index_for((value, True))
-    result = allocate(value, index, AllocationContext.current_mandatory(index.bindings[0].period_key), DisplayPlacement(True, 4))
+    result = allocate(value, index, AllocationContext.current_mandatory(index.bindings[0].period_key), DISPLAY)
     assert result.reused_existing is True
     assert result.binding == index.bindings[0]
     assert result.publication_entry is not None
-    assert (result.publication_entry.display_primary, result.publication_entry.display_order) == (True, 4)
+    assert (result.publication_entry.display_primary, result.publication_entry.display_order) == (False, 0)
+
+
+def test_current_exact_rejects_changed_display_without_binding_update() -> None:
+    value = report()
+    index = index_for((value, True))
+    with pytest.raises(VNextIdentityError, match="identity_reuse_mismatch"):
+        allocate(value, index, AllocationContext.current_mandatory(index.bindings[0].period_key), DisplayPlacement(True, 4))
 
 
 def test_changed_current_is_typed_variant_and_historical_requires_canonical() -> None:
@@ -191,6 +198,8 @@ def test_publication_plan_dispatches_mixed_legacy_and_vnext_types() -> None:
         PublicationEntry(SelectedCandidate.from_report(old, source_identity="old"), legacy, PublicationRole.RECOVERED_HISTORY, False, 1),
     ))
     assert {type(entry.binding) for entry in plan.entries} == {VNextIdentityBinding, V3IdentityBinding}
+    assert _binding_payload(typed)["binding_namespace"] == VNEXT_WIRE_NAMESPACE
+    assert "binding_namespace" not in _binding_payload(legacy)
 
 
 @pytest.mark.parametrize("field", ["md", "manifest"])
@@ -205,8 +214,8 @@ def test_optional_omission_is_valid_null_is_not(field: str) -> None:
 
 @pytest.mark.parametrize("order", [0, MAX_SAFE_JSON_INTEGER])
 def test_display_order_boundaries(order: int) -> None:
-    value = report()
-    result = allocate(value, index_for((value, True)), AllocationContext.current_mandatory("weekly:2026-06-15:2026-06-21"), DisplayPlacement(True, order))
+    value = report(generated_at="2026-07-15T00:00:00Z")
+    result = allocate(value, index_for((report(), True)), AllocationContext.current_mandatory("weekly:2026-06-15:2026-06-21"), DisplayPlacement(True, order))
     assert result.publication_entry is not None
     assert result.publication_entry.display_order == order
 

@@ -270,7 +270,12 @@ def allocate_vnext_identity(
         raise _error("identity_integrity_conflict")
     if exact:
         binding = exact[0]
-        _check_policy(binding, requested, display, exact_mode=context.mode is AllocationMode.EXACT_ARTIFACT_REUSE)
+        _check_policy(
+            binding,
+            requested,
+            display,
+            exact_mode=context.mode in {AllocationMode.EXACT_ARTIFACT_REUSE, AllocationMode.CURRENT_MANDATORY},
+        )
         entry = None
         plan = None
         if context.mode is AllocationMode.CURRENT_MANDATORY:
