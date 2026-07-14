@@ -36,6 +36,8 @@ def build_args(output: Path, evidence: Path) -> tuple[str, ...]:
         str(evidence),
         "--base-sha",
         BASE_SHA,
+        "--frozen-generated-at",
+        "2026-07-15T00:00:00Z",
     )
 
 
@@ -50,6 +52,12 @@ def test_representative_daily_build_emits_deterministic_evidence(tmp_path):
     assert payload["source_kind"] == "repository_representative_fixture"
     assert payload["base_sha"] == BASE_SHA
     assert payload["bundle_contract"] == "qar.preview_bundle.v1"
+    assert payload["source"] == {
+        "cadence": "daily",
+        "as_of": "2026-06-20",
+        "generated_at": "2026-07-15T00:00:00Z",
+        "schema_version": "5",
+    }
     assert payload["checks"] == [
         "exact_three_files",
         "canonical_json_readback",
@@ -73,6 +81,8 @@ def test_verify_rejects_tampered_artifact(tmp_path):
         str(output),
         "--evidence-path",
         str(tmp_path / "downloaded-evidence.json"),
+        "--build-evidence-path",
+        str(evidence),
         "--base-sha",
         BASE_SHA,
     )
@@ -98,8 +108,34 @@ def test_build_rejects_non_daily_source_before_output(tmp_path):
         str(tmp_path / "evidence.json"),
         "--base-sha",
         BASE_SHA,
+        "--frozen-generated-at",
+        "2026-07-15T00:00:00Z",
     )
 
     assert result.returncode != 0
     assert not (tmp_path / "preview").exists()
     assert "daily_only" in result.stderr
+
+
+def test_verify_rejects_build_evidence_base_mismatch(tmp_path):
+    output = tmp_path / "preview"
+    evidence = tmp_path / "evidence.json"
+    assert run_script(BUILD, *build_args(output, evidence)).returncode == 0
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    payload["base_sha"] = "0" * 40
+    evidence.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = run_script(
+        VERIFY,
+        "--artifact-dir",
+        str(output),
+        "--evidence-path",
+        str(tmp_path / "downloaded-evidence.json"),
+        "--build-evidence-path",
+        str(evidence),
+        "--base-sha",
+        BASE_SHA,
+    )
+
+    assert result.returncode != 0
+    assert "readback_failed" in result.stderr

@@ -10,15 +10,19 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from quant_advisor_research.advisory_report import build_advisory_report
+from quant_advisor_research import advisory_report
 from quant_advisor_research.preview_bundle import PreviewBundleError, build_preview_bundle, read_preview_bundle
 
 
 BASE_SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 SOURCE_KIND = "repository_representative_fixture"
+SOURCE_SCHEMA_VERSION = "5"
+SOURCE_CONTRACT_VERSION = "model_recommendations.v5"
+BUNDLE_CONTRACT = "qar.preview_bundle.v1"
 CHECKS = [
     "exact_three_files",
     "canonical_json_readback",
@@ -39,13 +43,32 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _require_contract(report: dict[str, object], manifest: dict[str, object]) -> None:
+    source = manifest.get("source")
+    if not isinstance(source, dict):
+        raise PreviewBundleError("contract_drift")
+    if report.get("schema_version") != SOURCE_SCHEMA_VERSION or report.get("cadence") != "daily":
+        raise PreviewBundleError("contract_drift")
+    if manifest.get("bundle_contract") != BUNDLE_CONTRACT:
+        raise PreviewBundleError("contract_drift")
+    expected_source = {
+        "schema_version": SOURCE_SCHEMA_VERSION,
+        "contract_version": SOURCE_CONTRACT_VERSION,
+        "cadence": "daily",
+        "as_of": report.get("as_of"),
+        "generated_at": report.get("generated_at"),
+    }
+    if source != expected_source:
+        raise PreviewBundleError("contract_drift")
+
+
 def _evidence(
     *, output: Path, report: dict[str, object], manifest: dict[str, object], base_sha: str, repeat_equal: bool
 ) -> dict[str, object]:
     return {
         "source_kind": SOURCE_KIND,
         "base_sha": base_sha,
-        "bundle_contract": "qar.preview_bundle.v1",
+        "bundle_contract": BUNDLE_CONTRACT,
         "source": {
             "cadence": report["cadence"],
             "as_of": report["as_of"],
@@ -62,6 +85,7 @@ def _evidence(
         "html_links": ["report.json", "manifest.json"],
         "checks": CHECKS,
         "repeat_build_bytes": repeat_equal,
+        "deterministic_clock": {"mode": "frozen_harness", "generated_at": report["generated_at"]},
     }
 
 
@@ -72,18 +96,29 @@ def build(args: argparse.Namespace) -> None:
     watchlist = Path(args.political_watchlist)
     if not events.is_file() or not watchlist.is_file():
         raise PreviewBundleError("fixture_missing")
-    report = build_advisory_report(
-        as_of=args.as_of,
-        cadence=args.cadence,
-        political_events_path=events,
-        political_watchlist_path=watchlist,
-    )
-    build_preview_bundle(report, output)
-    evidence = read_preview_bundle(output)
+    if not args.frozen_generated_at:
+        raise PreviewBundleError("frozen_generated_at_required")
     repeat_parent = Path(tempfile.mkdtemp(prefix=f".{output.name}.repeat-", dir=output.parent))
     try:
         repeat_output = repeat_parent / "preview"
-        build_preview_bundle(report, repeat_output)
+        with patch.object(advisory_report, "utc_now_iso", return_value=args.frozen_generated_at):
+            first_report = advisory_report.build_advisory_report(
+                as_of=args.as_of,
+                cadence=args.cadence,
+                political_events_path=events,
+                political_watchlist_path=watchlist,
+            )
+            build_preview_bundle(first_report, output)
+            first_evidence = read_preview_bundle(output)
+            second_report = advisory_report.build_advisory_report(
+                as_of=args.as_of,
+                cadence=args.cadence,
+                political_events_path=events,
+                political_watchlist_path=watchlist,
+            )
+            build_preview_bundle(second_report, repeat_output)
+        evidence = first_evidence
+        _require_contract(dict(evidence.report), dict(evidence.manifest))
         repeat_equal = all(
             (output / name).read_bytes() == (repeat_output / name).read_bytes()
             for name in ("manifest.json", "report.html", "report.json")
@@ -115,6 +150,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--artifact-dir", required=True)
     result.add_argument("--evidence-path", required=True)
     result.add_argument("--base-sha", required=True)
+    result.add_argument("--frozen-generated-at", required=True)
     return result
 
 

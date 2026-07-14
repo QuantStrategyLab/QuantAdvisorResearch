@@ -2,9 +2,11 @@
 
 This workflow is an isolated, repository-representative fixture acceptance slice:
 
-1. `build_advisory_report(..., cadence="daily")` reads the fixed examples CSVs.
+1. Two independent `build_advisory_report(..., cadence="daily")` invocations read the fixed examples CSVs under a harness-only frozen `generated_at` clock. This proves representative-fixture determinism; it is not a live wall-clock guarantee.
 2. Existing `qar.preview_bundle.v1` writes exactly `report.json`, `report.html`, and `manifest.json` under a unique `$RUNNER_TEMP` destination.
 3. The bundle is read back before `actions/upload-artifact@v7`.
-4. The uploaded artifact is downloaded to a separate temporary directory and read back again.
+4. The uploaded artifact is downloaded to a separate temporary directory and read back again, bound to the build evidence by full base SHA, source metadata, and all three file hashes.
+
+Both build and download harnesses fail closed unless the exact contract is schema `"5"`, manifest contract `model_recommendations.v5`, cadence `daily`, and bundle contract `qar.preview_bundle.v1`.
 
 Evidence explicitly identifies `source_kind=repository_representative_fixture`; it is not live producer or production-trusted evidence. The workflow does not modify weekly/monthly workflows, publisher, archive/feed, Pages, identity, or persistence. Issue #50 remains the production-trust hardening gate.

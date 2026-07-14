@@ -48,6 +48,7 @@ jobs:
             --artifact-dir "${RUNNER_TEMP}/qar-daily-preview" \
             --evidence-path "${RUNNER_TEMP}/qar-daily-preview-build-evidence.json" \
             --base-sha "${BASE_SHA}" \
+            --frozen-generated-at "2026-07-15T00:00:00Z" \
             > "${RUNNER_TEMP}/qar-daily-preview-build-evidence.log"
           cat "${RUNNER_TEMP}/qar-daily-preview-build-evidence.log"
       - name: Upload daily preview artifact
@@ -69,4 +70,5 @@ jobs:
           python scripts/d3_verify_daily_preview_artifact.py \
             --artifact-dir "${RUNNER_TEMP}/qar-daily-preview-downloaded" \
             --evidence-path "${RUNNER_TEMP}/qar-daily-preview-download-evidence.json" \
+            --build-evidence-path "${RUNNER_TEMP}/qar-daily-preview-build-evidence.json" \
             --base-sha "${BASE_SHA}"
