@@ -13,6 +13,7 @@ from quant_advisor_research.publisher import (
     report_content_fingerprint,
     unique_report_paths_by_content,
 )
+from quant_advisor_research.archive_backfill import backfill_site_archive
 from quant_advisor_research.time_contract import canonical_reference_time
 
 
@@ -132,6 +133,25 @@ def test_period_cadence_and_content_boundaries_are_preserved(tmp_path: Path) -> 
     assert set(unique_report_paths_by_content(paths)) == set(paths)
 
 
+def test_distinct_reports_retain_caller_order(tmp_path: Path) -> None:
+    earlier = build_v5()
+    earlier["generated_at"] = "2026-05-31T12:00:00Z"
+    later = json.loads(json.dumps(earlier))
+    later["schema_version"] = "6"
+    later["contract_version"] = "model_recommendations.v6"
+    later["reference_time"] = canonical_reference_time(dt.date(2026, 5, 30)).isoformat().replace("+00:00", "Z")
+    later["generated_at"] = "2026-06-01T12:00:00.123456Z"
+    later["expires_at"] = "2026-06-08T12:00:00.123456Z"
+    later["recommendations"][0]["reasons"] = ["distinct logical content"]
+    later["freshness"] = {
+        "ai_signal": {"present": False, "valid": False, "reason": "not_provided"},
+        "theme_momentum": {"present": False, "valid": False, "reason": "not_provided"},
+    }
+    first = write_report(tmp_path / "first.json", earlier)
+    second = write_report(tmp_path / "second.json", later)
+    assert unique_report_paths_by_content([first, second]) == [first, second]
+
+
 @pytest.mark.parametrize(
     ("name", "payload", "status", "reason"),
     [
@@ -158,7 +178,25 @@ def test_quarantine_classification_is_sanitized_and_structured(
 def test_empty_valid_set_fails_closed(tmp_path: Path) -> None:
     invalid = tmp_path / "invalid.json"
     invalid.write_text("[]", encoding="utf-8")
-    assert unique_report_paths_by_content([invalid]) == []
+    with pytest.raises(ValueError, match="no_valid_report_candidates"):
+        unique_report_paths_by_content([invalid])
+
+
+def test_backfill_all_invalid_fails_before_site_write(tmp_path: Path) -> None:
+    invalid = tmp_path / "advisory_report_2026-05-30.json"
+    invalid.write_text("[]", encoding="utf-8")
+    output = tmp_path / "site"
+    output.mkdir()
+    sentinel = output / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+    with pytest.raises(ValueError, match="no_valid_report_candidates"):
+        backfill_site_archive(
+            report_paths=[invalid],
+            output_dir=output,
+            site_url="https://example.invalid",
+            feed_title="Test",
+        )
+    assert list(output.iterdir()) == [sentinel]
 
 
 def test_repeated_reads_are_deterministic(tmp_path: Path) -> None:

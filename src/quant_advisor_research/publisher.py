@@ -233,26 +233,34 @@ def select_report_candidates(report_paths: list[str | Path]) -> CandidateSelecti
                     fingerprint=fingerprint, generated_at=candidate.generated_at,
                 )
             )
-    valid_candidates.sort(key=lambda candidate: candidate.artifact_id)
-    valid_candidates.sort(
-        key=lambda candidate: candidate.generated_at or dt.datetime.min.replace(tzinfo=dt.UTC),
-        reverse=True,
-    )
-    valid_candidates.sort(key=_schema_rank, reverse=True)
+    grouped: dict[str, list[_ReportCandidate]] = {}
     for candidate in valid_candidates:
-        fingerprint = candidate.fingerprint
-        if not any(
-            previous.fingerprint == fingerprint
-            and previous.report is not None
-            and is_same_period_duplicate(candidate.report, previous.report)
-            for previous in selected
-        ):
-            selected.append(candidate)
+        grouped.setdefault(candidate.fingerprint or "", []).append(candidate)
+    for group in grouped.values():
+        group.sort(key=lambda candidate: candidate.artifact_id)
+        group.sort(
+            key=lambda candidate: candidate.generated_at or dt.datetime.min.replace(tzinfo=dt.UTC),
+            reverse=True,
+        )
+        group.sort(key=_schema_rank, reverse=True)
+        for candidate in group:
+            if not any(
+                previous.report is not None
+                and is_same_period_duplicate(candidate.report, previous.report)
+                for previous in selected
+                if previous.fingerprint == candidate.fingerprint
+            ):
+                selected.append(candidate)
+    order = {candidate.path: index for index, candidate in enumerate(candidates)}
+    selected.sort(key=lambda candidate: order[candidate.path])
     return CandidateSelection(tuple(candidate.path for candidate in selected), quarantined)
 
 
 def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]:
-    return list(select_report_candidates(report_paths).selected_paths)
+    selection = select_report_candidates(report_paths)
+    if report_paths and not selection.selected_paths:
+        raise ValueError("no_valid_report_candidates")
+    return list(selection.selected_paths)
 
 
 def format_datetime(value: str) -> str:
