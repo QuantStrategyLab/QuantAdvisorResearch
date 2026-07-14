@@ -137,12 +137,14 @@ def test_v6_present_false_rejects_timestamp_keys_even_when_falsey(value) -> None
 )
 def test_v6_accepts_well_formed_canonical_invalid_outcomes(item: dict[str, object]) -> None:
     report = build_v6()
+    report["source_artifacts"]["ai_signal"] = "context.json"
     report["freshness"]["ai_signal"] = item
     validate_advisory_report(report)
 
 
 def test_v6_rejects_malformed_invalid_outcome_and_unknown_data_keys() -> None:
     report = build_v6()
+    report["source_artifacts"]["ai_signal"] = "context.json"
     report["freshness"]["ai_signal"] = {
         "present": True,
         "valid": False,
@@ -160,6 +162,13 @@ def test_v6_rejects_malformed_invalid_outcome_and_unknown_data_keys() -> None:
         validate_advisory_report(report)
 
 
+def test_v6_rejects_top_level_freshness_extra_key_with_sanitized_error() -> None:
+    report = build_v6()
+    report["freshness"]["debug"] = {"raw": "redacted"}
+    with pytest.raises(AdvisoryValidationError, match="freshness_keys_invalid"):
+        validate_advisory_report(report)
+
+
 def test_v6_requires_freshness_when_source_artifact_is_declared() -> None:
     report = build_v6()
     report["source_artifacts"]["ai_signal"] = "context.json"
@@ -167,8 +176,50 @@ def test_v6_requires_freshness_when_source_artifact_is_declared() -> None:
         validate_advisory_report(report)
 
 
+@pytest.mark.parametrize("artifact_value", ["", None, [], {"path": "context.json"}])
+def test_v6_source_artifact_values_are_minimal_and_coherent(artifact_value) -> None:
+    report = build_v6()
+    report["source_artifacts"]["ai_signal"] = artifact_value
+    if isinstance(artifact_value, dict) or isinstance(artifact_value, list):
+        expected = "source_artifact_value_invalid"
+    else:
+        expected = None
+    if expected:
+        with pytest.raises(AdvisoryValidationError, match=expected):
+            validate_advisory_report(report)
+    else:
+        validate_advisory_report(report)
+
+
+def test_v6_present_source_requires_nonempty_artifact_and_valid_absent_pair() -> None:
+    report = build_v6()
+    report["source_artifacts"]["ai_signal"] = "context.json"
+    report["freshness"]["ai_signal"] = {
+        "present": True,
+        "valid": True,
+        "reason": "fresh",
+        "as_of": "2026-05-30",
+        "generated_at": "2026-05-30T12:00:00Z",
+        "expires_at": "2026-06-30",
+    }
+    validate_advisory_report(report)
+
+    report["source_artifacts"].pop("ai_signal")
+    with pytest.raises(AdvisoryValidationError, match="source_artifact_freshness_mismatch"):
+        validate_advisory_report(report)
+
+    report["source_artifacts"]["ai_signal"] = ""
+    with pytest.raises(AdvisoryValidationError, match="source_artifact_freshness_mismatch"):
+        validate_advisory_report(report)
+
+    report["source_artifacts"]["theme_momentum"] = "theme.json"
+    with pytest.raises(AdvisoryValidationError, match="source_artifact_freshness_mismatch"):
+        validate_advisory_report(report)
+
+
 def test_v6_rejects_field_timestamp_and_reason_mismatch() -> None:
     report = build_v6()
+    report["source_artifacts"]["ai_signal"] = "context.json"
     item = {
         "present": True,
         "valid": False,
@@ -193,6 +244,7 @@ def test_v6_rejects_field_timestamp_and_reason_mismatch() -> None:
 
 def test_v6_explicit_legacy_expiry_exception_is_exact() -> None:
     report = build_v6()
+    report["source_artifacts"]["ai_signal"] = "context.json"
     report["freshness"]["ai_signal"] = {
         "present": True,
         "valid": True,

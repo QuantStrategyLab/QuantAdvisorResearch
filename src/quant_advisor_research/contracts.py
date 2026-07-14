@@ -105,6 +105,8 @@ def _validate_v6_freshness(
         raise AdvisoryValidationError("freshness_invalid")
     if not isinstance(source_artifacts, Mapping):
         raise AdvisoryValidationError("source_artifacts_invalid")
+    if set(freshness) != {"ai_signal", "theme_momentum"}:
+        raise AdvisoryValidationError("freshness_keys_invalid")
     for name in ("ai_signal", "theme_momentum"):
         item = freshness.get(name)
         if not isinstance(item, Mapping):
@@ -122,11 +124,14 @@ def _validate_v6_freshness(
         if legacy_key in item and not legacy:
             raise AdvisoryValidationError("freshness_keys_invalid")
         declared_artifact = source_artifacts.get(name)
+        if declared_artifact is not None and not isinstance(declared_artifact, str):
+            raise AdvisoryValidationError("source_artifact_value_invalid")
+        declared = isinstance(declared_artifact, str) and bool(declared_artifact.strip())
+        if declared != item["present"]:
+            raise AdvisoryValidationError("source_artifact_freshness_mismatch")
         if not item["present"]:
             if item["valid"] or any(key in item for key in ("as_of", "generated_at", "expires_at")):
                 raise AdvisoryValidationError("freshness_state_incoherent")
-            if declared_artifact:
-                raise AdvisoryValidationError("source_artifact_freshness_mismatch")
             result = assess_context_freshness(
                 None,
                 report_as_of=report_as_of,
