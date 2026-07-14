@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from .build_pipeline import DEFAULT_FEED_TITLE, DEFAULT_SITE_URL, copy_if_different
-from .publisher import preflight_publish_destinations, publish_reports, require_publish_candidates
+from .publisher import build_publication_plan, preflight_publication_plan, publish_reports
 
 
-REPORT_JSON_PATTERN = re.compile(r"advisory_report_\d{4}-\d{2}-\d{2}\.json")
+REPORT_JSON_PATTERN = re.compile(r"advisory_report_\d{4}-\d{2}-\d{2}(?:\.variant-[0-9a-f]{12})?\.json")
 
 
 def load_report(path: Path) -> dict[str, Any] | None:
@@ -65,9 +65,13 @@ def backfill_site_archive(
 ) -> list[Path]:
     if not report_paths and current_report is None:
         raise ValueError("No advisory_report_YYYY-MM-DD.json files found for backfill.")
-    selection = require_publish_candidates(current_report, report_paths)
-    report_paths = list(selection.selected_paths)
-    preflight_publish_destinations(report_paths)
+    publication_plan = build_publication_plan(
+        report_paths,
+        mandatory_current=current_report,
+        recovered_history=report_paths if current_report is not None else None,
+    )
+    preflight_publication_plan(publication_plan)
+    report_paths = [entry.source_path for entry in publication_plan.entries]
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     written = publish_reports(
@@ -77,15 +81,16 @@ def backfill_site_archive(
         feed_title=feed_title,
         mandatory_current=current_report,
         recovered_history=report_paths if current_report is not None else None,
+        publication_plan=publication_plan,
     )
-    for report_path in report_paths:
-        copy_if_different(report_path, output / report_path.name)
-        markdown_path = report_path.with_suffix(".md")
-        manifest_path = Path(f"{report_path}.manifest.json")
+    for entry in publication_plan.entries:
+        copy_if_different(entry.source_path, output / entry.json_name)
+        markdown_path = entry.source_path.with_suffix(".md")
+        manifest_path = Path(f"{entry.source_path}.manifest.json")
         if markdown_path.exists():
-            copy_if_different(markdown_path, output / markdown_path.name)
+            copy_if_different(markdown_path, output / entry.markdown_name)
         if manifest_path.exists():
-            copy_if_different(manifest_path, output / manifest_path.name)
+            copy_if_different(manifest_path, output / entry.manifest_name)
     return written
 
 

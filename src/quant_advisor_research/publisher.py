@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import html
 import json
 import os
@@ -75,6 +76,24 @@ class CandidateSelection:
     selected_paths: tuple[Path, ...]
     quarantined: tuple[CandidateClassification, ...]
     mandatory_current_status: str = "NOT_REQUIRED"
+
+
+@dataclass(frozen=True)
+class PublicationEntry:
+    report: dict[str, Any]
+    source_path: Path
+    html_name: str
+    json_name: str
+    markdown_name: str
+    manifest_name: str
+    fingerprint: str
+    canonical_owner: bool
+    generated_at: dt.datetime
+
+
+@dataclass(frozen=True)
+class PublicationPlan:
+    entries: tuple[PublicationEntry, ...]
 
 
 @dataclass(frozen=True)
@@ -297,23 +316,108 @@ def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]
 
 
 def preflight_publish_destinations(report_paths: list[str | Path]) -> None:
-    destinations: dict[tuple[str, str], tuple[Path, str]] = {}
-    for raw_path in report_paths:
-        path = Path(raw_path)
-        report = load_report(path)
-        fingerprint = report_content_fingerprint(report)
-        names = (
-            ("html", report_filename(report)),
-            ("json", path.name),
-            ("markdown", path.with_suffix(".md").name),
-            ("manifest", f"{path.name}.manifest.json"),
+    plan = build_publication_plan(report_paths)
+    preflight_publication_plan(plan)
+
+
+def _publication_rank(candidates: list[_ReportCandidate]) -> list[_ReportCandidate]:
+    ranked = sorted(candidates, key=lambda candidate: candidate.artifact_id)
+    ranked.sort(key=lambda candidate: candidate.fingerprint or "")
+    ranked.sort(
+        key=lambda candidate: candidate.generated_at or dt.datetime.min.replace(tzinfo=dt.UTC),
+        reverse=True,
+    )
+    ranked.sort(key=_schema_rank, reverse=True)
+    ranked.sort(key=lambda candidate: candidate.as_of or dt.date.min, reverse=True)
+    ranked.sort(
+        key=lambda candidate: candidate.period.period_end if candidate.period else dt.date.min,
+        reverse=True,
+    )
+    return ranked
+
+
+def _variant_digest(fingerprint: str) -> str:
+    return hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:12]
+
+
+def _variant_name(name: str, suffix: str) -> str:
+    stem, extension = name.rsplit(".", 1)
+    return f"{stem}.variant-{suffix}.{extension}"
+
+
+def build_publication_plan(
+    report_paths: list[str | Path],
+    *,
+    mandatory_current: str | Path | None = None,
+    recovered_history: list[str | Path] | None = None,
+    reject_invalid: bool = False,
+) -> PublicationPlan:
+    if mandatory_current is None:
+        history = list(report_paths)
+    else:
+        history = list(recovered_history) if recovered_history is not None else [
+            path for path in report_paths if Path(path).resolve() != Path(mandatory_current).resolve()
+        ]
+    selection = require_publish_candidates(mandatory_current, history)
+    if reject_invalid and selection.quarantined:
+        raise ValueError("invalid_report_candidate")
+    selected_paths = list(selection.selected_paths)
+    artifact_ids = _relative_artifact_ids(selected_paths)
+    candidates = [
+        _load_candidate(path, artifact_ids[path], index)
+        for index, path in enumerate(selected_paths)
+    ]
+    valid_candidates = [candidate for candidate in candidates if candidate.report is not None]
+    groups: dict[tuple[str, str], list[_ReportCandidate]] = {}
+    for candidate in valid_candidates:
+        groups.setdefault((str(candidate.report["as_of"]), str(candidate.report["cadence"])), []).append(candidate)
+    mandatory_resolved = Path(mandatory_current).resolve() if mandatory_current is not None else None
+    entries_by_path: dict[Path, PublicationEntry] = {}
+    for group in groups.values():
+        ranked = _publication_rank(group)
+        owner = next(
+            (candidate for candidate in ranked if candidate.path.resolve() == mandatory_resolved),
+            ranked[0],
         )
-        for kind, name in names:
-            identity = (kind, name)
-            previous = destinations.get(identity)
-            if previous is not None and (previous[0] != path.resolve() or previous[1] != fingerprint):
+        for candidate in ranked:
+            assert candidate.report is not None and candidate.fingerprint is not None and candidate.generated_at is not None
+            as_of = str(candidate.report["as_of"])
+            canonical_html = report_filename(candidate.report)
+            canonical_json = f"advisory_report_{as_of}.json"
+            canonical_markdown = f"advisory_report_{as_of}.md"
+            if candidate is owner:
+                html_name, json_name, markdown_name = canonical_html, canonical_json, canonical_markdown
+                canonical_owner = True
+            else:
+                suffix = _variant_digest(candidate.fingerprint)
+                html_name = _variant_name(canonical_html, suffix)
+                json_name = _variant_name(canonical_json, suffix)
+                markdown_name = _variant_name(canonical_markdown, suffix)
+                canonical_owner = False
+            entries_by_path[candidate.path] = PublicationEntry(
+                report=candidate.report,
+                source_path=candidate.path,
+                html_name=html_name,
+                json_name=json_name,
+                markdown_name=markdown_name,
+                manifest_name=f"{json_name}.manifest.json",
+                fingerprint=candidate.fingerprint,
+                canonical_owner=canonical_owner,
+                generated_at=candidate.generated_at,
+            )
+    entries = [entries_by_path[candidate.path] for candidate in _publication_rank(valid_candidates)]
+    return PublicationPlan(tuple(entries))
+
+
+def preflight_publication_plan(plan: PublicationPlan) -> None:
+    destinations: dict[str, tuple[Path, str]] = {}
+    for entry in plan.entries:
+        for name in (entry.html_name, entry.json_name, entry.markdown_name, entry.manifest_name):
+            previous = destinations.get(name)
+            identity = (entry.source_path.resolve(), entry.fingerprint)
+            if previous is not None and previous != identity:
                 raise ValueError("archive_destination_collision")
-            destinations[identity] = (path.resolve(), fingerprint)
+            destinations[name] = identity
 
 
 def format_datetime(value: str) -> str:
@@ -934,9 +1038,11 @@ def render_symbol_tags(symbols: list[str], *, empty_label: str = "暂无") -> st
     return "".join(f'<span class="symbol-tag">{html.escape(symbol)}</span>' for symbol in symbols)
 
 
-def render_horizon_snapshot(report: dict[str, Any], *, linked: bool = False) -> str:
+def render_horizon_snapshot(
+    report: dict[str, Any], *, linked: bool = False, html_filename: str | None = None
+) -> str:
     columns = []
-    href = report_filename(report)
+    href = html_filename or report_filename(report)
     for horizon, label, window, symbols in format_horizon_summary(report):
         tags = render_symbol_tags(symbols)
         body = f'<a class="horizon-link" href="{html.escape(href)}">{tags}</a>' if linked else tags
@@ -952,12 +1058,14 @@ def render_horizon_snapshot(report: dict[str, Any], *, linked: bool = False) -> 
     return f'<div class="snapshot-grid">{"".join(columns)}</div>'
 
 
-def render_index_html(reports: list[dict[str, Any]]) -> str:
-    sorted_reports = sorted(reports, key=lambda item: item["as_of"], reverse=True)
+def render_index_html(reports: list[dict[str, Any]], publication_html_names: dict[int, str] | None = None) -> str:
+    sorted_reports = list(reports) if publication_html_names is not None else sorted(
+        reports, key=lambda item: item["as_of"], reverse=True
+    )
     latest = sorted_reports[0] if sorted_reports else None
     latest_block = ""
     if latest:
-        latest_filename = report_filename(latest)
+        latest_filename = (publication_html_names or {}).get(id(latest), report_filename(latest))
         top_themes = format_theme_ids(latest["summary"].get("top_theme_ids", []))
         top_symbols = latest["summary"].get("top_recommended_symbols", [])
         latest_block = f"""
@@ -970,13 +1078,13 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
             <div class="symbol-strip hero-symbols">{render_symbol_tags([str(symbol) for symbol in top_symbols])}</div>
             <a class="primary-action" href="{html.escape(latest_filename)}">打开最新报告</a>
           </div>
-          {render_horizon_snapshot(latest)}
+          {render_horizon_snapshot(latest, html_filename=latest_filename)}
         </section>
         """
     items = []
     recent_reports = sorted_reports[1 : INDEX_HISTORY_LIMIT + 1]
     for report in recent_reports:
-        filename = report_filename(report)
+        filename = (publication_html_names or {}).get(id(report), report_filename(report))
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
         top_symbols = [str(symbol) for symbol in report["summary"].get("top_recommended_symbols", [])]
         items.append(
@@ -985,7 +1093,7 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
               <a class="archive-title" href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
               <p>主要信号：{html.escape(top_themes or '无')}</p>
               <div class="archive-symbols">{render_symbol_tags(top_symbols)}</div>
-              {render_horizon_snapshot(report, linked=True)}
+              {render_horizon_snapshot(report, linked=True, html_filename=filename)}
             </article>
             """
         )
@@ -1253,8 +1361,8 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
 """
 
 
-def render_archive_card(report: dict[str, Any]) -> str:
-    filename = report_filename(report)
+def render_archive_card(report: dict[str, Any], html_filename: str | None = None) -> str:
+    filename = html_filename or report_filename(report)
     top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
     top_symbols = [str(symbol) for symbol in report["summary"].get("top_recommended_symbols", [])]
     return f"""
@@ -1262,13 +1370,15 @@ def render_archive_card(report: dict[str, Any]) -> str:
       <a class="archive-title" href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
       <p>主要信号：{html.escape(top_themes or '无')}</p>
       <div class="archive-symbols">{render_symbol_tags(top_symbols)}</div>
-      {render_horizon_snapshot(report, linked=True)}
+      {render_horizon_snapshot(report, linked=True, html_filename=filename)}
     </article>
     """
 
 
-def render_archive_html(reports: list[dict[str, Any]]) -> str:
-    sorted_reports = sorted(reports, key=lambda item: item["as_of"], reverse=True)
+def render_archive_html(reports: list[dict[str, Any]], publication_html_names: dict[int, str] | None = None) -> str:
+    sorted_reports = list(reports) if publication_html_names is not None else sorted(
+        reports, key=lambda item: item["as_of"], reverse=True
+    )
     groups: dict[str, list[dict[str, Any]]] = {}
     for report in sorted_reports:
         key = str(report.get("as_of", ""))[:7] or "unknown"
@@ -1278,7 +1388,10 @@ def render_archive_html(reports: list[dict[str, Any]]) -> str:
     for key, group_reports in groups.items():
         year, _, month = key.partition("-")
         title = f"{year} 年 {month} 月" if month else key
-        cards = "".join(render_archive_card(report) for report in group_reports)
+        cards = "".join(
+            render_archive_card(report, (publication_html_names or {}).get(id(report)))
+            for report in group_reports
+        )
         sections.append(
             f"""
             <section class="month-group">
@@ -1406,28 +1519,44 @@ def render_archive_html(reports: list[dict[str, Any]]) -> str:
 """
 
 
-def render_reports_index_json(reports: list[dict[str, Any]]) -> str:
+def render_reports_index_json(
+    reports: list[dict[str, Any]],
+    publication_json_names: dict[int, str] | None = None,
+    publication_html_names: dict[int, str] | None = None,
+) -> str:
     items = []
-    for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
+    ordered_reports = list(reports) if publication_json_names is not None else sorted(
+        reports, key=lambda item: item["as_of"], reverse=True
+    )
+    for report in ordered_reports:
         as_of = str(report.get("as_of", ""))
         items.append(
             {
                 "as_of": as_of,
                 "cadence": str(report.get("cadence", "")),
-                "html": report_filename(report),
-                "json": f"advisory_report_{as_of}.json",
+                "html": (publication_html_names or {}).get(id(report), report_filename(report)),
+                "json": (publication_json_names or {}).get(id(report), f"advisory_report_{as_of}.json"),
             }
         )
     return json.dumps({"schema_version": 1, "reports": items}, ensure_ascii=False, indent=2) + "\n"
 
 
-def render_feed_xml(reports: list[dict[str, Any]], *, site_url: str, feed_title: str) -> str:
+def render_feed_xml(
+    reports: list[dict[str, Any]],
+    *,
+    site_url: str,
+    feed_title: str,
+    publication_html_names: dict[int, str] | None = None,
+) -> str:
     channel = ET.Element("channel")
     ET.SubElement(channel, "title").text = feed_title
     ET.SubElement(channel, "link").text = site_url
     ET.SubElement(channel, "description").text = "QuantStrategyLab 智慧投顾研究系统，包含推荐理由、周期和风险提示。"
-    for report in sorted(reports, key=lambda item: item["as_of"], reverse=True)[:RSS_ITEM_LIMIT]:
-        filename = report_filename(report)
+    ordered_reports = list(reports) if publication_html_names is not None else sorted(
+        reports, key=lambda item: item["as_of"], reverse=True
+    )
+    for report in ordered_reports[:RSS_ITEM_LIMIT]:
+        filename = (publication_html_names or {}).get(id(report), report_filename(report))
         link = f"{site_url.rstrip('/')}/{quote(filename)}"
         item = ET.SubElement(channel, "item")
         ET.SubElement(item, "title").text = f"{report['as_of']} {cadence_label(report)}智慧投顾研究"
@@ -1454,40 +1583,51 @@ def publish_reports(
     mandatory_current: str | Path | None = None,
     recovered_history: list[str | Path] | None = None,
     reject_invalid: bool = False,
+    publication_plan: PublicationPlan | None = None,
 ) -> list[Path]:
-    if mandatory_current is None:
-        selection = require_publish_candidates(None, report_paths)
-    else:
-        history = list(recovered_history) if recovered_history is not None else [
-            path for path in report_paths if Path(path).resolve() != Path(mandatory_current).resolve()
-        ]
-        selection = require_publish_candidates(mandatory_current, history)
-    if reject_invalid and selection.quarantined:
-        raise ValueError("invalid_report_candidate")
-    preflight_publish_destinations(list(selection.selected_paths))
+    plan = publication_plan or build_publication_plan(
+        report_paths,
+        mandatory_current=mandatory_current,
+        recovered_history=recovered_history,
+        reject_invalid=reject_invalid,
+    )
+    if reject_invalid and publication_plan is not None:
+        selection = require_publish_candidates(
+            mandatory_current,
+            list(recovered_history) if recovered_history is not None else report_paths,
+        )
+        if selection.quarantined:
+            raise ValueError("invalid_report_candidate")
+    preflight_publication_plan(plan)
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    report_paths = list(selection.selected_paths)
-    reports = [load_report(path) for path in report_paths]
+    reports = [entry.report for entry in plan.entries]
+    html_names = {id(entry.report): entry.html_name for entry in plan.entries}
+    json_names = {id(entry.report): entry.json_name for entry in plan.entries}
     written: list[Path] = []
-    for report in reports:
-        path = output / report_filename(report)
-        path.write_text(render_report_html(report), encoding="utf-8")
+    for entry in plan.entries:
+        path = output / entry.html_name
+        path.write_text(render_report_html(entry.report), encoding="utf-8")
         written.append(path)
     icon_path = output / SITE_ICON_FILENAME
     icon_path.write_text(SITE_ICON_SVG, encoding="utf-8")
     written.append(icon_path)
     index_path = output / "index.html"
-    index_path.write_text(render_index_html(reports), encoding="utf-8")
+    index_path.write_text(render_index_html(reports, html_names), encoding="utf-8")
     written.append(index_path)
     archive_path = output / "archive.html"
-    archive_path.write_text(render_archive_html(reports), encoding="utf-8")
+    archive_path.write_text(render_archive_html(reports, html_names), encoding="utf-8")
     written.append(archive_path)
     reports_index_path = output / "reports_index.json"
-    reports_index_path.write_text(render_reports_index_json(reports), encoding="utf-8")
+    reports_index_path.write_text(
+        render_reports_index_json(reports, json_names, html_names), encoding="utf-8"
+    )
     written.append(reports_index_path)
     feed_path = output / "feed.xml"
-    feed_path.write_text(render_feed_xml(reports, site_url=site_url, feed_title=feed_title), encoding="utf-8")
+    feed_path.write_text(
+        render_feed_xml(reports, site_url=site_url, feed_title=feed_title, publication_html_names=html_names),
+        encoding="utf-8",
+    )
     written.append(feed_path)
     return written
 

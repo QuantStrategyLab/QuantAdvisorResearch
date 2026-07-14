@@ -17,6 +17,7 @@ from quant_advisor_research.publisher import (
     select_publish_candidates,
     unique_report_paths_by_content,
 )
+import quant_advisor_research.publisher as publisher_module
 from quant_advisor_research.time_contract import canonical_reference_time
 
 
@@ -135,6 +136,23 @@ def test_discovery_orders_all_candidates_newest_first_with_stable_same_date_tie(
     assert discovered[0].parent < discovered[1].parent
 
 
+def test_discovery_accepts_only_canonical_variant_json_names(tmp_path: Path) -> None:
+    valid = write_report(
+        tmp_path / "advisory_report_2026-06-20.variant-abcdef123456.json", build_v5()
+    )
+    malformed_suffix = write_report(
+        tmp_path / "advisory_report_2026-06-20.variant-abcdef12345.json", build_v5()
+    )
+    path_trick = write_report(
+        tmp_path / "advisory_report_2026-06-20.variant-abcdef123456.json.bak", build_v5()
+    )
+
+    discovered = discover_report_paths([tmp_path], [])
+
+    assert discovered == [valid]
+    assert malformed_suffix.exists() and path_trick.exists()
+
+
 def test_mandatory_current_is_pinned_over_higher_schema_history_duplicate(tmp_path: Path) -> None:
     current = write_report(tmp_path / "advisory_report_2026-06-20.json", build_v5())
     recovered = write_report(tmp_path / "recovered.json", build_v6())
@@ -227,19 +245,63 @@ def test_direct_publisher_cli_keeps_all_valid_history_compatibility(tmp_path: Pa
     assert (output / "index.html").exists()
 
 
-def test_selected_fingerprint_collision_fails_before_site_write(tmp_path: Path) -> None:
+def test_same_identity_different_fingerprint_publishes_canonical_and_variant(tmp_path: Path) -> None:
     first = build_v5()
     second = copy.deepcopy(first)
     second["recommendations"][0]["reasons"] = ["different semantic content"]
     first_path = write_report(tmp_path / "first.json", first)
     second_path = write_report(tmp_path / "second.json", second)
     output = tmp_path / "site"
+    publish_reports([first_path, second_path], output, site_url="https://example.invalid", feed_title="Test")
+
+    html_names = {path.name for path in output.glob("*.html")}
+    assert "2026-06-20-weekly-model-recommendations.html" in html_names
+    assert any(name.startswith("2026-06-20-weekly-model-recommendations.variant-") for name in html_names)
+
+
+def test_publication_plan_is_permutation_stable_and_links_actual_variant_targets(tmp_path: Path) -> None:
+    first = build_v5()
+    second = copy.deepcopy(first)
+    second["recommendations"][0]["reasons"] = ["different semantic content"]
+    first_path = write_report(tmp_path / "a.json", first)
+    second_path = write_report(tmp_path / "b.json", second)
+    first_output = tmp_path / "first-site"
+    second_output = tmp_path / "second-site"
+
+    publish_reports([first_path, second_path], first_output, site_url="https://example.invalid", feed_title="Test")
+    publish_reports([second_path, first_path], second_output, site_url="https://example.invalid", feed_title="Test")
+
+    for name in {path.name for path in first_output.iterdir()}:
+        assert (first_output / name).read_bytes() == (second_output / name).read_bytes()
+    index = json.loads((first_output / "reports_index.json").read_text(encoding="utf-8"))
+    variant = next(item for item in index["reports"] if ".variant-" in item["json"])
+    feed = (first_output / "feed.xml").read_text(encoding="utf-8")
+    assert variant["html"] in feed
+    assert variant["html"] in (first_output / "archive.html").read_text(encoding="utf-8")
+
+
+def test_digest_collision_fails_before_output_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first = build_v5()
+    second = copy.deepcopy(first)
+    second["recommendations"][0]["reasons"] = ["different semantic content"]
+    third = copy.deepcopy(first)
+    third["recommendations"][0]["reasons"] = ["another semantic content"]
+    first_path = write_report(tmp_path / "a.json", first)
+    second_path = write_report(tmp_path / "b.json", second)
+    third_path = write_report(tmp_path / "c.json", third)
+    output = tmp_path / "site"
     output.mkdir()
     sentinel = output / "sentinel.txt"
     sentinel.write_text("keep", encoding="utf-8")
+    monkeypatch.setattr(publisher_module, "_variant_digest", lambda _: "0123456789ab")
 
     with pytest.raises(ValueError, match="archive_destination_collision"):
-        publish_reports([first_path, second_path], output, site_url="https://example.invalid", feed_title="Test")
+        publish_reports(
+            [first_path, second_path, third_path],
+            output,
+            site_url="https://example.invalid",
+            feed_title="Test",
+        )
     assert list(output.iterdir()) == [sentinel]
 
 

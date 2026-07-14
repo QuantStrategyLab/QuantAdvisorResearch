@@ -22,9 +22,9 @@ from .market_confirmation import (
 )
 from .monthly_review import build_monthly_review, render_monthly_review_markdown
 from .publisher import (
-    preflight_publish_destinations,
+    build_publication_plan,
+    preflight_publication_plan,
     publish_reports,
-    require_publish_candidates,
     unique_report_paths_by_content,
 )
 from .recommendation_review import build_recommendation_review, render_recommendation_review_markdown
@@ -32,7 +32,7 @@ from .recommendation_review import build_recommendation_review, render_recommend
 
 DEFAULT_SITE_URL = "https://quantstrategylab.github.io/QuantAdvisorResearch"
 DEFAULT_FEED_TITLE = "智慧投顾研究系统"
-REPORT_JSON_PATTERN = re.compile(r"advisory_report_\d{4}-\d{2}-\d{2}\.json")
+REPORT_JSON_PATTERN = re.compile(r"advisory_report_\d{4}-\d{2}-\d{2}(?:\.variant-[0-9a-f]{12})?\.json")
 
 
 @dataclass(frozen=True)
@@ -155,15 +155,16 @@ def recover_published_reports(
         return []
 
     paths: list[Path] = []
-    seen_as_of = {current_as_of.isoformat()}
+    current_as_of_text = current_as_of.isoformat()
+    seen_names: set[str] = set()
     for item in index.get("reports", []):
         if not isinstance(item, dict):
             continue
         as_of = str(item.get("as_of", "")).strip()
         json_name = Path(str(item.get("json", ""))).name
-        if not as_of or as_of in seen_as_of or not REPORT_JSON_PATTERN.fullmatch(json_name):
+        if not as_of or as_of == current_as_of_text or json_name in seen_names or not REPORT_JSON_PATTERN.fullmatch(json_name):
             continue
-        seen_as_of.add(as_of)
+        seen_names.add(json_name)
         url = f"{site_url.rstrip('/')}/{quote(json_name)}"
         destination = history_dir / json_name
         try:
@@ -279,6 +280,7 @@ def build_advisory_artifacts(
         write_text(monthly_review_md, render_monthly_review_markdown(review))
 
     recovered_report_paths: list[Path] = []
+    publication_plan = None
     site_output: Path | None = Path(site_output_dir) if site_output_dir else None
     if site_output:
         if recover_site_archive:
@@ -291,8 +293,13 @@ def build_advisory_artifacts(
     else:
         report_paths = [report_json]
     if site_output:
-        report_paths = list(require_publish_candidates(report_json, recovered_report_paths).selected_paths)
-        preflight_publish_destinations(report_paths)
+        publication_plan = build_publication_plan(
+            report_paths,
+            mandatory_current=report_json,
+            recovered_history=recovered_report_paths,
+        )
+        preflight_publication_plan(publication_plan)
+        report_paths = [entry.source_path for entry in publication_plan.entries]
     else:
         report_paths = unique_report_paths_by_content(report_paths)
 
@@ -320,11 +327,17 @@ def build_advisory_artifacts(
             feed_title=feed_title,
             mandatory_current=report_json,
             recovered_history=recovered_report_paths,
+            publication_plan=publication_plan,
         )
-        for path in report_paths:
-            copy_if_different(Path(path), site_output / Path(path).name)
-        copy_if_different(report_md, site_output / report_md.name)
-        copy_if_different(report_manifest, site_output / report_manifest.name)
+        assert publication_plan is not None
+        for entry in publication_plan.entries:
+            copy_if_different(entry.source_path, site_output / entry.json_name)
+            markdown_path = entry.source_path.with_suffix(".md")
+            manifest_path = Path(f"{entry.source_path}.manifest.json")
+            if markdown_path.exists():
+                copy_if_different(markdown_path, site_output / entry.markdown_name)
+            if manifest_path.exists():
+                copy_if_different(manifest_path, site_output / entry.manifest_name)
         if recommendation_review_json and recommendation_review_md:
             copy_if_different(recommendation_review_json, site_output / recommendation_review_json.name)
             copy_if_different(recommendation_review_md, site_output / recommendation_review_md.name)
