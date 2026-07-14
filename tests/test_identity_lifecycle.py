@@ -120,6 +120,14 @@ def test_v2_variant_suffix_must_equal_full_digest() -> None:
         parse_v2_index({"schema_version": 2, "reports": [entry]})
 
 
+def test_v2_html_cadence_must_match_entry() -> None:
+    entry = v2_entry(variant=True)
+    entry["html"] = entry["html"].replace("weekly", "daily")
+
+    with pytest.raises(IdentityMetadataError, match="identity_name_mismatch"):
+        parse_v2_index({"schema_version": 2, "reports": [entry]})
+
+
 @pytest.mark.parametrize("field", ["md", "manifest"])
 def test_v2_explicit_null_attachment_is_rejected(field: str) -> None:
     entry = v2_entry()
@@ -137,6 +145,24 @@ def test_v2_only_one_canonical_binding_per_period() -> None:
 
     with pytest.raises(IdentityMetadataError, match="identity_canonical_conflict"):
         parse_v2_index({"schema_version": 2, "reports": entries})
+
+
+def test_v2_variant_only_period_is_rejected() -> None:
+    with pytest.raises(IdentityMetadataError, match="identity_canonical_missing"):
+        parse_v2_index({"schema_version": 2, "reports": [v2_entry(variant=True)]})
+
+
+@pytest.mark.parametrize(
+    "optional_fields",
+    [(), ("md",), ("manifest",), ("md", "manifest")],
+)
+def test_v2_optional_attachments_can_be_declared_independently(optional_fields: tuple[str, ...]) -> None:
+    entry = v2_entry(variant=True, digest=DIGEST_B)
+    for field in ("md", "manifest"):
+        if field not in optional_fields:
+            del entry[field]
+
+    assert len(parse_v2_index({"schema_version": 2, "reports": [v2_entry(), entry]}).bindings) == 2
 
 
 def test_v2_duplicate_identity_rejects_any_metadata_or_digest_difference() -> None:

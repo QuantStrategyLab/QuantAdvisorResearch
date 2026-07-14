@@ -102,11 +102,13 @@ def _is_basename(value: object) -> bool:
     return isinstance(value, str) and bool(value) and "/" not in value and "\\" not in value
 
 
-def _name_digest(name: str, pattern: re.Pattern[str], *, as_of: str, code: str) -> str | None:
+def _name_digest(name: str, pattern: re.Pattern[str], *, as_of: str, cadence: str | None = None) -> str | None:
     if not _is_basename(name):
         raise _error("invalid_identity_name")
     match = pattern.fullmatch(name)
     if match is None or match.group("as_of") != as_of:
+        raise _error("identity_name_mismatch")
+    if cadence is not None and match.groupdict().get("cadence") != cadence:
         raise _error("identity_name_mismatch")
     return match.groupdict().get("digest")
 
@@ -119,9 +121,9 @@ def _validate_v1_entry(entry: object) -> V1ProvisionalBinding:
     period_key = _period_key(as_of, cadence)
     json_name = _require_exact_type(entry["json"], str, "invalid_identity_name")
     html_name = _require_exact_type(entry["html"], str, "invalid_identity_name")
-    if _name_digest(json_name, _JSON_PATTERN, as_of=as_of, code="invalid_identity_name") is not None:
+    if _name_digest(json_name, _JSON_PATTERN, as_of=as_of) is not None:
         raise _error("v1_variant_unverified")
-    if _name_digest(html_name, _HTML_PATTERN, as_of=as_of, code="invalid_identity_name") is not None:
+    if _name_digest(html_name, _HTML_PATTERN, as_of=as_of, cadence=cadence) is not None:
         raise _error("v1_variant_unverified")
     if html_name != f"{as_of}-{cadence}-model-recommendations.html":
         raise _error("identity_name_mismatch")
@@ -163,16 +165,16 @@ def _validate_v2_entry(entry: object) -> V2IdentityBinding:
         md_name = _require_exact_type(md_name, str, "invalid_identity_name")
     if "manifest" in entry:
         manifest_name = _require_exact_type(manifest_name, str, "invalid_identity_name")
-    json_digest = _name_digest(json_name, _JSON_PATTERN, as_of=as_of, code="invalid_identity_name")
-    html_digest = _name_digest(html_name, _HTML_PATTERN, as_of=as_of, code="invalid_identity_name")
-    md_digest = None if md_name is None else _name_digest(md_name, _MD_PATTERN, as_of=as_of, code="invalid_identity_name")
+    json_digest = _name_digest(json_name, _JSON_PATTERN, as_of=as_of)
+    html_digest = _name_digest(html_name, _HTML_PATTERN, as_of=as_of, cadence=cadence)
+    md_digest = None if md_name is None else _name_digest(md_name, _MD_PATTERN, as_of=as_of)
     manifest_digest = None if manifest_name is None else _name_digest(
-        manifest_name, _MANIFEST_PATTERN, as_of=as_of, code="invalid_identity_name"
+        manifest_name, _MANIFEST_PATTERN, as_of=as_of
     )
     expected_html = f"{as_of}-{cadence}-model-recommendations.html"
     if html_name != expected_html and html_digest is None:
         raise _error("identity_name_mismatch")
-    if any(digest != json_digest for digest in (html_digest, md_digest, manifest_digest)):
+    if any(digest != json_digest for digest in (html_digest, md_digest, manifest_digest) if digest is not None):
         raise _error("identity_name_mismatch")
     if json_digest is None:
         if canonical_identity is not True:
@@ -228,6 +230,9 @@ def _validate_v2_index(bindings: tuple[V2IdentityBinding, ...]) -> None:
         if previous is not None and previous != identity:
             raise _error("identity_digest_conflict")
         digest_map[digest_key] = identity
+    periods = {binding.period_key for binding in bindings}
+    if periods - canonical_periods:
+        raise _error("identity_canonical_missing")
 
 
 def parse_v1_index(payload: object) -> V1ProvisionalIndex:
