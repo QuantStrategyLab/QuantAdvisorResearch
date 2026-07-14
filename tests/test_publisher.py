@@ -135,7 +135,7 @@ def make_report_for_date(base_report: dict, as_of: str) -> dict:
     return report
 
 
-def test_unique_report_paths_by_content_keeps_first_duplicate_report(tmp_path: Path) -> None:
+def test_unique_report_paths_by_content_selects_newer_duplicate_report(tmp_path: Path) -> None:
     base = build_sample_report()
     current = make_report_for_date(base, "2026-06-20")
     duplicate = make_report_for_date(base, "2026-06-21")
@@ -150,7 +150,7 @@ def test_unique_report_paths_by_content_keeps_first_duplicate_report(tmp_path: P
 
     reports = unique_report_paths_by_content([current_path, duplicate_path, older_path])
 
-    assert reports == [current_path, older_path]
+    assert reports == [duplicate_path, older_path]
 
 
 def test_index_limits_recent_history_and_archive_keeps_all_reports() -> None:

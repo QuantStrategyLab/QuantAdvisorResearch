@@ -4,13 +4,17 @@ import argparse
 import datetime as dt
 import html
 import json
+import os
 import re
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 from .advisory_report import display_number, display_percent, sector_label, theme_label
+from .contracts import AdvisoryValidationError, validate_advisory_report
+from .time_contract import TimeContractError, normalize_aware_datetime
 
 
 CADENCE_LABELS_ZH = {
@@ -59,10 +63,110 @@ def load_report(path: str | Path) -> dict[str, Any]:
         return json.load(handle)
 
 
+@dataclass(frozen=True)
+class CandidateClassification:
+    artifact_id: str
+    status: str
+    reason: str
+    schema_version: str | None = None
+    cadence: str | None = None
+    as_of: str | None = None
+
+
+@dataclass(frozen=True)
+class _ReportCandidate:
+    path: Path
+    report: dict[str, Any] | None
+    artifact_id: str
+    classification: CandidateClassification
+    fingerprint: str | None = None
+    generated_at: dt.datetime | None = None
+
+
+def _relative_artifact_ids(paths: list[str | Path]) -> dict[Path, str]:
+    resolved = {Path(path).resolve() for path in paths}
+    if not resolved:
+        return {}
+    common_root = Path(os.path.commonpath([str(path.parent) for path in sorted(resolved, key=str)]))
+    return {Path(path): Path(path).resolve().relative_to(common_root).as_posix() for path in paths}
+
+
+def _classify_loaded_report(path: Path, report: Any, artifact_id: str) -> _ReportCandidate:
+    if not isinstance(report, dict):
+        classification = CandidateClassification(artifact_id, "INVALID", "report_object_invalid")
+        return _ReportCandidate(path, None, artifact_id, classification)
+    schema_version = report.get("schema_version") if report.get("schema_version") in {"5", "6"} else None
+    cadence = report.get("cadence") if report.get("cadence") in {"daily", "weekly", "monthly"} else None
+    as_of = report.get("as_of") if isinstance(report.get("as_of"), str) and report_as_of_date(report) else None
+    try:
+        validate_advisory_report(report)
+    except AdvisoryValidationError:
+        classification = CandidateClassification(
+            artifact_id, "INVALID", "contract_invalid", schema_version, cadence, as_of
+        )
+        return _ReportCandidate(path, None, artifact_id, classification)
+    try:
+        generated_at = normalize_aware_datetime(report["generated_at"])
+    except (KeyError, TimeContractError, TypeError, ValueError):
+        classification = CandidateClassification(
+            artifact_id, "INVALID", "generated_at_invalid", schema_version, cadence, as_of
+        )
+        return _ReportCandidate(path, None, artifact_id, classification)
+    classification = CandidateClassification(
+        artifact_id, "VALID", "valid", schema_version, cadence, as_of
+    )
+    return _ReportCandidate(path, report, artifact_id, classification, generated_at=generated_at)
+
+
+def classify_report_path(path: str | Path) -> CandidateClassification:
+    resolved = Path(path)
+    artifact_id = resolved.name
+    try:
+        report = load_report(resolved)
+    except (OSError, UnicodeError):
+        return CandidateClassification(artifact_id, "IO_INVALID", "io_invalid")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return CandidateClassification(artifact_id, "IO_INVALID", "json_invalid")
+    return _classify_loaded_report(resolved, report, artifact_id).classification
+
+
 def report_content_fingerprint(report: dict[str, Any]) -> str:
-    ignored_top_level_keys = {"as_of", "generated_at", "source_artifacts"}
+    ignored_top_level_keys = {
+        "as_of", "generated_at", "reference_time", "expires_at", "schema_version",
+        "contract_version", "source_artifacts",
+    }
     normalized = {key: value for key, value in report.items() if key not in ignored_top_level_keys}
+    freshness = normalized.get("freshness")
+    if isinstance(freshness, dict):
+        normalized["freshness"] = {
+            name: {
+                key: entry[key]
+                for key in ("present", "valid", "reason")
+                if key in entry
+            }
+            for name, entry in freshness.items()
+            if isinstance(entry, dict)
+        }
+    elif "freshness" not in normalized:
+        normalized["freshness"] = {
+            "ai_signal": {"present": False, "valid": False, "reason": "not_provided"},
+            "theme_momentum": {"present": False, "valid": False, "reason": "not_provided"},
+        }
+    summary = normalized.get("summary")
+    if isinstance(summary, dict) and isinstance(summary.get("data_quality_warnings"), list):
+        summary = dict(summary)
+        summary["data_quality_warnings"] = [
+            warning for warning in summary["data_quality_warnings"]
+            if not _is_compatibility_warning(warning)
+        ]
+        normalized["summary"] = summary
     return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _is_compatibility_warning(value: Any) -> bool:
+    return isinstance(value, str) and value.startswith(
+        ("compatibility:", "compatibility_", "schema_compatibility:", "schema_compatibility_")
+    )
 
 
 def report_as_of_date(report: dict[str, Any]) -> dt.date | None:
@@ -84,19 +188,59 @@ def is_same_period_duplicate(report: dict[str, Any], previous_report: dict[str, 
     return as_of == previous_as_of
 
 
-def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]:
-    unique_paths: list[Path] = []
-    seen_reports_by_fingerprint: dict[str, list[dict[str, Any]]] = {}
-    for report_path in report_paths:
-        path = Path(report_path)
+def _schema_rank(candidate: _ReportCandidate) -> int:
+    return {"5": 5, "6": 6}.get(candidate.classification.schema_version, -1)
+
+
+def _prefer_candidate(candidate: _ReportCandidate, current: _ReportCandidate) -> bool:
+    candidate_schema = _schema_rank(candidate)
+    current_schema = _schema_rank(current)
+    if candidate_schema != current_schema:
+        return candidate_schema > current_schema
+    candidate_time = candidate.generated_at or dt.datetime.min.replace(tzinfo=dt.UTC)
+    current_time = current.generated_at or dt.datetime.min.replace(tzinfo=dt.UTC)
+    if candidate_time != current_time:
+        return candidate_time > current_time
+    return candidate.artifact_id < current.artifact_id
+
+
+def _load_candidate(path: Path, artifact_id: str) -> _ReportCandidate:
+    try:
         report = load_report(path)
-        fingerprint = report_content_fingerprint(report)
-        previous_reports = seen_reports_by_fingerprint.setdefault(fingerprint, [])
-        if any(is_same_period_duplicate(report, previous) for previous in previous_reports):
+    except (OSError, UnicodeError):
+        return _ReportCandidate(path, None, artifact_id, CandidateClassification(artifact_id, "IO_INVALID", "io_invalid"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return _ReportCandidate(path, None, artifact_id, CandidateClassification(artifact_id, "IO_INVALID", "json_invalid"))
+    return _classify_loaded_report(path, report, artifact_id)
+
+
+def unique_report_paths_by_content(report_paths: list[str | Path]) -> list[Path]:
+    paths = [Path(path) for path in report_paths]
+    artifact_ids = _relative_artifact_ids(paths)
+    candidates = [_load_candidate(path, artifact_ids[path]) for path in paths]
+    selected: list[_ReportCandidate] = []
+    for candidate in candidates:
+        if candidate.classification.status != "VALID" or candidate.report is None:
             continue
-        previous_reports.append(report)
-        unique_paths.append(path)
-    return unique_paths
+        fingerprint = report_content_fingerprint(candidate.report)
+        candidate = _ReportCandidate(
+            candidate.path, candidate.report, candidate.artifact_id, candidate.classification,
+            fingerprint=fingerprint, generated_at=candidate.generated_at,
+        )
+        duplicate_index = next(
+            (
+                index for index, previous in enumerate(selected)
+                if previous.fingerprint == fingerprint
+                and previous.report is not None
+                and is_same_period_duplicate(candidate.report, previous.report)
+            ),
+            None,
+        )
+        if duplicate_index is None:
+            selected.append(candidate)
+        elif _prefer_candidate(candidate, selected[duplicate_index]):
+            selected[duplicate_index] = candidate
+    return [candidate.path for candidate in selected]
 
 
 def format_datetime(value: str) -> str:
