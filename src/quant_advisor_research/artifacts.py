@@ -6,7 +6,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from .contracts import REPORT_CONTRACT_VERSION, SOURCE_PROJECT
+from .contracts import SOURCE_PROJECT, validate_advisory_report
+from .time_contract import TimeContractError, contract_version_for_schema
+
+
+def contract_version_for_report(report: Mapping[str, Any]) -> str:
+    schema_version = report.get("schema_version")
+    if not isinstance(schema_version, str) or not schema_version.strip():
+        raise ValueError("schema_version_type_invalid")
+    try:
+        expected = contract_version_for_schema(schema_version)
+    except TimeContractError as exc:
+        raise ValueError("schema_version_unsupported") from exc
+    actual = report.get("contract_version")
+    if schema_version == "6" and actual != "model_recommendations.v6":
+        raise ValueError("v6_contract_version_required")
+    if actual is not None and actual != expected:
+        raise ValueError("contract_version_mismatch")
+    return expected
 
 
 def sha256_file(path: str | Path) -> str:
@@ -44,6 +61,7 @@ def write_report_manifest(
         raise FileNotFoundError(f"report JSON artifact not found: {resolved_report}")
     if not resolved_markdown.exists():
         raise FileNotFoundError(f"Markdown report artifact not found: {resolved_markdown}")
+    validate_advisory_report(report)
 
     version_parts = [
         str(report.get("as_of") or "unknown"),
@@ -62,7 +80,7 @@ def write_report_manifest(
     payload = {
         "manifest_type": "model_recommendation_report",
         "artifact_type": "model_recommendations",
-        "contract_version": REPORT_CONTRACT_VERSION,
+        "contract_version": contract_version_for_report(report),
         "schema_version": str(report.get("schema_version") or ""),
         "version": "-".join(version_parts),
         "mode": str(report.get("mode") or ""),
