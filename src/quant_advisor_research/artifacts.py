@@ -17,6 +17,8 @@ def contract_version_for_report(report: Mapping[str, Any]) -> str:
     except TimeContractError as exc:
         raise ValueError(str(exc)) from exc
     actual = report.get("contract_version")
+    if schema_version == "6" and actual is None:
+        raise ValueError("schema 6 report requires an explicit contract_version")
     if actual is not None and actual != expected:
         raise ValueError("report schema_version and contract_version do not match")
     return expected
