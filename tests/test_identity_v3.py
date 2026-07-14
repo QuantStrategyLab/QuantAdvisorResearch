@@ -144,6 +144,13 @@ def test_v3_same_semantic_digest_different_artifact_is_allowed() -> None:
     assert len(parse_v3_index(v3_payload(canonical, variant)).bindings) == 2
 
 
+def test_same_period_different_semantic_and_artifact_variants_are_allowed() -> None:
+    canonical = v3_entry(semantic_digest=DIGEST_A, artifact_digest=DIGEST_A)
+    variant = v3_entry(identity_class="V3_VARIANT", semantic_digest=DIGEST_B, artifact_digest=DIGEST_B)
+
+    assert len(parse_v3_index(v3_payload(canonical, variant)).bindings) == 2
+
+
 def test_semantic_digest_can_repeat_across_periods() -> None:
     first = v3_entry(semantic_digest=DIGEST_A, artifact_digest=DIGEST_A)
     second = v3_entry(as_of="2026-06-27", semantic_digest=DIGEST_A, artifact_digest=DIGEST_B)
@@ -245,6 +252,32 @@ def test_dispatcher_unknown_version_and_mapping_shape_fail_closed() -> None:
 
     with pytest.raises(IdentityMetadataError, match="invalid_reports_index"):
         parse_identity_index({"schema_version": "3", "reports": []})
+
+
+def test_dispatcher_preserves_v1_v2_identity_error_codes() -> None:
+    v1 = {
+        "schema_version": 1,
+        "reports": [{
+            "as_of": "2026-06-20", "cadence": "weekly",
+            "json": f"advisory_report_2026-06-20.variant-{DIGEST_A}.json",
+            "html": "2026-06-20-weekly-model-recommendations.html",
+        }],
+    }
+    with pytest.raises(IdentityMetadataError, match="v1_variant_unverified"):
+        parse_identity_index(v1)
+
+    v2 = {
+        "schema_version": 2,
+        "reports": [{
+            "period_key": "weekly:2026-06-15:2026-06-21", "as_of": "2026-06-20", "cadence": "weekly",
+            "schema_version": "5", "fingerprint_version": FINGERPRINT_VERSION,
+            "fingerprint_digest": "short", "json": "advisory_report_2026-06-20.json",
+            "html": "2026-06-20-weekly-model-recommendations.html", "canonical_identity": True,
+            "display_primary": True, "display_order": 0,
+        }],
+    }
+    with pytest.raises(IdentityMetadataError, match="invalid_fingerprint_digest"):
+        parse_identity_index(v2)
 
 
 class ExplodingMapping(Mapping[str, object]):

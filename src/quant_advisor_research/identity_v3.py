@@ -270,11 +270,15 @@ def parse_identity_index(payload: Mapping[str, Any]) -> V1ProvisionalIndex | V2I
     if schema_version == 1:
         try:
             return parse_v1_index(snapshot)
+        except IdentityMetadataError:
+            raise
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
             raise _error("invalid_reports_index") from None
     if schema_version == 2:
         try:
             return parse_v2_index(snapshot)
+        except IdentityMetadataError:
+            raise
         except (AttributeError, KeyError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
             raise _error("invalid_reports_index") from None
     if schema_version == V3_SCHEMA_VERSION:
