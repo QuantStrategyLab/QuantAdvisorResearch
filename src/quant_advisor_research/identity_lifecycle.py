@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
+from .contracts import AdvisoryValidationError, validate_advisory_report
 from .period_contract import PeriodContractError, canonical_period_identity
 
 
@@ -31,6 +33,12 @@ class IdentityMetadataError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class _EvidenceSeal:
+    kind: str
+    payload: tuple[object, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class V1ProvisionalBinding:
     period_key: str
     as_of: str
@@ -49,6 +57,7 @@ class VerifiedReportEvidence:
     fingerprint_version: str
     fingerprint_digest: str
     status: str = "VERIFIED_REPORT_EVIDENCE"
+    _seal: _EvidenceSeal | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +88,29 @@ class V1ProvisionalIndex:
 class V2IdentityIndex:
     schema_version: int
     bindings: tuple[V2IdentityBinding, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedIdentityEvidence:
+    binding: V2IdentityBinding
+    report_digest: str
+    _seal: _EvidenceSeal | None = field(default=None, repr=False, compare=False)
+
+
+@dataclass(frozen=True, slots=True)
+class AllocatedIdentity:
+    period_key: str
+    as_of: str
+    cadence: str
+    schema_version: str
+    fingerprint_version: str
+    fingerprint_digest: str
+    json_name: str
+    html_name: str
+    markdown_name: str | None
+    manifest_name: str | None
+    canonical_identity: bool
+    allocation_source: str
 
 
 def _error(code: str) -> IdentityMetadataError:
@@ -274,4 +306,170 @@ def make_verified_report_evidence(
         raise _error("invalid_schema_version")
     if type(fingerprint_digest) is not str or re.fullmatch(r"[0-9a-f]{64}", fingerprint_digest) is None:
         raise _error("invalid_fingerprint_digest")
-    return VerifiedReportEvidence(period_key, as_of, cadence, schema_version, FINGERPRINT_VERSION, fingerprint_digest)
+    payload = (period_key, as_of, cadence, schema_version, FINGERPRINT_VERSION, fingerprint_digest)
+    return VerifiedReportEvidence(*payload, _seal=_EvidenceSeal("report", payload))
+
+
+def _v1_binding_payload(binding: V1ProvisionalBinding) -> dict[str, object]:
+    return {
+        "as_of": binding.as_of,
+        "cadence": binding.cadence,
+        "json": binding.json_name,
+        "html": binding.html_name,
+    }
+
+
+def _v2_binding_payload(binding: V2IdentityBinding) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "period_key": binding.period_key,
+        "as_of": binding.as_of,
+        "cadence": binding.cadence,
+        "schema_version": binding.schema_version,
+        "fingerprint_version": binding.fingerprint_version,
+        "fingerprint_digest": binding.fingerprint_digest,
+        "json": binding.json_name,
+        "html": binding.html_name,
+        "canonical_identity": binding.canonical_identity,
+        "display_primary": binding.display_primary,
+        "display_order": binding.display_order,
+    }
+    if binding.markdown_name is not None:
+        payload["md"] = binding.markdown_name
+    if binding.manifest_name is not None:
+        payload["manifest"] = binding.manifest_name
+    return payload
+
+
+def _compute_report_evidence(report: object, provisional: V1ProvisionalBinding | None = None) -> tuple[str, str, str, str, str]:
+    if type(report) is not dict:
+        raise _error("report_invalid")
+    try:
+        validate_advisory_report(report)
+        as_of = _require_exact_type(report["as_of"], str, "report_invalid")
+        cadence = _require_exact_type(report["cadence"], str, "report_invalid")
+        schema_version = _require_exact_type(report["schema_version"], str, "report_invalid")
+        if schema_version not in {"5", "6"}:
+            raise _error("report_invalid")
+        period_key = _period_key(as_of, cadence)
+        if provisional is not None:
+            if not isinstance(provisional, V1ProvisionalBinding):
+                raise _error("identity_metadata_mismatch")
+            parsed = _validate_v1_entry(_v1_binding_payload(provisional))
+            if parsed != provisional or (parsed.as_of, parsed.cadence) != (as_of, cadence):
+                raise _error("identity_metadata_mismatch")
+        from .publisher import report_content_fingerprint
+
+        fingerprint = report_content_fingerprint(report)
+        digest = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()
+    except IdentityMetadataError:
+        raise
+    except (AdvisoryValidationError, AttributeError, KeyError, TypeError, ValueError, OverflowError):
+        raise _error("report_invalid") from None
+    return period_key, as_of, cadence, schema_version, digest
+
+
+def _valid_report_seal(evidence: VerifiedReportEvidence) -> bool:
+    payload = (
+        evidence.period_key, evidence.as_of, evidence.cadence, evidence.schema_version,
+        evidence.fingerprint_version, evidence.fingerprint_digest,
+    )
+    return isinstance(evidence._seal, _EvidenceSeal) and evidence._seal == _EvidenceSeal("report", payload)
+
+
+def verify_report_evidence(
+    report: object,
+    *,
+    provisional: V1ProvisionalBinding | None = None,
+    expected: VerifiedReportEvidence | None = None,
+) -> VerifiedReportEvidence:
+    period_key, as_of, cadence, schema_version, digest = _compute_report_evidence(report, provisional)
+    if expected is not None:
+        if not isinstance(expected, VerifiedReportEvidence) or not _valid_report_seal(expected):
+            raise _error("report_evidence_untrusted")
+        if (period_key, as_of, cadence, schema_version, digest) != (
+            expected.period_key, expected.as_of, expected.cadence, expected.schema_version, expected.fingerprint_digest
+        ):
+            raise _error("identity_content_conflict")
+    payload = (period_key, as_of, cadence, schema_version, FINGERPRINT_VERSION, digest)
+    return VerifiedReportEvidence(*payload, _seal=_EvidenceSeal("report", payload))
+
+
+def verify_existing_identity(report: object, binding: V2IdentityBinding) -> VerifiedIdentityEvidence:
+    if not isinstance(binding, V2IdentityBinding):
+        raise _error("identity_evidence_untrusted")
+    try:
+        validated = _validate_v2_entry(_v2_binding_payload(binding))
+    except IdentityMetadataError:
+        raise _error("identity_evidence_invalid") from None
+    period_key, as_of, cadence, schema_version, digest = _compute_report_evidence(report)
+    if (period_key, as_of, cadence, schema_version) != (
+        validated.period_key, validated.as_of, validated.cadence, validated.schema_version
+    ):
+        raise _error("identity_metadata_mismatch")
+    if digest != validated.fingerprint_digest:
+        raise _error("identity_content_conflict")
+    payload = (validated, digest)
+    return VerifiedIdentityEvidence(validated, digest, _EvidenceSeal("identity", payload))
+
+
+def _valid_identity_evidence(evidence: VerifiedIdentityEvidence) -> bool:
+    if not isinstance(evidence, VerifiedIdentityEvidence):
+        return False
+    return isinstance(evidence._seal, _EvidenceSeal) and evidence._seal == _EvidenceSeal(
+        "identity", (evidence.binding, evidence.report_digest)
+    )
+
+
+def _new_allocated_identity(evidence: VerifiedReportEvidence, *, canonical: bool, source: str) -> AllocatedIdentity:
+    suffix = "" if canonical else f".variant-{evidence.fingerprint_digest}"
+    return AllocatedIdentity(
+        evidence.period_key, evidence.as_of, evidence.cadence, evidence.schema_version,
+        FINGERPRINT_VERSION, evidence.fingerprint_digest,
+        f"advisory_report_{evidence.as_of}{suffix}.json",
+        f"{evidence.as_of}-{evidence.cadence}-model-recommendations{suffix}.html",
+        None, None, canonical, source,
+    )
+
+
+def allocate_identity(
+    evidence: VerifiedReportEvidence,
+    *,
+    existing_identities: tuple[VerifiedIdentityEvidence, ...] | list[VerifiedIdentityEvidence] = (),
+    current_period_key: str | None = None,
+) -> AllocatedIdentity:
+    if not isinstance(evidence, VerifiedReportEvidence) or not _valid_report_seal(evidence):
+        raise _error("report_evidence_untrusted")
+    if current_period_key is not None and not isinstance(current_period_key, str):
+        raise _error("period_mismatch")
+    identities = tuple(existing_identities)
+    if any(not _valid_identity_evidence(item) for item in identities):
+        raise _error("identity_evidence_untrusted")
+    bindings = tuple(item.binding for item in identities)
+    try:
+        _validate_v2_index(bindings)
+    except IdentityMetadataError:
+        raise
+    exact = [item for item in identities if item.binding.period_key == evidence.period_key and item.report_digest == evidence.fingerprint_digest]
+    if len(exact) > 1:
+        raise _error("identity_digest_conflict")
+    if exact:
+        binding = exact[0].binding
+        return AllocatedIdentity(
+            binding.period_key, binding.as_of, binding.cadence, binding.schema_version,
+            binding.fingerprint_version, binding.fingerprint_digest, binding.json_name, binding.html_name,
+            binding.markdown_name, binding.manifest_name, binding.canonical_identity, "REUSED_VERIFIED_IDENTITY",
+        )
+    canonical_exists = any(item.binding.period_key == evidence.period_key and item.binding.canonical_identity for item in identities)
+    canonical = current_period_key == evidence.period_key and not canonical_exists
+    allocated = _new_allocated_identity(
+        evidence, canonical=canonical, source="ALLOCATED_CANONICAL" if canonical else "ALLOCATED_VARIANT"
+    )
+    existing_names = {
+        name
+        for item in identities
+        for name in (item.binding.json_name, item.binding.html_name, item.binding.markdown_name, item.binding.manifest_name)
+        if name is not None
+    }
+    if any(name in existing_names for name in (allocated.json_name, allocated.html_name)):
+        raise _error("identity_artifact_conflict")
+    return allocated
