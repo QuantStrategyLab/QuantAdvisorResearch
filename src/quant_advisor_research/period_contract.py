@@ -43,13 +43,16 @@ def canonical_period_identity(cadence: str, as_of: str) -> CanonicalPeriod:
     if cadence == "daily":
         period_start = period_end = logical_date
     elif cadence == "weekly":
-        period_start = logical_date - dt.timedelta(days=logical_date.isoweekday() - 1)
-        period_end = period_start + dt.timedelta(days=6)
+        try:
+            period_start = logical_date - dt.timedelta(days=logical_date.isoweekday() - 1)
+            period_end = period_start + dt.timedelta(days=6)
+        except (OverflowError, ValueError) as error:
+            raise PeriodContractError("period_boundary_unrepresentable") from error
     else:
         period_start = logical_date.replace(day=1)
         if logical_date.month == 12:
-            next_month = dt.date(logical_date.year + 1, 1, 1)
+            period_end = dt.date(logical_date.year, 12, 31)
         else:
             next_month = dt.date(logical_date.year, logical_date.month + 1, 1)
-        period_end = next_month - dt.timedelta(days=1)
+            period_end = next_month - dt.timedelta(days=1)
     return CanonicalPeriod(cadence, period_start, period_end)

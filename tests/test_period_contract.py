@@ -95,3 +95,32 @@ def test_unapproved_explicit_bounds_do_not_affect_identity() -> None:
     ) == canonical_period_identity(
         v6_with_unapproved_bounds["cadence"], v6_with_unapproved_bounds["as_of"]
     )
+
+
+@pytest.mark.parametrize("as_of", [dt.date.min.isoformat(), dt.date.max.isoformat()])
+def test_daily_extreme_dates_are_representable(as_of: str) -> None:
+    period = canonical_period_identity("daily", as_of)
+
+    assert period.period_start == period.period_end == dt.date.fromisoformat(as_of)
+
+
+def test_weekly_date_min_is_representable() -> None:
+    period = canonical_period_identity("weekly", dt.date.min.isoformat())
+
+    assert period.period_start == dt.date.min
+    assert period.period_end == dt.date(1, 1, 7)
+
+
+def test_unrepresentable_weekly_maximum_date_boundary_is_fail_closed() -> None:
+    with pytest.raises(PeriodContractError) as error:
+        canonical_period_identity("weekly", dt.date.max.isoformat())
+
+    assert error.value.code == "period_boundary_unrepresentable"
+    assert str(error.value) == "period_boundary_unrepresentable"
+
+
+def test_monthly_maximum_date_uses_safe_calendar_month_end() -> None:
+    period = canonical_period_identity("monthly", dt.date.max.isoformat())
+
+    assert period.period_start == dt.date(9999, 12, 1)
+    assert period.period_end == dt.date.max
