@@ -42,9 +42,10 @@ def discover_report_paths(artifact_roots: list[str | Path], explicit_reports: li
 
     unique_paths: list[Path] = []
     seen: set[Path] = set()
-    root_candidates.sort(key=lambda item: str(item))
-    root_candidates.sort(key=lambda item: item.name, reverse=True)
-    candidates = explicit_candidates + root_candidates
+    all_candidates = explicit_candidates + root_candidates
+    all_candidates.sort(key=lambda item: str(item))
+    all_candidates.sort(key=lambda item: item.name, reverse=True)
+    candidates = all_candidates
     for path in candidates:
         resolved = path.resolve()
         if resolved in seen:

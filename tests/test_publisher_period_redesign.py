@@ -11,6 +11,7 @@ from quant_advisor_research.advisory_report import build_advisory_report
 from quant_advisor_research.archive_backfill import discover_report_paths
 from quant_advisor_research.publisher import (
     classify_report_path,
+    main as publisher_main,
     publish_reports,
     report_content_fingerprint,
     select_publish_candidates,
@@ -117,7 +118,7 @@ def test_discovery_returns_valid_and_malformed_siblings_for_later_validation(tmp
     assert set(discovered) == {valid, malformed}
 
 
-def test_discovery_keeps_explicit_priority_and_root_candidates_newest_first(tmp_path: Path) -> None:
+def test_discovery_orders_all_candidates_newest_first_with_stable_same_date_tie(tmp_path: Path) -> None:
     oldest = write_report(
         tmp_path / "root-a" / "advisory_report_2026-06-18.json", build_v5("2026-06-18")
     )
@@ -130,13 +131,12 @@ def test_discovery_keeps_explicit_priority_and_root_candidates_newest_first(tmp_
 
     discovered = discover_report_paths([tmp_path / "root-a", tmp_path / "root-b", tmp_path / "root-c"], [oldest])
 
-    assert discovered[0] == oldest
-    assert [path.name for path in discovered[1:]] == [newest.name, same_day_sibling.name]
-    assert discovered[1].parent < discovered[2].parent
+    assert [path.name for path in discovered] == [newest.name, same_day_sibling.name, oldest.name]
+    assert discovered[0].parent < discovered[1].parent
 
 
 def test_mandatory_current_is_pinned_over_higher_schema_history_duplicate(tmp_path: Path) -> None:
-    current = write_report(tmp_path / "current.json", build_v5())
+    current = write_report(tmp_path / "advisory_report_2026-06-20.json", build_v5())
     recovered = write_report(tmp_path / "recovered.json", build_v6())
 
     selection = select_publish_candidates(current, [recovered])
@@ -166,7 +166,7 @@ def test_invalid_current_with_valid_history_fails_before_site_write(tmp_path: Pa
 
 
 def test_valid_current_with_invalid_history_publishes_current(tmp_path: Path) -> None:
-    current = write_report(tmp_path / "current.json", build_v5())
+    current = write_report(tmp_path / "advisory_report_2026-06-20.json", build_v5())
     invalid_history = write_report(tmp_path / "history.json", "[]")
     output = tmp_path / "site"
 
@@ -180,6 +180,51 @@ def test_valid_current_with_invalid_history_publishes_current(tmp_path: Path) ->
     )
 
     assert (output / "2026-06-20-weekly-model-recommendations.html").exists()
+
+
+@pytest.mark.parametrize("current_name", ["current.json", "advisory_report_2026-06-19.json"])
+def test_current_report_requires_validated_canonical_basename(tmp_path: Path, current_name: str) -> None:
+    current = write_report(tmp_path / current_name, build_v5("2026-06-20"))
+    output = tmp_path / "site"
+    output.mkdir()
+    sentinel = output / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="mandatory_current_filename_invalid"):
+        publish_reports(
+            [current],
+            output,
+            site_url="https://example.invalid",
+            feed_title="Test",
+            mandatory_current=current,
+            recovered_history=[],
+        )
+    assert list(output.iterdir()) == [sentinel]
+
+
+def test_direct_publisher_cli_rejects_mixed_invalid_before_site_write(tmp_path: Path) -> None:
+    valid = write_report(tmp_path / "advisory_report_2026-06-19.json", build_v5("2026-06-19"))
+    corrupt = write_report(tmp_path / "advisory_report_2026-06-20.json", "{not-json")
+    output = tmp_path / "site"
+    output.mkdir()
+    sentinel = output / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid_report_candidate"):
+        publisher_main(
+            ["--reports", str(corrupt), str(valid), "--output-dir", str(output)]
+        )
+    assert list(output.iterdir()) == [sentinel]
+
+
+def test_direct_publisher_cli_keeps_all_valid_history_compatibility(tmp_path: Path) -> None:
+    first = write_report(tmp_path / "advisory_report_2026-06-19.json", build_v5("2026-06-19"))
+    second = write_report(tmp_path / "advisory_report_2026-06-20.json", build_v5("2026-06-20"))
+    output = tmp_path / "site"
+
+    publisher_main(["--reports", str(first), str(second), "--output-dir", str(output)])
+
+    assert (output / "index.html").exists()
 
 
 def test_selected_fingerprint_collision_fails_before_site_write(tmp_path: Path) -> None:

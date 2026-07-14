@@ -257,6 +257,10 @@ def select_publish_candidates(
         raise ValueError("mandatory_current_missing")
     if mandatory_candidate is not None and mandatory_candidate.report is None:
         return CandidateSelection(tuple(), quarantined, "INVALID")
+    if mandatory_candidate is not None:
+        expected_name = f"advisory_report_{mandatory_candidate.as_of.isoformat()}.json"
+        if mandatory_candidate.path.name != expected_name:
+            return CandidateSelection(tuple(), quarantined, "INVALID_FILENAME")
 
     valid_candidates = [candidate for candidate in candidates if candidate.report is not None]
     grouped: dict[tuple[str, str], list[_ReportCandidate]] = {}
@@ -279,6 +283,8 @@ def require_publish_candidates(
     recovered_history: list[str | Path],
 ) -> CandidateSelection:
     selection = select_publish_candidates(mandatory_current, recovered_history)
+    if mandatory_current is not None and selection.mandatory_current_status == "INVALID_FILENAME":
+        raise ValueError("mandatory_current_filename_invalid")
     if mandatory_current is not None and selection.mandatory_current_status != "VALID_SELECTED":
         raise ValueError("mandatory_current_invalid")
     if mandatory_current is None and recovered_history and not selection.selected_paths:
@@ -1447,6 +1453,7 @@ def publish_reports(
     feed_title: str,
     mandatory_current: str | Path | None = None,
     recovered_history: list[str | Path] | None = None,
+    reject_invalid: bool = False,
 ) -> list[Path]:
     if mandatory_current is None:
         selection = require_publish_candidates(None, report_paths)
@@ -1455,6 +1462,8 @@ def publish_reports(
             path for path in report_paths if Path(path).resolve() != Path(mandatory_current).resolve()
         ]
         selection = require_publish_candidates(mandatory_current, history)
+    if reject_invalid and selection.quarantined:
+        raise ValueError("invalid_report_candidate")
     preflight_publish_destinations(list(selection.selected_paths))
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -1494,7 +1503,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
-    publish_reports(args.reports, args.output_dir, site_url=args.site_url, feed_title=args.feed_title)
+    publish_reports(
+        args.reports,
+        args.output_dir,
+        site_url=args.site_url,
+        feed_title=args.feed_title,
+        reject_invalid=True,
+    )
 
 
 if __name__ == "__main__":

@@ -137,6 +137,26 @@ def test_archive_backfill_collision_fails_before_existing_site_write(tmp_path: P
     assert first_payload["as_of"] == second_payload["as_of"]
 
 
+def test_backfill_current_report_requires_canonical_validated_basename(tmp_path: Path) -> None:
+    current = build_fixture_report(tmp_path / "artifacts", dt.date(2026, 5, 31))
+    noncanonical = tmp_path / "current.json"
+    noncanonical.write_text(current.read_text(encoding="utf-8"), encoding="utf-8")
+    output = tmp_path / "site"
+    output.mkdir()
+    sentinel = output / "sentinel.txt"
+    sentinel.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="mandatory_current_filename_invalid"):
+        backfill_site_archive(
+            report_paths=[noncanonical],
+            current_report=noncanonical,
+            output_dir=output,
+            site_url="https://example.invalid/advisor",
+            feed_title="Test",
+        )
+    assert list(output.iterdir()) == [sentinel]
+
+
 def test_build_pipeline_collision_fails_before_site_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     recovered = build_fixture_report(tmp_path / "recovered", dt.date(2026, 5, 31))
     recovered_payload = json.loads(recovered.read_text(encoding="utf-8"))
