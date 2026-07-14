@@ -156,13 +156,17 @@ def recover_published_reports(
 
     paths: list[Path] = []
     current_as_of_text = current_as_of.isoformat()
+    current_canonical_name = f"advisory_report_{current_as_of_text}.json"
     seen_names: set[str] = set()
     for item in index.get("reports", []):
         if not isinstance(item, dict):
             continue
         as_of = str(item.get("as_of", "")).strip()
-        json_name = Path(str(item.get("json", ""))).name
-        if not as_of or as_of == current_as_of_text or json_name in seen_names or not REPORT_JSON_PATTERN.fullmatch(json_name):
+        json_value = item.get("json")
+        if not isinstance(json_value, str) or json_value != Path(json_value).name:
+            continue
+        json_name = json_value
+        if not as_of or json_name == current_canonical_name or json_name in seen_names or not REPORT_JSON_PATTERN.fullmatch(json_name):
             continue
         seen_names.add(json_name)
         url = f"{site_url.rstrip('/')}/{quote(json_name)}"

@@ -133,6 +133,59 @@ def test_archive_backfill_same_identity_different_fingerprint_publishes_variant(
     assert first_payload["as_of"] == second_payload["as_of"]
 
 
+def test_recover_published_reports_keeps_same_day_variants_but_skips_current_canonical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    current = build_fixture_report(tmp_path / "current", dt.date(2026, 5, 31))
+    variant_payload = json.loads(current.read_text(encoding="utf-8"))
+    variant_payload["recommendations"][0]["reasons"] = ["different semantic content"]
+    variant = tmp_path / "variant.json"
+    variant.write_text(json.dumps(variant_payload), encoding="utf-8")
+    older = build_fixture_report(tmp_path / "older", dt.date(2026, 5, 24))
+    payloads = {
+        "advisory_report_2026-05-31.json": current.read_bytes(),
+        "advisory_report_2026-05-31.variant-0123456789ab.json": variant.read_bytes(),
+        "advisory_report_2026-05-24.json": older.read_bytes(),
+    }
+    index = {
+        "reports": [
+            {"as_of": "2026-05-31", "json": "advisory_report_2026-05-31.json"},
+            {"as_of": "2026-05-31", "json": "advisory_report_2026-05-31.variant-0123456789ab.json"},
+            {"as_of": "2026-05-24", "json": "advisory_report_2026-05-24.json"},
+            {"as_of": "2026-05-31", "json": "nested/advisory_report_2026-05-31.json"},
+        ]
+    }
+
+    class Response:
+        def __init__(self, body: bytes) -> None:
+            self.body = body
+
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return self.body
+
+    def fake_urlopen(url: str, timeout: int) -> Response:
+        name = Path(url).name
+        return Response(json.dumps(index).encode() if name == "reports_index.json" else payloads[name])
+
+    monkeypatch.setattr(build_pipeline_module, "urlopen", fake_urlopen)
+    recovered = build_pipeline_module.recover_published_reports(
+        site_url="https://example.invalid/advisor",
+        history_dir=tmp_path / "history",
+        current_as_of=dt.date(2026, 5, 31),
+    )
+
+    assert [path.name for path in recovered] == [
+        "advisory_report_2026-05-31.variant-0123456789ab.json",
+        "advisory_report_2026-05-24.json",
+    ]
+
+
 def test_backfill_current_report_requires_canonical_validated_basename(tmp_path: Path) -> None:
     current = build_fixture_report(tmp_path / "artifacts", dt.date(2026, 5, 31))
     noncanonical = tmp_path / "current.json"
@@ -186,6 +239,11 @@ def test_build_pipeline_same_identity_different_fingerprint_publishes_variant(
         recover_site_archive=True,
     )
     assert any(path.name.startswith("2026-05-31-weekly-model-recommendations.variant-") for path in site.glob("*.html"))
+    reports_index = json.loads((site / "reports_index.json").read_text(encoding="utf-8"))
+    variant = next(item for item in reports_index["reports"] if ".variant-" in item["json"])
+    assert (site / variant["json"]).exists()
+    assert variant["html"] in (site / "archive.html").read_text(encoding="utf-8")
+    assert variant["html"] in (site / "feed.xml").read_text(encoding="utf-8")
 
 
 def test_cross_repo_smoke_uses_fixture_artifacts_without_network(tmp_path: Path) -> None:
