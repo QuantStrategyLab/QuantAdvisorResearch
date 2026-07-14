@@ -19,6 +19,9 @@ class VNextBindingError(ValueError):
         super().__init__(code)
 
 
+MAX_SAFE_JSON_INTEGER = 2**53 - 1
+
+
 _DATE = r"(?P<as_of>\d{4}-\d{2}-\d{2})"
 _DIGEST = r"(?P<digest>[0-9a-f]{64})"
 _CADENCE = r"(?P<cadence>daily|weekly|monthly)"
@@ -125,7 +128,12 @@ def validate_vnext_binding(entry: object) -> V3IdentityBinding:
     canonical = entry["canonical_identity"]
     primary = entry["display_primary"]
     order = entry["display_order"]
-    if type(canonical) is not bool or type(primary) is not bool or type(order) is not int or order < 0:
+    if (
+        type(canonical) is not bool
+        or type(primary) is not bool
+        or type(order) is not int
+        or not 0 <= order <= MAX_SAFE_JSON_INTEGER
+    ):
         raise _error("identity_binding_invalid")
     if (identity_class == V3_CANONICAL) != canonical:
         raise _error("identity_metadata_mismatch")
@@ -154,4 +162,4 @@ def validate_vnext_binding(entry: object) -> V3IdentityBinding:
     )
 
 
-__all__ = ["VNextBindingError", "binding_payload", "validate_vnext_binding"]
+__all__ = ["MAX_SAFE_JSON_INTEGER", "VNextBindingError", "binding_payload", "validate_vnext_binding"]

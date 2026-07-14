@@ -27,7 +27,7 @@ from .identity_v3 import (
 from .period_contract import PeriodContractError, canonical_period_identity
 from .publisher import report_content_fingerprint
 from .time_contract import TimeContractError, contract_version_for_schema
-from .vnext_binding import VNextBindingError, validate_vnext_binding
+from .vnext_binding import MAX_SAFE_JSON_INTEGER, VNextBindingError, validate_vnext_binding
 
 
 class PublicationPlanError(ValueError):
@@ -174,7 +174,7 @@ class PublicationEntry:
     role: PublicationRole
     display_primary: bool
     display_order: int
-    identity_namespace: str = "legacy"
+    identity_namespace: str
 
     def __post_init__(self) -> None:
         _validate_entry(self)
@@ -263,7 +263,11 @@ def _validate_entry(entry: PublicationEntry) -> None:
         raise _error("publication_role_invalid")
     if type(entry.identity_namespace) is not str or entry.identity_namespace not in {"legacy", "vnext"}:
         raise _error("identity_namespace_invalid")
-    if type(entry.display_primary) is not bool or type(entry.display_order) is not int or entry.display_order < 0:
+    if (
+        type(entry.display_primary) is not bool
+        or type(entry.display_order) is not int
+        or not 0 <= entry.display_order <= MAX_SAFE_JSON_INTEGER
+    ):
         raise _error("display_evidence_invalid")
     binding = _validate_binding(entry.binding, strict_vnext=entry.identity_namespace == "vnext")
     candidate = entry.candidate

@@ -17,7 +17,7 @@ from .publication_plan import (
     PublicationRole,
     SelectedCandidate,
 )
-from .vnext_binding import VNextBindingError, binding_payload, validate_vnext_binding
+from .vnext_binding import MAX_SAFE_JSON_INTEGER, VNextBindingError, binding_payload, validate_vnext_binding
 
 
 VNEXT_INDEX_SCHEMA = "qar_vnext.identity_index.v1"
@@ -207,7 +207,11 @@ def _validate_requested(value: object) -> RequestedArtifactSet:
 def _validate_display(value: object) -> DisplayPlacement:
     if type(value) is not DisplayPlacement:
         raise _error("display_evidence_required")
-    if type(value.display_primary) is not bool or type(value.display_order) is not int or value.display_order < 0:
+    if (
+        type(value.display_primary) is not bool
+        or type(value.display_order) is not int
+        or not 0 <= value.display_order <= MAX_SAFE_JSON_INTEGER
+    ):
         raise _error("display_evidence_invalid")
     return value
 
@@ -278,7 +282,7 @@ def allocate_vnext_identity(
         entry = None
         plan = None
         if context.mode is AllocationMode.CURRENT_MANDATORY:
-            entry = PublicationEntry(candidate, binding, PublicationRole.MANDATORY_CURRENT, display.display_primary, display.display_order, "vnext")
+            entry = PublicationEntry(candidate, binding, PublicationRole.MANDATORY_CURRENT, display.display_primary, display.display_order, identity_namespace="vnext")
             plan = PublicationPlan((entry,))
         return AllocationResult(binding, True, entry, plan)
     if context.mode is AllocationMode.EXACT_ARTIFACT_REUSE:
@@ -292,7 +296,7 @@ def allocate_vnext_identity(
     entry = None
     plan = None
     if context.mode is AllocationMode.CURRENT_MANDATORY:
-        entry = PublicationEntry(candidate, binding, PublicationRole.MANDATORY_CURRENT, display.display_primary, display.display_order, "vnext")
+        entry = PublicationEntry(candidate, binding, PublicationRole.MANDATORY_CURRENT, display.display_primary, display.display_order, identity_namespace="vnext")
         plan = PublicationPlan((entry,))
     return AllocationResult(binding, False, entry, plan)
 

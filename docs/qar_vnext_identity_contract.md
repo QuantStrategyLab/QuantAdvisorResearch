@@ -18,6 +18,12 @@ was not requested; a present key must contain a valid basename string. `null`,
 empty strings and other types are invalid and cannot be silently dropped by
 serialization.
 
+`PublicationEntry.identity_namespace` is explicit and required. `"vnext"`
+uses the shared clean validator; `"legacy"` remains an explicitly isolated
+old-runtime path. It is never inferred from filenames. `display_order` is a
+non-boolean integer in the inclusive range `0..(2**53-1)` at wire and
+in-memory boundaries.
+
 `EXACT_ARTIFACT_REUSE`, `CURRENT_MANDATORY` and `HISTORICAL_RECOVERY` validate
 all inputs before lookup. An identical current artifact reuses its immutable
 canonical binding; a changed artifact in an occupied period receives a full

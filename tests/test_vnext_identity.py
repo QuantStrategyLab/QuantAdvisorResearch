@@ -12,7 +12,7 @@ from quant_advisor_research.artifact_integrity import artifact_integrity_digest
 from quant_advisor_research.identity_lifecycle import FINGERPRINT_VERSION
 from quant_advisor_research.identity_v3 import V3_CANONICAL, V3_VARIANT
 from quant_advisor_research.period_contract import canonical_period_identity
-from quant_advisor_research.publication_plan import PublicationRole
+from quant_advisor_research.publication_plan import PublicationEntry, PublicationRole, SelectedCandidate
 from quant_advisor_research.publisher import report_content_fingerprint
 from quant_advisor_research.time_contract import contract_version_for_schema
 from quant_advisor_research.vnext_identity import (
@@ -26,6 +26,7 @@ from quant_advisor_research.vnext_identity import (
     parse_vnext_index,
     serialize_vnext_index,
 )
+from quant_advisor_research.vnext_binding import MAX_SAFE_JSON_INTEGER
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -116,6 +117,19 @@ def test_current_exact_reuses_canonical_and_new_display_does_not_rewrite_binding
     assert (result.publication_entry.display_primary, result.publication_entry.display_order) == (True, 8)
 
 
+def test_publication_entry_namespace_is_required() -> None:
+    value = report()
+    binding = index_for((value, True)).bindings[0]
+    with pytest.raises(TypeError):
+        PublicationEntry(  # type: ignore[call-arg]
+            SelectedCandidate.from_report(value, source_identity="source"),
+            binding,
+            PublicationRole.MANDATORY_CURRENT,
+            False,
+            0,
+        )
+
+
 def test_current_changed_artifact_in_occupied_period_is_variant() -> None:
     old = report()
     changed = report(generated_at="2026-07-15T00:00:00Z")
@@ -146,6 +160,23 @@ def test_exact_miss_validates_display_and_attachment_before_miss() -> None:
             report(), index=empty_vnext_index(), context=AllocationContext.exact_artifact_reuse(),
             requested_artifacts=replace(REQUESTED, include_markdown=1), display_placement=DISPLAY, source_identity="source",
         )
+
+
+@pytest.mark.parametrize("order", [0, MAX_SAFE_JSON_INTEGER])
+def test_display_order_safe_boundaries_are_accepted(order: int) -> None:
+    value = report()
+    index = index_for((value, True))
+    result = allocate(value, index, AllocationContext.current_mandatory(index.bindings[0].period_key), DisplayPlacement(True, order))
+    assert result.publication_entry is not None
+    assert result.publication_entry.display_order == order
+
+
+@pytest.mark.parametrize("order", [-1, MAX_SAFE_JSON_INTEGER + 1, True, "1"])
+def test_display_order_unsafe_values_are_rejected(order: object) -> None:
+    value = report()
+    index = index_for((value, True))
+    with pytest.raises(VNextIdentityError, match="display_evidence_invalid|identity_reuse_mismatch"):
+        allocate(value, index, AllocationContext.current_mandatory(index.bindings[0].period_key), DisplayPlacement(True, order))  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("cadence", ["daily", "weekly", "monthly"])

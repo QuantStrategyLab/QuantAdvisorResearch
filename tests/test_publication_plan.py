@@ -76,7 +76,14 @@ def candidate(value: dict, source: str) -> SelectedCandidate:
 
 
 def entry(value: dict, binding, role: PublicationRole, *, primary: bool = False, order: int = 0) -> PublicationEntry:
-    return PublicationEntry(candidate(value, f"source-{value['as_of']}-{binding.identity_class}"), binding, role, primary, order)
+    return PublicationEntry(
+        candidate(value, f"source-{value['as_of']}-{binding.identity_class}"),
+        binding,
+        role,
+        primary,
+        order,
+        identity_namespace="legacy",
+    )
 
 
 def test_current_source_can_bind_variant_public_target() -> None:
