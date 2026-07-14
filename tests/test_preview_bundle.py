@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import quant_advisor_research.preview_bundle as preview_bundle
 from quant_advisor_research.advisory_report import build_advisory_report
 from quant_advisor_research.preview_bundle import (
     BUNDLE_CONTRACT,
@@ -29,7 +30,6 @@ def report(*, cadence="daily", as_of="2026-06-20"):
 
 def test_daily_bundle_builds_and_readback_validates(tmp_path):
     output = tmp_path / "preview"
-    output.mkdir()
     result = build_preview_bundle(report(), output)
 
     assert result.bundle_contract == BUNDLE_CONTRACT
@@ -64,10 +64,9 @@ def test_daily_bundle_builds_and_readback_validates(tmp_path):
 @pytest.mark.parametrize("cadence", ["weekly", "monthly"])
 def test_non_daily_source_is_rejected_before_output(cadence, tmp_path):
     output = tmp_path / "preview"
-    output.mkdir()
     with pytest.raises(PreviewBundleError, match="daily_only"):
         build_preview_bundle(report(cadence=cadence), output)
-    assert list(output.iterdir()) == []
+    assert not output.exists()
 
 
 @pytest.mark.parametrize("mutation", [
@@ -79,17 +78,14 @@ def test_source_contract_mutations_fail_closed_without_partial_output(mutation, 
     value = report()
     mutation(value)
     output = tmp_path / "preview"
-    output.mkdir()
     with pytest.raises(PreviewBundleError):
         build_preview_bundle(value, output)
-    assert list(output.iterdir()) == []
+    assert not output.exists()
 
 
 def test_build_is_deterministic_for_equivalent_mapping_order(tmp_path):
     left = tmp_path / "left"
     right = tmp_path / "right"
-    left.mkdir()
-    right.mkdir()
     value = report()
     reordered = {key: value[key] for key in reversed(list(value))}
     build_preview_bundle(value, left)
@@ -101,7 +97,6 @@ def test_build_is_deterministic_for_equivalent_mapping_order(tmp_path):
 
 def test_html_escapes_snapshot_and_has_only_fixed_relative_links(tmp_path):
     output = tmp_path / "preview"
-    output.mkdir()
     value = report()
     value["source_artifacts"]["political_events"] = "<script>alert('x')</script>"
     build_preview_bundle(value, output)
@@ -121,7 +116,6 @@ def test_html_escapes_snapshot_and_has_only_fixed_relative_links(tmp_path):
 ])
 def test_readback_tamper_and_extra_file_fail_closed(tamper, tmp_path):
     output = tmp_path / "preview"
-    output.mkdir()
     build_preview_bundle(report(), output)
     tamper(output)
     with pytest.raises(PreviewBundleError):
@@ -133,6 +127,51 @@ def test_non_empty_output_fails_without_touching_sentinel(tmp_path):
     output.mkdir()
     sentinel = output / "sentinel"
     sentinel.write_text("keep")
-    with pytest.raises(PreviewBundleError, match="output_not_empty"):
+    with pytest.raises(PreviewBundleError, match="output_exists"):
         build_preview_bundle(report(), output)
     assert sentinel.read_text() == "keep"
+
+
+def test_destination_is_not_visible_during_staging_readback(tmp_path, monkeypatch):
+    output = tmp_path / "preview"
+    observed = []
+    original = preview_bundle.read_preview_bundle
+
+    def inspect(path):
+        observed.append(Path(path))
+        assert not output.exists()
+        return original(path)
+
+    monkeypatch.setattr(preview_bundle, "read_preview_bundle", inspect)
+    build_preview_bundle(report(), output)
+    assert len(observed) == 1
+    assert output.is_dir()
+
+
+def test_concurrent_destination_winner_is_not_overwritten_or_cleaned(tmp_path, monkeypatch):
+    output = tmp_path / "preview"
+    real_rename = preview_bundle.os.rename
+
+    def concurrent_winner(source, destination):
+        Path(destination).mkdir()
+        raise FileExistsError(destination)
+
+    monkeypatch.setattr(preview_bundle.os, "rename", concurrent_winner)
+    with pytest.raises(PreviewBundleError, match="output_exists"):
+        build_preview_bundle(report(), output)
+    assert output.is_dir()
+    assert not list(tmp_path.glob(".preview.staging-*"))
+    monkeypatch.setattr(preview_bundle.os, "rename", real_rename)
+
+
+def test_staging_directory_is_cleaned_when_install_fails(tmp_path, monkeypatch):
+    output = tmp_path / "preview"
+
+    def fail_readback(_path):
+        raise PreviewBundleError("forced_readback_failure")
+
+    monkeypatch.setattr(preview_bundle, "read_preview_bundle", fail_readback)
+    with pytest.raises(PreviewBundleError, match="output_write_failed"):
+        build_preview_bundle(report(), output)
+    assert not output.exists()
+    assert not list(tmp_path.glob(".preview.staging-*"))

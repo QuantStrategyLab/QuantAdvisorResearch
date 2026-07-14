@@ -106,45 +106,46 @@ def _manifest(snapshot: Mapping[str, object], report_bytes: bytes, html_bytes: b
     }
 
 
-def _output_dir(path: str | Path) -> Path:
+def _output_parent(path: str | Path) -> Path:
     output = Path(path)
     try:
-        if not output.is_dir():
-            raise _error("output_directory_invalid")
-        if any(output.iterdir()):
-            raise _error("output_not_empty")
+        if output.exists():
+            raise _error("output_exists")
+        if not output.parent.is_dir():
+            raise _error("output_parent_invalid")
     except PreviewBundleError:
         raise
     except (OSError, TypeError, ValueError):
-        raise _error("output_directory_invalid") from None
+        raise _error("output_parent_invalid") from None
     return output
 
 
 def build_preview_bundle(report: Mapping[str, Any], output_dir: str | Path) -> PreviewBundleEvidence:
     """Validate once, build three deterministic bytes, then write an empty directory."""
     snapshot = _validated_source(report)
-    output = _output_dir(output_dir)
+    output = _output_parent(output_dir)
     report_bytes = _canonical_json(snapshot)
     html_bytes = _render_html(snapshot, report_bytes)
     manifest = _manifest(snapshot, report_bytes, html_bytes)
     manifest_bytes = _canonical_json(manifest)
     files = {"report.json": report_bytes, "report.html": html_bytes, "manifest.json": manifest_bytes}
-    temp_dir: str | None = None
+    staging_dir: str | None = None
     try:
-        temp_dir = tempfile.mkdtemp(prefix=".qar-preview-", dir=output)
+        staging_dir = tempfile.mkdtemp(prefix=f".{output.name}.staging-", dir=output.parent)
         for name, content in files.items():
-            Path(temp_dir, name).write_bytes(content)
-        for name in files:
-            os.replace(Path(temp_dir, name), output / name)
-        os.rmdir(temp_dir)
-        temp_dir = None
+            Path(staging_dir, name).write_bytes(content)
+        read_preview_bundle(staging_dir)
+        os.rename(staging_dir, output)
+        staging_dir = None
+    except FileExistsError:
+        raise _error("output_exists") from None
     except (OSError, TypeError, ValueError):
         raise _error("output_write_failed") from None
     finally:
-        if temp_dir is not None:
-            for child in Path(temp_dir).iterdir():
+        if staging_dir is not None:
+            for child in Path(staging_dir).iterdir():
                 child.unlink(missing_ok=True)
-            Path(temp_dir).rmdir()
+            Path(staging_dir).rmdir()
     return PreviewBundleEvidence(MappingProxyType(snapshot), MappingProxyType(manifest))
 
 
