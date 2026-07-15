@@ -31,11 +31,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.11"
       - name: Install advisor package
@@ -57,13 +57,13 @@ jobs:
             > "${RUNNER_TEMP}/qar-daily-preview-build-evidence.log"
           cat "${RUNNER_TEMP}/qar-daily-preview-build-evidence.log"
       - name: Upload daily preview artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: qar-daily-preview-reslice
           path: ${{ runner.temp }}/qar-daily-preview
           if-no-files-found: error
       - name: Download daily preview artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: qar-daily-preview-reslice
           path: ${{ runner.temp }}/qar-daily-preview-downloaded

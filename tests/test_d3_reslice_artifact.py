@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -88,3 +89,16 @@ def test_reslice_workflow_paths_cover_fixture_and_transitive_contract_inputs():
         "uv.lock",
     ):
         assert path in workflow
+
+
+def test_reslice_workflow_action_inventory_uses_immutable_full_shas():
+    workflow = (ROOT / ".github/workflows/qar_vnext_d3_daily_preview_artifact_reslice.yml").read_text()
+    expected = {
+        "actions/checkout": "df4cb1c069e1874edd31b4311f1884172cec0e10",
+        "actions/setup-python": "ece7cb06caefa5fff74198d8649806c4678c61a1",
+        "actions/upload-artifact": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "actions/download-artifact": "37930b1c2abaa49bbe596cd826c3c89aef350131",
+    }
+    uses = re.findall(r"^\s+uses:\s+([^\s#]+)\s+#\s+(v\d+)$", workflow, flags=re.MULTILINE)
+    assert dict(item[0].split("@", 1) for item in uses) == expected
+    assert not re.search(r"^\s+uses:\s+[^\s]+@(v\d+|main|master|[0-9a-f]{7,39})\b", workflow, flags=re.MULTILINE)
