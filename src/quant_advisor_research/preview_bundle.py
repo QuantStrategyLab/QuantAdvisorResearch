@@ -1,4 +1,9 @@
-"""Concrete daily report-to-preview bundle with no legacy or runtime integration."""
+"""Concrete daily preview bundle with an explicit trusted-parent boundary.
+
+The caller must provide a stable, non-symlink parent and coordinate all writers
+through the bundle install lock. This module fails closed for filesystem races
+within that contract; it does not claim to pin hostile ancestor replacement.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -110,27 +115,30 @@ def _manifest(snapshot: Mapping[str, object], report_bytes: bytes, html_bytes: b
 
 def _output_parent(path: str | Path) -> Path:
     output = Path(path)
+    _assert_parent_chain(output)
     try:
-        current = output.parent
-        os.lstat(current)
-        while True:
-            parent_stat = os.lstat(current)
-            if stat.S_ISLNK(parent_stat.st_mode) or not stat.S_ISDIR(parent_stat.st_mode):
-                raise _error("output_parent_invalid")
-            if current.parent == current:
-                break
-            current = current.parent
         os.lstat(output)
         raise _error("output_exists")
     except FileNotFoundError:
-        if current == output.parent:
-            raise _error("output_parent_invalid") from None
         return output
+    except (OSError, TypeError, ValueError):
+        raise _error("output_exists") from None
+
+
+def _assert_parent_chain(path: Path) -> None:
+    try:
+        current = path.parent
+        while True:
+            info = os.lstat(current)
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+                raise _error("output_parent_invalid")
+            if current.parent == current:
+                return
+            current = current.parent
     except PreviewBundleError:
         raise
     except (OSError, TypeError, ValueError):
-        raise _error("output_exists") from None
-    return output
+        raise _error("output_parent_invalid") from None
 
 
 def _assert_directory(path: Path) -> None:
@@ -241,8 +249,31 @@ def _cleanup_staging(path: Path) -> None:
         pass
 
 
-def _read_bundle_files(output: Path) -> tuple[bytes, bytes, bytes]:
+def _fsync_directory(path: Path) -> None:
+    fd = -1
     try:
+        fd = os.open(path, _safe_file_flags(os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)))
+        os.fsync(fd)
+    except PreviewBundleError:
+        raise
+    except (OSError, TypeError, ValueError):
+        raise _error("output_write_failed") from None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def _read_bundle_files(output: Path, *, allow_install_lock: bool = False) -> tuple[bytes, bytes, bytes]:
+    try:
+        _assert_parent_chain(output)
+        lock = output.parent / f".{output.name}.install-lock"
+        if not allow_install_lock:
+            try:
+                os.lstat(lock)
+            except FileNotFoundError:
+                pass
+            else:
+                raise _error("readback_incomplete")
         output_info = os.lstat(output)
         if stat.S_ISLNK(output_info.st_mode) or not stat.S_ISDIR(output_info.st_mode):
             raise _error("readback_invalid")
@@ -273,10 +304,10 @@ def build_preview_bundle(report: Mapping[str, Any], output_dir: str | Path) -> P
     staging_dir: str | None = None
     lock_fd = -1
     lock_path: Path | None = None
+    output_created = False
+    install_succeeded = False
     try:
         output = _output_parent(output)
-        lock_fd, lock_path = _acquire_install_lock(output.parent, output)
-        _output_parent(output)
         staging_dir = tempfile.mkdtemp(prefix=f".{output.name}.staging-", dir=output.parent)
         staging_path = Path(staging_dir)
         _assert_directory(staging_path)
@@ -286,8 +317,15 @@ def build_preview_bundle(report: Mapping[str, Any], output_dir: str | Path) -> P
             read_preview_bundle(staging_path)
         except PreviewBundleError:
             raise _error("output_write_failed") from None
+        lock_fd, lock_path = _acquire_install_lock(output.parent, output)
         _output_parent(output)
-        os.rename(staging_dir, output)
+        os.mkdir(output, 0o700)
+        output_created = True
+        for name in files:
+            os.rename(staging_path / name, output / name)
+        _read_preview_bundle(output, allow_install_lock=True)
+        _fsync_directory(output)
+        install_succeeded = True
         staging_dir = None
     except FileExistsError:
         raise _error("output_exists") from None
@@ -298,6 +336,8 @@ def build_preview_bundle(report: Mapping[str, Any], output_dir: str | Path) -> P
     finally:
         if staging_dir is not None:
             _cleanup_staging(Path(staging_dir))
+        if output_created and not install_succeeded:
+            _cleanup_staging(output)
         if lock_fd >= 0 and lock_path is not None:
             _release_install_lock(lock_fd, lock_path)
     return PreviewBundleEvidence(MappingProxyType(snapshot), MappingProxyType(manifest))
@@ -311,9 +351,8 @@ def _parse_json_bytes(content: bytes) -> object:
         raise _error("readback_invalid") from None
 
 
-def read_preview_bundle(output_dir: str | Path) -> PreviewBundleEvidence:
-    output = Path(output_dir)
-    report_bytes, html_bytes, manifest_bytes = _read_bundle_files(output)
+def _read_preview_bundle(output: Path, *, allow_install_lock: bool = False) -> PreviewBundleEvidence:
+    report_bytes, html_bytes, manifest_bytes = _read_bundle_files(output, allow_install_lock=allow_install_lock)
 
     report = _parse_json_bytes(report_bytes)
     if not isinstance(report, Mapping):
@@ -341,6 +380,10 @@ def read_preview_bundle(output_dir: str | Path) -> PreviewBundleEvidence:
     if html_bytes != expected_html or html_bytes.count(b'href="report.json"') != 1 or html_bytes.count(b'href="manifest.json"') != 1:
         raise _error("html_links_invalid")
     return PreviewBundleEvidence(MappingProxyType(snapshot), MappingProxyType(dict(manifest)))
+
+
+def read_preview_bundle(output_dir: str | Path) -> PreviewBundleEvidence:
+    return _read_preview_bundle(Path(output_dir))
 
 
 __all__ = [

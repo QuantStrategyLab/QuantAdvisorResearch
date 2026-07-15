@@ -151,18 +151,37 @@ def test_destination_is_not_visible_during_staging_readback(tmp_path, monkeypatc
 
 def test_concurrent_destination_winner_is_not_overwritten_or_cleaned(tmp_path, monkeypatch):
     output = tmp_path / "preview"
-    real_rename = preview_bundle.os.rename
+    real_mkdir = preview_bundle.os.mkdir
 
-    def concurrent_winner(source, destination):
-        Path(destination).mkdir()
-        raise FileExistsError(destination)
+    def concurrent_winner(path, mode=0o777):
+        if Path(path) == output:
+            real_mkdir(path, mode)
+            (output / "winner").write_text("keep")
+            raise FileExistsError(path)
+        return real_mkdir(path, mode)
 
-    monkeypatch.setattr(preview_bundle.os, "rename", concurrent_winner)
+    monkeypatch.setattr(preview_bundle.os, "mkdir", concurrent_winner)
     with pytest.raises(PreviewBundleError, match="output_exists"):
         build_preview_bundle(report(), output)
-    assert output.is_dir()
+    assert (output / "winner").read_text() == "keep"
     assert not list(tmp_path.glob(".preview.staging-*"))
-    monkeypatch.setattr(preview_bundle.os, "rename", real_rename)
+
+
+def test_relative_output_dir_works_from_current_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    build_preview_bundle(report(), "preview")
+    assert {path.name for path in Path("preview").iterdir()} == {"report.json", "report.html", "manifest.json"}
+
+
+def test_readback_rejects_symlinked_ancestor(tmp_path):
+    real_parent = tmp_path / "real"
+    real_parent.mkdir()
+    output = real_parent / "preview"
+    build_preview_bundle(report(), output)
+    alias = tmp_path / "alias"
+    alias.symlink_to(real_parent, target_is_directory=True)
+    with pytest.raises(PreviewBundleError, match="readback"):
+        read_preview_bundle(alias / "preview")
 
 
 def test_staging_directory_is_cleaned_when_install_fails(tmp_path, monkeypatch):
