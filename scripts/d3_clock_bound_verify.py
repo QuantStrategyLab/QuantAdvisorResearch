@@ -25,6 +25,26 @@ def error(code: str) -> PreviewBundleError:
     return PreviewBundleError(code)
 
 
+def require_exact_files(artifact_dir: Path) -> None:
+    if sorted(path.name for path in artifact_dir.iterdir()) != FILES or any(
+        not (artifact_dir / name).is_file() for name in FILES
+    ):
+        raise error("file_set_invalid")
+
+
+def require_external_paths(artifact_dir: Path, *evidence_paths: Path) -> None:
+    try:
+        artifact_resolved = artifact_dir.resolve()
+        for evidence_path in evidence_paths:
+            evidence_resolved = evidence_path.resolve()
+            if evidence_resolved == artifact_resolved or artifact_resolved in evidence_resolved.parents:
+                raise error("evidence_path_inside_artifact")
+    except PreviewBundleError:
+        raise
+    except (OSError, RuntimeError, ValueError):
+        raise error("evidence_path_invalid") from None
+
+
 def canonical(value: object) -> bytes:
     try:
         return json.dumps(
@@ -38,6 +58,9 @@ def verify(args: argparse.Namespace) -> None:
     if BASE_SHA_RE.fullmatch(args.base_sha) is None or not args.frozen_generated_at:
         raise error("input_invalid")
     output = Path(args.artifact_dir)
+    build_evidence_path = Path(args.build_evidence_path)
+    evidence_path = Path(args.evidence_path)
+    require_external_paths(output, build_evidence_path, evidence_path)
     if sorted(path.name for path in output.iterdir()) != FILES:
         raise error("file_set_invalid")
     raw_manifest = (output / "manifest.json").read_bytes()
@@ -68,23 +91,31 @@ def verify(args: argparse.Namespace) -> None:
     ):
         raise error("contract_or_clock_drift")
     try:
-        build_evidence = json.loads(Path(args.build_evidence_path).read_text(encoding="utf-8"))
+        build_evidence = json.loads(build_evidence_path.read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError, UnicodeError, RecursionError):
         raise error("build_evidence_invalid") from None
     actual_hashes = {name: hashlib.sha256((output / name).read_bytes()).hexdigest() for name in FILES}
-    if (
-        not isinstance(build_evidence, dict)
-        or build_evidence.get("source_kind") != "repository_representative_fixture"
-        or build_evidence.get("base_sha") != args.base_sha
-        or build_evidence.get("bundle_contract") != BUNDLE
-        or build_evidence.get("frozen_generated_at") != args.frozen_generated_at
-        or build_evidence.get("producer_generated_at_values") != [args.frozen_generated_at, args.frozen_generated_at]
-        or build_evidence.get("manifest_generated_at_values") != [args.frozen_generated_at, args.frozen_generated_at]
-        or build_evidence.get("report_generated_at") != args.frozen_generated_at
-        or build_evidence.get("manifest_source") != source
-        or build_evidence.get("files") != FILES
-        or build_evidence.get("sha256") != actual_hashes
-    ):
+    expected_build_evidence = {
+        "source_kind": "repository_representative_fixture",
+        "base_sha": args.base_sha,
+        "bundle_contract": BUNDLE,
+        "frozen_generated_at": args.frozen_generated_at,
+        "producer_generated_at_values": [args.frozen_generated_at, args.frozen_generated_at],
+        "report_generated_at": args.frozen_generated_at,
+        "manifest_generated_at_values": [args.frozen_generated_at, args.frozen_generated_at],
+        "source": {
+            "cadence": "daily",
+            "as_of": report.get("as_of"),
+            "generated_at": args.frozen_generated_at,
+            "schema_version": SCHEMA,
+        },
+        "manifest_source": source,
+        "files": FILES,
+        "sha256": actual_hashes,
+        "repeat_build_bytes": True,
+        "deterministic_clock": {"mode": "frozen_harness", "generated_at": args.frozen_generated_at},
+    }
+    if build_evidence != expected_build_evidence:
         raise error("build_evidence_mismatch")
     payload = {
         "source_kind": "downloaded_repository_representative_fixture",
@@ -97,10 +128,10 @@ def verify(args: argparse.Namespace) -> None:
         "manifest_canonical_bytes": True,
         "build_evidence_bound": True,
     }
-    evidence_path = Path(args.evidence_path)
     if evidence_path.exists():
         raise error("evidence_exists")
     evidence_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    require_exact_files(output)
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
 

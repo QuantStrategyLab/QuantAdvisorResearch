@@ -74,3 +74,64 @@ def test_verify_rejects_manifest_clock_drift(tmp_path):
 
     assert result.returncode != 0
     assert "readback_failed" in result.stderr
+
+
+def test_verify_rejects_every_build_evidence_payload_shape_tamper(tmp_path):
+    output = tmp_path / "preview"
+    evidence = tmp_path / "build-evidence.json"
+    assert run_script(BUILD, *build_args(output, evidence)).returncode == 0
+    original = json.loads(evidence.read_text(encoding="utf-8"))
+
+    for key in original:
+        tampered = dict(original)
+        tampered.pop(key)
+        evidence.write_text(json.dumps(tampered), encoding="utf-8")
+        result = run_script(
+            VERIFY, "--artifact-dir", str(output), "--build-evidence-path", str(evidence),
+            "--evidence-path", str(tmp_path / f"download-{key}.json"), "--base-sha", BASE_SHA,
+            "--frozen-generated-at", FROZEN,
+        )
+        assert result.returncode != 0
+        evidence.write_text(json.dumps(original), encoding="utf-8")
+
+    tampered = dict(original)
+    tampered["unknown"] = "reject"
+    evidence.write_text(json.dumps(tampered), encoding="utf-8")
+    result = run_script(
+        VERIFY, "--artifact-dir", str(output), "--build-evidence-path", str(evidence),
+        "--evidence-path", str(tmp_path / "download-unknown.json"), "--base-sha", BASE_SHA,
+        "--frozen-generated-at", FROZEN,
+    )
+    assert result.returncode != 0
+
+
+def test_build_rejects_evidence_path_inside_artifact_before_writing(tmp_path):
+    output = tmp_path / "preview"
+    result = run_script(
+        BUILD,
+        *build_args(output, output / "build-evidence.json"),
+    )
+    assert result.returncode != 0
+    assert not output.exists()
+
+
+def test_verify_rejects_evidence_paths_inside_or_aliasing_artifact(tmp_path):
+    output = tmp_path / "preview"
+    evidence = tmp_path / "build-evidence.json"
+    assert run_script(BUILD, *build_args(output, evidence)).returncode == 0
+
+    inside = run_script(
+        VERIFY, "--artifact-dir", str(output), "--build-evidence-path", str(evidence),
+        "--evidence-path", str(output / "download.json"), "--base-sha", BASE_SHA,
+        "--frozen-generated-at", FROZEN,
+    )
+    assert inside.returncode != 0
+
+    alias = tmp_path / "alias"
+    alias.symlink_to(output, target_is_directory=True)
+    aliased = run_script(
+        VERIFY, "--artifact-dir", str(output), "--build-evidence-path", str(alias / "build.json"),
+        "--evidence-path", str(tmp_path / "download.json"), "--base-sha", BASE_SHA,
+        "--frozen-generated-at", FROZEN,
+    )
+    assert aliased.returncode != 0

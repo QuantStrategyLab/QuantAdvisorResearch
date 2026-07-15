@@ -33,6 +33,26 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def require_exact_files(artifact_dir: Path) -> None:
+    if sorted(path.name for path in artifact_dir.iterdir()) != FILES or any(
+        not (artifact_dir / name).is_file() for name in FILES
+    ):
+        raise error("file_set_invalid")
+
+
+def require_external_paths(artifact_dir: Path, *evidence_paths: Path) -> None:
+    try:
+        artifact_resolved = artifact_dir.resolve()
+        for evidence_path in evidence_paths:
+            evidence_resolved = evidence_path.resolve()
+            if evidence_resolved == artifact_resolved or artifact_resolved in evidence_resolved.parents:
+                raise error("evidence_path_inside_artifact")
+    except PreviewBundleError:
+        raise
+    except (OSError, RuntimeError, ValueError):
+        raise error("evidence_path_invalid") from None
+
+
 def contract_source(report: dict[str, object], manifest: dict[str, object], frozen: str) -> dict[str, object]:
     source = manifest.get("source")
     expected = {
@@ -60,6 +80,8 @@ def build(args: argparse.Namespace) -> None:
     events = Path(args.political_events)
     watchlist = Path(args.political_watchlist)
     output = Path(args.artifact_dir)
+    evidence_path = Path(args.evidence_path)
+    require_external_paths(output, evidence_path)
     if not events.is_file() or not watchlist.is_file():
         raise error("fixture_missing")
     repeat_parent = Path(tempfile.mkdtemp(prefix=f".{output.name}.repeat-", dir=output.parent))
@@ -103,12 +125,11 @@ def build(args: argparse.Namespace) -> None:
         }
     finally:
         shutil.rmtree(repeat_parent, ignore_errors=True)
-    if payload["files"] != FILES:
-        raise error("file_set_invalid")
-    evidence_path = Path(args.evidence_path)
+    require_exact_files(output)
     if evidence_path.exists():
         raise error("evidence_exists")
     evidence_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    require_exact_files(output)
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
 
