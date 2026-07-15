@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -175,3 +176,73 @@ def test_staging_directory_is_cleaned_when_install_fails(tmp_path, monkeypatch):
         build_preview_bundle(report(), output)
     assert not output.exists()
     assert not list(tmp_path.glob(".preview.staging-*"))
+
+
+def test_builder_rejects_symlink_member_without_touching_external_target(tmp_path, monkeypatch):
+    output = tmp_path / "preview"
+    external = tmp_path / "external.json"
+    external.write_bytes(b"keep")
+    original_mkdtemp = preview_bundle.tempfile.mkdtemp
+
+    def inject_symlink(**kwargs):
+        staging = original_mkdtemp(**kwargs)
+        (Path(staging) / "report.json").symlink_to(external)
+        return staging
+
+    monkeypatch.setattr(preview_bundle.tempfile, "mkdtemp", inject_symlink)
+    with pytest.raises(PreviewBundleError, match="output_write_failed"):
+        build_preview_bundle(report(), output)
+    assert external.read_bytes() == b"keep"
+    assert not output.exists()
+
+
+def test_readback_rejects_symlink_member(tmp_path):
+    output = tmp_path / "preview"
+    build_preview_bundle(report(), output)
+    member = output / "report.json"
+    original = member.read_bytes()
+    member.unlink()
+    outside = output.parent / "outside"
+    outside.write_bytes(original)
+    member.symlink_to(outside)
+    with pytest.raises(PreviewBundleError, match="readback"):
+        read_preview_bundle(output)
+
+
+def test_readback_rejects_fifo_member(tmp_path):
+    output = tmp_path / "preview"
+    build_preview_bundle(report(), output)
+    member = output / "report.json"
+    member.unlink()
+    os.mkfifo(member)
+    with pytest.raises(PreviewBundleError, match="readback"):
+        read_preview_bundle(output)
+
+
+def test_readback_rejects_hardlink_alias(tmp_path):
+    output = tmp_path / "preview"
+    build_preview_bundle(report(), output)
+    alias = tmp_path / "alias.json"
+    alias.hardlink_to(output / "report.json")
+    with pytest.raises(PreviewBundleError, match="readback"):
+        read_preview_bundle(output)
+
+
+def test_destination_symlink_is_rejected_without_following_it(tmp_path):
+    external = tmp_path / "external"
+    external.mkdir()
+    output = tmp_path / "preview"
+    output.symlink_to(external, target_is_directory=True)
+    with pytest.raises(PreviewBundleError, match="output_exists"):
+        build_preview_bundle(report(), output)
+    assert not (external / "report.json").exists()
+
+
+def test_parent_symlink_is_rejected_without_writing_through_alias(tmp_path):
+    real_parent = tmp_path / "real"
+    real_parent.mkdir()
+    alias_parent = tmp_path / "alias"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+    with pytest.raises(PreviewBundleError, match="output_parent_invalid"):
+        build_preview_bundle(report(), alias_parent / "preview")
+    assert not (real_parent / "preview").exists()

@@ -5,6 +5,7 @@ import hashlib
 import html
 import json
 import os
+import stat
 import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ _FIXED_FILES = frozenset({"report.json", "report.html", "manifest.json"})
 _MANIFEST_KEYS = frozenset({"bundle_contract", "source", "artifacts"})
 _SOURCE_KEYS = frozenset({"schema_version", "contract_version", "cadence", "as_of", "generated_at"})
 _ARTIFACT_KEYS = frozenset({"name", "role", "sha256"})
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", None)
 
 
 class PreviewBundleError(ValueError):
@@ -109,15 +111,154 @@ def _manifest(snapshot: Mapping[str, object], report_bytes: bytes, html_bytes: b
 def _output_parent(path: str | Path) -> Path:
     output = Path(path)
     try:
-        if output.exists():
-            raise _error("output_exists")
-        if not output.parent.is_dir():
-            raise _error("output_parent_invalid")
+        current = output.parent
+        os.lstat(current)
+        while True:
+            parent_stat = os.lstat(current)
+            if stat.S_ISLNK(parent_stat.st_mode) or not stat.S_ISDIR(parent_stat.st_mode):
+                raise _error("output_parent_invalid")
+            if current.parent == current:
+                break
+            current = current.parent
+        os.lstat(output)
+        raise _error("output_exists")
+    except FileNotFoundError:
+        if current == output.parent:
+            raise _error("output_parent_invalid") from None
+        return output
     except PreviewBundleError:
         raise
     except (OSError, TypeError, ValueError):
-        raise _error("output_parent_invalid") from None
+        raise _error("output_exists") from None
     return output
+
+
+def _assert_directory(path: Path) -> None:
+    try:
+        info = os.lstat(path)
+    except (OSError, TypeError, ValueError):
+        raise _error("output_write_failed") from None
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        raise _error("output_write_failed")
+
+
+def _safe_file_flags(base: int) -> int:
+    if _NOFOLLOW is None:
+        raise _error("filesystem_unsupported")
+    return base | _NOFOLLOW
+
+
+def _assert_regular_file(path: Path, descriptor: int | None = None) -> None:
+    try:
+        info = os.fstat(descriptor) if descriptor is not None else os.lstat(path)
+    except (OSError, TypeError, ValueError):
+        raise _error("filesystem_invalid") from None
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise _error("filesystem_invalid")
+    if descriptor is not None:
+        try:
+            path_info = os.lstat(path)
+        except OSError:
+            raise _error("filesystem_invalid") from None
+        if (path_info.st_dev, path_info.st_ino) != (info.st_dev, info.st_ino):
+            raise _error("filesystem_invalid")
+
+
+def _write_member(path: Path, content: bytes) -> None:
+    fd = -1
+    try:
+        fd = os.open(path, _safe_file_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL), 0o600)
+        _assert_regular_file(path, fd)
+        offset = 0
+        while offset < len(content):
+            offset += os.write(fd, content[offset:])
+        os.fsync(fd)
+        _assert_regular_file(path, fd)
+    except PreviewBundleError:
+        raise
+    except (OSError, TypeError, ValueError):
+        raise _error("output_write_failed") from None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def _read_member(path: Path) -> bytes:
+    fd = -1
+    try:
+        _assert_regular_file(path)
+        fd = os.open(path, _safe_file_flags(os.O_RDONLY))
+        _assert_regular_file(path, fd)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        _assert_regular_file(path, fd)
+        return b"".join(chunks)
+    except PreviewBundleError:
+        raise
+    except (OSError, TypeError, ValueError):
+        raise _error("readback_invalid") from None
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def _acquire_install_lock(parent: Path, output: Path) -> tuple[int, Path]:
+    lock = parent / f".{output.name}.install-lock"
+    try:
+        fd = os.open(lock, _safe_file_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL), 0o600)
+        _assert_regular_file(lock, fd)
+        return fd, lock
+    except PreviewBundleError:
+        raise
+    except (FileExistsError, OSError, TypeError, ValueError):
+        raise _error("output_exists") from None
+
+
+def _release_install_lock(fd: int, path: Path) -> None:
+    try:
+        os.close(fd)
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+def _cleanup_staging(path: Path) -> None:
+    try:
+        for entry in os.scandir(path):
+            child = Path(entry.path)
+            try:
+                os.unlink(child)
+            except IsADirectoryError:
+                os.rmdir(child)
+        os.rmdir(path)
+    except OSError:
+        pass
+
+
+def _read_bundle_files(output: Path) -> tuple[bytes, bytes, bytes]:
+    try:
+        output_info = os.lstat(output)
+        if stat.S_ISLNK(output_info.st_mode) or not stat.S_ISDIR(output_info.st_mode):
+            raise _error("readback_invalid")
+        if {entry.name for entry in os.scandir(output)} != _FIXED_FILES:
+            raise _error("readback_file_set_invalid")
+        return (
+            _read_member(output / "report.json"),
+            _read_member(output / "report.html"),
+            _read_member(output / "manifest.json"),
+        )
+    except PreviewBundleError as exc:
+        if exc.code == "readback_file_set_invalid":
+            raise
+        raise _error("readback_invalid") from None
+    except (OSError, TypeError, ValueError):
+        raise _error("readback_invalid") from None
 
 
 def build_preview_bundle(report: Mapping[str, Any], output_dir: str | Path) -> PreviewBundleEvidence:
@@ -130,22 +271,35 @@ def build_preview_bundle(report: Mapping[str, Any], output_dir: str | Path) -> P
     manifest_bytes = _canonical_json(manifest)
     files = {"report.json": report_bytes, "report.html": html_bytes, "manifest.json": manifest_bytes}
     staging_dir: str | None = None
+    lock_fd = -1
+    lock_path: Path | None = None
     try:
+        output = _output_parent(output)
+        lock_fd, lock_path = _acquire_install_lock(output.parent, output)
+        _output_parent(output)
         staging_dir = tempfile.mkdtemp(prefix=f".{output.name}.staging-", dir=output.parent)
+        staging_path = Path(staging_dir)
+        _assert_directory(staging_path)
         for name, content in files.items():
-            Path(staging_dir, name).write_bytes(content)
-        read_preview_bundle(staging_dir)
+            _write_member(staging_path / name, content)
+        try:
+            read_preview_bundle(staging_path)
+        except PreviewBundleError:
+            raise _error("output_write_failed") from None
+        _output_parent(output)
         os.rename(staging_dir, output)
         staging_dir = None
     except FileExistsError:
         raise _error("output_exists") from None
+    except PreviewBundleError:
+        raise
     except (OSError, TypeError, ValueError):
         raise _error("output_write_failed") from None
     finally:
         if staging_dir is not None:
-            for child in Path(staging_dir).iterdir():
-                child.unlink(missing_ok=True)
-            Path(staging_dir).rmdir()
+            _cleanup_staging(Path(staging_dir))
+        if lock_fd >= 0 and lock_path is not None:
+            _release_install_lock(lock_fd, lock_path)
     return PreviewBundleEvidence(MappingProxyType(snapshot), MappingProxyType(manifest))
 
 
@@ -159,16 +313,7 @@ def _parse_json_bytes(content: bytes) -> object:
 
 def read_preview_bundle(output_dir: str | Path) -> PreviewBundleEvidence:
     output = Path(output_dir)
-    try:
-        if not output.is_dir() or {item.name for item in output.iterdir()} != _FIXED_FILES:
-            raise _error("readback_file_set_invalid")
-        report_bytes = (output / "report.json").read_bytes()
-        html_bytes = (output / "report.html").read_bytes()
-        manifest_bytes = (output / "manifest.json").read_bytes()
-    except PreviewBundleError:
-        raise
-    except (OSError, TypeError, ValueError):
-        raise _error("readback_invalid") from None
+    report_bytes, html_bytes, manifest_bytes = _read_bundle_files(output)
 
     report = _parse_json_bytes(report_bytes)
     if not isinstance(report, Mapping):
@@ -179,6 +324,8 @@ def read_preview_bundle(output_dir: str | Path) -> PreviewBundleEvidence:
     manifest = _parse_json_bytes(manifest_bytes)
     if not isinstance(manifest, Mapping):
         raise _error("manifest_invalid")
+    if _canonical_json(manifest) != manifest_bytes:
+        raise _error("manifest_bytes_noncanonical")
     if set(manifest) != _MANIFEST_KEYS or set(manifest.get("source", {})) != _SOURCE_KEYS:
         raise _error("manifest_shape_invalid")
     artifacts = manifest.get("artifacts")
