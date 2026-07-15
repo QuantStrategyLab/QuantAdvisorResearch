@@ -1,0 +1,104 @@
+name: QAR D3 daily preview artifact
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/qar_d3_daily_preview_artifact.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "scripts/d3_*.py"
+      - "src/quant_advisor_research/**"
+      - "tests/test_d3_tool_agnostic.py"
+      - "examples/political_events.example.csv"
+      - "examples/political_watchlist.example.csv"
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "Daily representative fixture as_of"
+        required: false
+        default: "2026-06-20"
+      frozen_generated_at:
+        description: "Harness-only deterministic generated_at"
+        required: false
+        default: "2026-07-15T00:00:00Z"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    env:
+      INPUT_AS_OF: ${{ inputs.as_of || '2026-06-20' }}
+      FROZEN_GENERATED_AT: ${{ inputs.frozen_generated_at || '2026-07-15T00:00:00Z' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.11.19"
+      - name: Sync locked test environment
+        run: uv sync --locked --extra test
+      - name: Build representative previews
+        id: build
+        env:
+          BASE_SHA: ${{ github.sha }}
+          BUILD_ROOT: ${{ runner.temp }}/qar-d3
+        run: |
+          mkdir -p "$BUILD_ROOT"
+          uv run --no-sync python scripts/d3_build_daily_preview.py \
+            --as-of "$INPUT_AS_OF" \
+            --political-events examples/political_events.example.csv \
+            --political-watchlist examples/political_watchlist.example.csv \
+            --frozen-generated-at "$FROZEN_GENERATED_AT" \
+            --base-sha "$BASE_SHA" \
+            --uv-version "$(uv --version)" \
+            --lock-path uv.lock \
+            --temp-root "$BUILD_ROOT" \
+            --evidence-path "$BUILD_ROOT/build-evidence.json" \
+            --workspace-path-file "$BUILD_ROOT/workspace-path.txt"
+          echo "workspace=$(cat "$BUILD_ROOT/workspace-path.txt")" >> "$GITHUB_OUTPUT"
+          echo "evidence=$BUILD_ROOT/build-evidence.json" >> "$GITHUB_OUTPUT"
+      - name: Upload exact preview members
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: qar-d3-preview-bundle
+          path: ${{ steps.build.outputs.workspace }}/*
+          if-no-files-found: error
+      - name: Upload build evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: qar-d3-build-evidence
+          path: ${{ steps.build.outputs.evidence }}
+          if-no-files-found: error
+      - name: Download preview members
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: qar-d3-preview-bundle
+          path: ${{ runner.temp }}/qar-d3-download/bundle
+      - name: Download build evidence
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: qar-d3-build-evidence
+          path: ${{ runner.temp }}/qar-d3-download/evidence
+      - name: Verify downloaded artifact and full evidence binding
+        run: |
+          uv run --no-sync python scripts/d3_verify_daily_preview.py \
+            --workspace "${{ runner.temp }}/qar-d3-download/bundle" \
+            --evidence-path "${{ runner.temp }}/qar-d3-download/evidence/build-evidence.json" \
+            --base-sha "${{ github.sha }}" \
+            --uv-version "$(uv --version)" \
+            --lock-path uv.lock \
+            --as-of "$INPUT_AS_OF" \
+            --political-events examples/political_events.example.csv \
+            --political-watchlist examples/political_watchlist.example.csv \
+            --frozen-generated-at "$FROZEN_GENERATED_AT"
+      - name: Cleanup private preview workspaces
+        if: always()
+        run: rm -rf "${{ runner.temp }}/qar-d3"
