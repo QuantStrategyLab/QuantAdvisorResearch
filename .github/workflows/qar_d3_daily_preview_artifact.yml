@@ -1,0 +1,105 @@
+name: QAR D3 Daily Preview Artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "Representative daily report date"
+        required: true
+        default: "2026-06-20"
+        type: string
+      frozen_generated_at:
+        description: "Harness-only deterministic producer timestamp"
+        required: true
+        default: "2026-07-15T00:00:00Z"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Python # v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: python -m pip install -e ".[test]"
+
+      - name: Build two frozen-clock workspaces
+        id: build
+        env:
+          INPUT_AS_OF: ${{ inputs.as_of }}
+          FROZEN_GENERATED_AT: ${{ inputs.frozen_generated_at }}
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR="$RUNNER_TEMP/qar-d3-evidence"
+          mkdir -p "$EVIDENCE_DIR"
+          python scripts/d3_build_daily_preview.py \
+            --as-of "$INPUT_AS_OF" \
+            --political-events examples/political_events.example.csv \
+            --political-watchlist examples/political_watchlist.example.csv \
+            --frozen-generated-at "$FROZEN_GENERATED_AT" \
+            --base-sha "$GITHUB_SHA" \
+            --temp-root "$RUNNER_TEMP" \
+            --evidence-path "$EVIDENCE_DIR/build_evidence.json" \
+            --workspace-path-file "$RUNNER_TEMP/qar-d3-workspace.txt"
+          echo "workspace=$(cat "$RUNNER_TEMP/qar-d3-workspace.txt")" >> "$GITHUB_OUTPUT"
+          echo "evidence=$EVIDENCE_DIR/build_evidence.json" >> "$GITHUB_OUTPUT"
+
+      - name: Upload exact three-file preview artifact # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qar-daily-preview
+          path: ${{ steps.build.outputs.workspace }}/*
+          if-no-files-found: error
+
+      - name: Upload build evidence # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qar-daily-preview-build-evidence
+          path: ${{ steps.build.outputs.evidence }}
+          if-no-files-found: error
+
+      - name: Download preview artifact # v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: qar-daily-preview
+          path: ${{ runner.temp }}/qar-d3-download
+
+      - name: Download build evidence # v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: qar-daily-preview-build-evidence
+          path: ${{ runner.temp }}/qar-d3-evidence-download
+
+      - name: Verify downloaded artifact against full build evidence
+        env:
+          INPUT_AS_OF: ${{ inputs.as_of }}
+          FROZEN_GENERATED_AT: ${{ inputs.frozen_generated_at }}
+        run: |
+          set -euo pipefail
+          python scripts/d3_verify_daily_preview.py \
+            --workspace "$RUNNER_TEMP/qar-d3-download" \
+            --evidence-path "$RUNNER_TEMP/qar-d3-evidence-download/build_evidence.json" \
+            --base-sha "$GITHUB_SHA" \
+            --as-of "$INPUT_AS_OF" \
+            --political-events examples/political_events.example.csv \
+            --political-watchlist examples/political_watchlist.example.csv \
+            --frozen-generated-at "$FROZEN_GENERATED_AT" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Cleanup private workspace after evidence
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          if [ -f "$RUNNER_TEMP/qar-d3-workspace.txt" ]; then
+            workspace="$(cat "$RUNNER_TEMP/qar-d3-workspace.txt")"
+            rm -rf -- "$(dirname "$workspace")"
+          fi
