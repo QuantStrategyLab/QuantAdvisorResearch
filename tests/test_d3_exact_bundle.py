@@ -18,7 +18,18 @@ def _normal_bundle(path: Path) -> None:
 def test_exact_bundle_validator_returns_only_regular_single_link_members(tmp_path):
     bundle = tmp_path / "bundle"
     _normal_bundle(bundle)
-    assert tuple(validate_exact_bundle(bundle)) == ("manifest.json", "report.html", "report.json")
+    snapshot = validate_exact_bundle(bundle)
+    assert tuple(item.name for item in snapshot.members) == ("manifest.json", "report.html", "report.json")
+    assert snapshot.member("report.json").content == b"report.json"
+
+
+def test_snapshot_is_immutable_after_path_replacement(tmp_path):
+    bundle = tmp_path / "bundle"
+    _normal_bundle(bundle)
+    snapshot = validate_exact_bundle(bundle)
+    (bundle / "report.json").unlink()
+    (bundle / "report.json").write_text("replacement")
+    assert snapshot.member("report.json").content == b"report.json"
 
 
 @pytest.mark.parametrize("mutation", [

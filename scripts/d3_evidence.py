@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import stat
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 FIXED_FILES = ("manifest.json", "report.html", "report.json")
@@ -29,27 +31,99 @@ class EvidenceContractError(ValueError):
         super().__init__(code)
 
 
-def validate_exact_bundle(workspace: str | Path) -> dict[str, Path]:
-    """Validate all directory members before any caller reads or hashes them."""
-    root = Path(workspace)
+@dataclass(frozen=True, slots=True)
+class BundleMemberSnapshot:
+    name: str
+    content: bytes
+    sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class BundleSnapshot:
+    members: tuple[BundleMemberSnapshot, ...]
+
+    def member(self, name: str) -> BundleMemberSnapshot:
+        for item in self.members:
+            if item.name == name:
+                return item
+        raise EvidenceContractError("bundle_member_set_invalid")
+
+
+def _directory_flags() -> int:
+    required = ("O_DIRECTORY", "O_CLOEXEC", "O_NOFOLLOW")
+    if any(not hasattr(os, name) for name in required):
+        raise EvidenceContractError("filesystem_unsupported")
+    return os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+
+
+def _member_flags() -> int:
+    if any(not hasattr(os, name) for name in ("O_CLOEXEC", "O_NOFOLLOW")):
+        raise EvidenceContractError("filesystem_unsupported")
+    return os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC | os.O_NOFOLLOW
+
+
+def validate_exact_bundle(workspace: str | Path) -> BundleSnapshot:
+    """Return an immutable FD-bound snapshot after validating all members."""
+    root_fd = -1
     try:
-        root_info = root.lstat()
+        root_fd = os.open(workspace, _directory_flags())
+        root_info = os.fstat(root_fd)
         if not stat.S_ISDIR(root_info.st_mode) or stat.S_ISLNK(root_info.st_mode):
             raise EvidenceContractError("bundle_directory_invalid")
-        entries = list(os.scandir(root))
-        if {entry.name for entry in entries} != set(FIXED_FILES) or len(entries) != len(FIXED_FILES):
+        names = os.listdir(root_fd)
+        if set(names) != set(FIXED_FILES) or len(names) != len(FIXED_FILES):
             raise EvidenceContractError("bundle_member_set_invalid")
-        result: dict[str, Path] = {}
-        for entry in entries:
-            info = entry.stat(follow_symlinks=False)
-            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-                raise EvidenceContractError("bundle_member_invalid")
-            result[entry.name] = root / entry.name
-        return {name: result[name] for name in FIXED_FILES}
+        result: list[BundleMemberSnapshot] = []
+        for name in FIXED_FILES:
+            fd = -1
+            try:
+                fd = os.open(name, _member_flags(), dir_fd=root_fd)
+                info = os.fstat(fd)
+                if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise EvidenceContractError("bundle_member_invalid")
+                chunks: list[bytes] = []
+                while chunk := os.read(fd, 1024 * 1024):
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+                result.append(BundleMemberSnapshot(name, content, hashlib.sha256(content).hexdigest()))
+            finally:
+                if fd >= 0:
+                    os.close(fd)
+        if set(os.listdir(root_fd)) != set(FIXED_FILES):
+            raise EvidenceContractError("bundle_member_set_invalid")
+        return BundleSnapshot(tuple(result))
     except EvidenceContractError:
         raise
     except (OSError, TypeError, ValueError):
         raise EvidenceContractError("bundle_member_invalid") from None
+    finally:
+        if root_fd >= 0:
+            os.close(root_fd)
+
+
+def validate_preview_snapshot(snapshot: BundleSnapshot) -> tuple[Mapping[str, object], Mapping[str, object]]:
+    """Readback validation using only the immutable member bytes."""
+    try:
+        from quant_advisor_research.preview_bundle import _canonical_json, _manifest, _render_html, _validated_source
+        report_bytes = snapshot.member("report.json").content
+        html_bytes = snapshot.member("report.html").content
+        manifest_bytes = snapshot.member("manifest.json").content
+        report = json.loads(report_bytes.decode("utf-8"))
+        if not isinstance(report, Mapping):
+            raise EvidenceContractError("readback_invalid")
+        validated = _validated_source(report)
+        if _canonical_json(validated) != report_bytes:
+            raise EvidenceContractError("report_bytes_noncanonical")
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+        if not isinstance(manifest, Mapping) or manifest != _manifest(validated, report_bytes, html_bytes):
+            raise EvidenceContractError("manifest_mismatch")
+        if html_bytes != _render_html(validated, report_bytes) or html_bytes.count(b'href="report.json"') != 1 or html_bytes.count(b'href="manifest.json"') != 1:
+            raise EvidenceContractError("html_links_invalid")
+        return validated, manifest
+    except EvidenceContractError:
+        raise
+    except (UnicodeError, json.JSONDecodeError, TypeError, ValueError, OverflowError, RecursionError):
+        raise EvidenceContractError("readback_invalid") from None
 
 
 def canonical_distribution_snapshot(values: Iterable[str]) -> tuple[list[str], str]:
@@ -85,25 +159,46 @@ def locked_environment_evidence(*, lock_sha256: str, uv_version: str, python_ver
 
 
 def repository_file_hashes(repo_root: str | Path, paths: Iterable[str]) -> dict[str, str]:
-    root = Path(repo_root)
+    root_fd = -1
+    opened: list[int] = []
     try:
-        if not stat.S_ISDIR(root.lstat().st_mode):
+        root_fd = os.open(repo_root, _directory_flags())
+        if not stat.S_ISDIR(os.fstat(root_fd).st_mode):
             raise EvidenceContractError("dependency_root_invalid")
         result: dict[str, str] = {}
         for raw in paths:
             relative = Path(raw)
-            if type(raw) is not str or not raw or relative.is_absolute() or ".." in relative.parts or raw in result:
+            if type(raw) is not str or not raw or relative.is_absolute() or any(part in ("", ".", "..") for part in relative.parts) or raw in result:
                 raise EvidenceContractError("dependency_path_invalid")
-            target = root / relative
-            info = target.lstat()
-            if not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode) or info.st_nlink != 1:
-                raise EvidenceContractError("dependency_file_invalid")
-            result[raw] = hashlib.sha256(target.read_bytes()).hexdigest()
+            parent_fd = root_fd
+            traversed: list[int] = []
+            try:
+                for part in relative.parts[:-1]:
+                    next_fd = os.open(part, _directory_flags(), dir_fd=parent_fd)
+                    traversed.append(next_fd)
+                    parent_fd = next_fd
+                file_fd = os.open(relative.parts[-1], _member_flags(), dir_fd=parent_fd)
+                opened.append(file_fd)
+                info = os.fstat(file_fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise EvidenceContractError("dependency_file_invalid")
+                digest = hashlib.sha256()
+                while chunk := os.read(file_fd, 1024 * 1024):
+                    digest.update(chunk)
+                result[raw] = digest.hexdigest()
+            finally:
+                for fd in reversed(traversed):
+                    os.close(fd)
         return dict(sorted(result.items()))
     except EvidenceContractError:
         raise
     except (OSError, TypeError, ValueError, UnicodeError):
         raise EvidenceContractError("dependency_file_invalid") from None
+    finally:
+        for fd in opened:
+            os.close(fd)
+        if root_fd >= 0:
+            os.close(root_fd)
 
 
 def require_exact_locked_environment(value: object, expected: Mapping[str, object]) -> None:

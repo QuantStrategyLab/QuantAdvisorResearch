@@ -9,8 +9,7 @@ import json
 import platform
 from pathlib import Path
 
-from d3_evidence import DEPENDENCY_INVENTORY, EVIDENCE_VERSION, EvidenceContractError, locked_environment_evidence, repository_file_hashes, validate_exact_bundle
-from quant_advisor_research.preview_bundle import read_preview_bundle
+from d3_evidence import DEPENDENCY_INVENTORY, EVIDENCE_VERSION, BundleSnapshot, EvidenceContractError, locked_environment_evidence, repository_file_hashes, validate_exact_bundle, validate_preview_snapshot
 
 EXPECTED_KEYS = frozenset({"evidence_version", "base_sha", "head_sha", "source", "deterministic_clock", "workflow_dependency_inventory", "dependency_files", "locked_environment", "bundle", "repeat_build"})
 
@@ -19,9 +18,8 @@ def _distributions() -> list[str]:
     return sorted({f"{name}=={dist.version}" for dist in importlib.metadata.distributions() if (name := dist.metadata.get("Name"))})
 
 
-def _hashes(workspace: Path) -> dict[str, dict[str, object]]:
-    members = validate_exact_bundle(workspace)
-    return {name: {"sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "size": path.stat().st_size} for name, path in members.items()}
+def _hashes(snapshot: BundleSnapshot) -> dict[str, dict[str, object]]:
+    return {item.name: {"sha256": item.sha256, "size": len(item.content)} for item in snapshot.members}
 
 
 def verify(args: argparse.Namespace) -> None:
@@ -34,13 +32,11 @@ def verify(args: argparse.Namespace) -> None:
             raise EvidenceContractError("dependency_evidence_mismatch")
         environment = locked_environment_evidence(lock_sha256=hashlib.sha256(Path(args.lock_path).read_bytes()).hexdigest(), uv_version=args.uv_version, python_version=platform.python_version(), distributions=_distributions())
         expected_source = {"schema_version": "5", "contract_version": "model_recommendations.v5", "cadence": "daily", "as_of": args.as_of, "generated_at": args.frozen_generated_at}
-        workspace = Path(args.workspace)
-        members = validate_exact_bundle(workspace)
-        read_preview_bundle(workspace)
-        manifest = json.loads(members["manifest.json"].read_text(encoding="utf-8"))
+        snapshot = validate_exact_bundle(args.workspace)
+        _, manifest = validate_preview_snapshot(snapshot)
         if manifest.get("bundle_contract") != "qar.preview_bundle.v1" or manifest.get("source") != expected_source:
             raise EvidenceContractError("source_contract_mismatch")
-        files = _hashes(workspace)
+        files = _hashes(snapshot)
         expected = {
             "evidence_version": EVIDENCE_VERSION, "base_sha": args.base_sha, "head_sha": args.head_sha,
             "source": {"fixture_paths": [Path(args.political_events).as_posix(), Path(args.political_watchlist).as_posix()], "provenance": "repository_representative_fixture"},
