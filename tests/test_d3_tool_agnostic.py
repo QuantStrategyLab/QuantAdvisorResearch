@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
-from d3_evidence import EvidenceContractError, canonical_distribution_snapshot, locked_environment_evidence, require_exact_locked_environment
+from d3_evidence import EvidenceContractError, canonical_distribution_snapshot, locked_environment_evidence, require_exact_locked_environment, repository_file_hashes
 
 
 def test_environment_contract_is_pure_and_deterministic():
@@ -45,9 +45,24 @@ def test_invalid_toolchain_values_are_rejected_without_uv_lookup():
 
 
 def test_distribution_snapshot_is_sorted_and_hashed():
-    snapshot, digest = canonical_distribution_snapshot(["Zed==1.0", "alpha==2.0"])
-    assert snapshot == ["alpha==2.0", "Zed==1.0"]
+    snapshot, digest = canonical_distribution_snapshot(["Zed==1.0", "alpha==2.0", "ALPHA==2.0"])
+    assert snapshot == ["alpha==2.0", "zed==1.0"]
     assert len(digest) == 64
+
+
+def test_distribution_snapshot_rejects_pep503_name_version_conflict():
+    with pytest.raises(EvidenceContractError, match="distribution_snapshot_conflict"):
+        canonical_distribution_snapshot(["alpha_.==1.0", "ALPHA-==2.0"])
+
+
+def test_repository_file_hashes_is_canonical_and_rejects_unsafe_members(tmp_path):
+    (tmp_path / "a.txt").write_text("a")
+    assert repository_file_hashes(tmp_path, ["a.txt"]) == repository_file_hashes(tmp_path, ["a.txt"])
+    with pytest.raises(EvidenceContractError, match="dependency_path_invalid"):
+        repository_file_hashes(tmp_path, ["../a.txt"])
+    (tmp_path / "link.txt").symlink_to(tmp_path / "a.txt")
+    with pytest.raises(EvidenceContractError, match="dependency_file_invalid"):
+        repository_file_hashes(tmp_path, ["link.txt"])
 
 
 def test_d3_workflow_is_triggered_and_uses_locked_tooling():
@@ -57,6 +72,9 @@ def test_d3_workflow_is_triggered_and_uses_locked_tooling():
     assert "uv sync --locked --extra test" in workflow
     assert "uv run --no-sync python" in workflow
     assert "pip install" not in workflow
+    assert "path: ${{ steps.build.outputs.workspace }}/*" not in workflow
+    assert "--base-sha" in workflow and "--head-sha" in workflow
+    assert "--repo-root \"$GITHUB_WORKSPACE\"" in workflow
     assert "${{ inputs.as_of || '2026-06-20' }}" in workflow
     assert "${{ inputs.frozen_generated_at || '2026-07-15T00:00:00Z' }}" in workflow
     for action in (

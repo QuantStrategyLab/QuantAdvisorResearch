@@ -48,7 +48,9 @@ jobs:
       - name: Build representative previews
         id: build
         env:
-          BASE_SHA: ${{ github.sha }}
+          # PRs bind the real target/source commits; dispatch binds both to the documented workflow SHA.
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           BUILD_ROOT: ${{ runner.temp }}/qar-d3
         run: |
           mkdir -p "$BUILD_ROOT"
@@ -58,8 +60,10 @@ jobs:
             --political-watchlist examples/political_watchlist.example.csv \
             --frozen-generated-at "$FROZEN_GENERATED_AT" \
             --base-sha "$BASE_SHA" \
+            --head-sha "$HEAD_SHA" \
             --uv-version "$(uv --version)" \
             --lock-path uv.lock \
+            --repo-root "$GITHUB_WORKSPACE" \
             --temp-root "$BUILD_ROOT" \
             --evidence-path "$BUILD_ROOT/build-evidence.json" \
             --workspace-path-file "$BUILD_ROOT/workspace-path.txt"
@@ -69,7 +73,11 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: qar-d3-preview-bundle
-          path: ${{ steps.build.outputs.workspace }}/*
+          path: |
+            ${{ steps.build.outputs.workspace }}/report.json
+            ${{ steps.build.outputs.workspace }}/report.html
+            ${{ steps.build.outputs.workspace }}/manifest.json
+          include-hidden-files: true
           if-no-files-found: error
       - name: Upload build evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -92,9 +100,11 @@ jobs:
           uv run --no-sync python scripts/d3_verify_daily_preview.py \
             --workspace "${{ runner.temp }}/qar-d3-download/bundle" \
             --evidence-path "${{ runner.temp }}/qar-d3-download/evidence/build-evidence.json" \
-            --base-sha "${{ github.sha }}" \
+            --base-sha "${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.sha }}" \
+            --head-sha "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}" \
             --uv-version "$(uv --version)" \
             --lock-path uv.lock \
+            --repo-root "$GITHUB_WORKSPACE" \
             --as-of "$INPUT_AS_OF" \
             --political-events examples/political_events.example.csv \
             --political-watchlist examples/political_watchlist.example.csv \

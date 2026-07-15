@@ -9,22 +9,30 @@ import json
 import os
 import platform
 import re
-import subprocess
+import stat
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from d3_evidence import DEPENDENCY_INVENTORY, locked_environment_evidence
+from d3_evidence import DEPENDENCY_INVENTORY, EvidenceContractError, locked_environment_evidence, repository_file_hashes
 from quant_advisor_research.advisory_report import build_advisory_report
 from quant_advisor_research.preview_bundle import read_preview_bundle
 from quant_advisor_research.preview_workspace import build_preview_workspace
 
-EVIDENCE_VERSION = "qar.d3.build_evidence.v2"
+EVIDENCE_VERSION = "qar.d3.build_evidence.v3"
 FIXED_FILES = ("manifest.json", "report.html", "report.json")
 
 
 def _file_hashes(workspace: Path) -> dict[str, dict[str, object]]:
-    return {name: {"sha256": hashlib.sha256((workspace / name).read_bytes()).hexdigest(), "size": (workspace / name).stat().st_size} for name in FIXED_FILES}
+    result: dict[str, dict[str, object]] = {}
+    for name in FIXED_FILES:
+        path = workspace / name
+        info = path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise RuntimeError("bundle_member_invalid")
+        content = path.read_bytes()
+        result[name] = {"sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}
+    return result
 
 
 def _distributions() -> list[str]:
@@ -37,8 +45,10 @@ def _report(as_of: str, events: Path, watchlist: Path, generated_at: str) -> dic
 
 
 def build_evidence(args: argparse.Namespace) -> Path:
-    if any(not Path(item).is_file() for item in DEPENDENCY_INVENTORY):
-        raise RuntimeError("dependency_inventory_invalid")
+    try:
+        dependency_files = repository_file_hashes(args.repo_root, DEPENDENCY_INVENTORY)
+    except EvidenceContractError as exc:
+        raise RuntimeError(exc.code) from None
     lock_path = Path(args.lock_path)
     environment = locked_environment_evidence(
         lock_sha256=hashlib.sha256(lock_path.read_bytes()).hexdigest(),
@@ -59,13 +69,14 @@ def build_evidence(args: argparse.Namespace) -> Path:
         source = {"schema_version": "5", "contract_version": "model_recommendations.v5", "cadence": "daily", "as_of": args.as_of, "generated_at": args.frozen_generated_at}
         if manifest.get("source") != source or manifest.get("bundle_contract") != "qar.preview_bundle.v1":
             raise RuntimeError("source_contract_mismatch")
-        if not re.fullmatch(r"[0-9a-f]{40}", args.base_sha):
-            raise RuntimeError("base_sha_invalid")
+        if not re.fullmatch(r"[0-9a-f]{40}", args.base_sha) or not re.fullmatch(r"[0-9a-f]{40}", args.head_sha):
+            raise RuntimeError("provenance_sha_invalid")
         evidence = {
-            "evidence_version": EVIDENCE_VERSION, "base_sha": args.base_sha,
+            "evidence_version": EVIDENCE_VERSION, "base_sha": args.base_sha, "head_sha": args.head_sha,
             "source": {"fixture_paths": [Path(args.political_events).as_posix(), Path(args.political_watchlist).as_posix()], "provenance": "repository_representative_fixture"},
             "deterministic_clock": {"frozen_generated_at": args.frozen_generated_at, "producer_invocations": 2},
             "workflow_dependency_inventory": DEPENDENCY_INVENTORY,
+            "dependency_files": dependency_files,
             "locked_environment": environment,
             "bundle": {"contract": manifest["bundle_contract"], "source": source, "files": first_files},
             "repeat_build": {"independent_invocations": 2, "bytes_equal": True, "files": second_files},
@@ -83,7 +94,7 @@ def build_evidence(args: argparse.Namespace) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(); p.add_argument("--as-of", required=True); p.add_argument("--political-events", required=True); p.add_argument("--political-watchlist", required=True); p.add_argument("--frozen-generated-at", required=True); p.add_argument("--base-sha", required=True); p.add_argument("--uv-version", required=True); p.add_argument("--lock-path", required=True); p.add_argument("--temp-root", required=True); p.add_argument("--evidence-path", required=True); p.add_argument("--workspace-path-file", required=True); return p.parse_args()
+    p = argparse.ArgumentParser(); p.add_argument("--as-of", required=True); p.add_argument("--political-events", required=True); p.add_argument("--political-watchlist", required=True); p.add_argument("--frozen-generated-at", required=True); p.add_argument("--base-sha", required=True); p.add_argument("--head-sha", required=True); p.add_argument("--uv-version", required=True); p.add_argument("--lock-path", required=True); p.add_argument("--repo-root", required=True); p.add_argument("--temp-root", required=True); p.add_argument("--evidence-path", required=True); p.add_argument("--workspace-path-file", required=True); return p.parse_args()
 
 
 if __name__ == "__main__": build_evidence(parse_args())
