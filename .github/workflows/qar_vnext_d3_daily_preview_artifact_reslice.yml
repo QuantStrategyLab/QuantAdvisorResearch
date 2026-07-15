@@ -1,0 +1,79 @@
+name: QAR vNext D3 Daily Preview Artifact Reslice
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/qar_vnext_d3_daily_preview_artifact_reslice.yml"
+      - "scripts/d3_reslice_build_preview.py"
+      - "scripts/d3_reslice_verify_preview.py"
+      - "src/quant_advisor_research/**"
+      - "examples/political_events.example.csv"
+      - "examples/political_watchlist.example.csv"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "tests/test_d3_reslice_artifact.py"
+      - "tests/test_preview_bundle.py"
+      - "docs/qar_vnext_d3_reslice_design_v1_2026-07-15.md"
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: "Representative daily report date"
+        required: true
+        default: "2026-06-20"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install advisor package
+        run: python -m pip install -e .
+      - name: Build representative daily preview twice
+        env:
+          AS_OF: ${{ inputs.as_of || '2026-06-20' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python scripts/d3_reslice_build_preview.py \
+            --as-of "${AS_OF}" \
+            --political-events examples/political_events.example.csv \
+            --political-watchlist examples/political_watchlist.example.csv \
+            --artifact-dir "${RUNNER_TEMP}/qar-daily-preview" \
+            --evidence-path "${RUNNER_TEMP}/qar-daily-preview-build-evidence.json" \
+            --base-sha "${BASE_SHA}" \
+            --frozen-generated-at "2026-07-15T00:00:00Z" \
+            > "${RUNNER_TEMP}/qar-daily-preview-build-evidence.log"
+          cat "${RUNNER_TEMP}/qar-daily-preview-build-evidence.log"
+      - name: Upload daily preview artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: qar-daily-preview-reslice
+          path: ${{ runner.temp }}/qar-daily-preview
+          if-no-files-found: error
+      - name: Download daily preview artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: qar-daily-preview-reslice
+          path: ${{ runner.temp }}/qar-daily-preview-downloaded
+      - name: Verify downloaded artifact against build evidence
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python scripts/d3_reslice_verify_preview.py \
+            --artifact-dir "${RUNNER_TEMP}/qar-daily-preview-downloaded" \
+            --build-evidence-path "${RUNNER_TEMP}/qar-daily-preview-build-evidence.json" \
+            --evidence-path "${RUNNER_TEMP}/qar-daily-preview-download-evidence.json" \
+            --base-sha "${BASE_SHA}"
