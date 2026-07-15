@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
 import os
 import re
@@ -50,6 +51,15 @@ def _file_hashes(workspace: Path) -> dict[str, dict[str, object]]:
     }
 
 
+def _installed_distributions() -> tuple[list[str], str]:
+    lines = sorted(
+        f"{name}=={distribution.version}"
+        for distribution in importlib.metadata.distributions()
+        if (name := distribution.metadata.get("Name"))
+    )
+    return lines, hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
 def _build_report(*, as_of: str, events: Path, watchlist: Path, frozen_generated_at: str) -> dict[str, object]:
     with patch("quant_advisor_research.advisory_report.utc_now_iso", return_value=frozen_generated_at):
         return build_advisory_report(
@@ -63,6 +73,9 @@ def _build_report(*, as_of: str, events: Path, watchlist: Path, frozen_generated
 def build_evidence(args: argparse.Namespace) -> tuple[Path, dict[str, object]]:
     if any(not Path(path).is_file() for path in DEPENDENCY_INVENTORY):
         raise RuntimeError("dependency_inventory_invalid")
+    lock_path = Path(args.lock_path)
+    lock_sha256 = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+    distributions, distributions_sha256 = _installed_distributions()
     temp_root = Path(args.temp_root)
     temp_root.mkdir(parents=True, exist_ok=True)
     parent = Path(tempfile.mkdtemp(prefix="qar-d3-parent-", dir=temp_root))
@@ -109,6 +122,14 @@ def build_evidence(args: argparse.Namespace) -> tuple[Path, dict[str, object]]:
                 "provenance": "repository_representative_fixture",
             },
             "deterministic_clock": {"frozen_generated_at": args.frozen_generated_at, "producer_invocations": 2},
+            "locked_environment": {
+                "lockfile": lock_path.as_posix(),
+                "lock_sha256": lock_sha256,
+                "uv_version": args.uv_version,
+                "python_version": __import__("platform").python_version(),
+                "installed_distributions": distributions,
+                "installed_distributions_sha256": distributions_sha256,
+            },
             "workflow_dependency_inventory": DEPENDENCY_INVENTORY,
             "bundle": {
                 "contract": manifest["bundle_contract"],
@@ -142,6 +163,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--evidence-path", required=True)
     parser.add_argument("--workspace-path-file", required=True)
     parser.add_argument("--base-sha")
+    parser.add_argument("--uv-version", required=True)
+    parser.add_argument("--lock-path", default="uv.lock")
     return parser.parse_args()
 
 

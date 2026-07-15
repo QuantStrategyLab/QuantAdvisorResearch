@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
+import platform
 import re
 from pathlib import Path
 
@@ -12,7 +14,7 @@ from quant_advisor_research.preview_bundle import read_preview_bundle
 
 EVIDENCE_VERSION = "qar.d3.build_evidence.v1"
 FIXED_FILES = ("manifest.json", "report.html", "report.json")
-EVIDENCE_KEYS = {"evidence_version", "base_sha", "source", "deterministic_clock", "bundle", "repeat_build"}
+EVIDENCE_KEYS = {"evidence_version", "base_sha", "source", "deterministic_clock", "locked_environment", "bundle", "repeat_build"}
 DEPENDENCY_INVENTORY = [
     ".github/workflows/qar_d3_daily_preview_artifact.yml",
     "scripts/d3_build_daily_preview.py",
@@ -44,7 +46,16 @@ def _canonical_json(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
-def verify(*, workspace: Path, evidence_path: Path, expected_base_sha: str, expected_as_of: str, expected_events: str, expected_watchlist: str, frozen_generated_at: str) -> dict[str, object]:
+def _installed_distributions() -> tuple[list[str], str]:
+    lines = sorted(
+        f"{name}=={distribution.version}"
+        for distribution in importlib.metadata.distributions()
+        if (name := distribution.metadata.get("Name"))
+    )
+    return lines, hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def verify(*, workspace: Path, evidence_path: Path, expected_base_sha: str, expected_as_of: str, expected_events: str, expected_watchlist: str, frozen_generated_at: str, uv_version: str, lock_path: Path) -> dict[str, object]:
     if any(not Path(path).is_file() for path in DEPENDENCY_INVENTORY):
         raise ValueError("dependency_inventory_invalid")
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
@@ -52,6 +63,8 @@ def verify(*, workspace: Path, evidence_path: Path, expected_base_sha: str, expe
         raise ValueError("evidence_shape_invalid")
     if not re.fullmatch(r"[0-9a-f]{40}", expected_base_sha):
         raise ValueError("base_sha_invalid")
+    distributions, distributions_sha256 = _installed_distributions()
+    lock_sha256 = hashlib.sha256(lock_path.read_bytes()).hexdigest()
     read_preview_bundle(workspace)
     if {path.name for path in workspace.iterdir()} != set(FIXED_FILES):
         raise ValueError("file_set_invalid")
@@ -67,6 +80,14 @@ def verify(*, workspace: Path, evidence_path: Path, expected_base_sha: str, expe
             "provenance": "repository_representative_fixture",
         },
         "deterministic_clock": {"frozen_generated_at": frozen_generated_at, "producer_invocations": 2},
+        "locked_environment": {
+            "lockfile": lock_path.as_posix(),
+            "lock_sha256": lock_sha256,
+            "uv_version": uv_version,
+            "python_version": platform.python_version(),
+            "installed_distributions": distributions,
+            "installed_distributions_sha256": distributions_sha256,
+        },
         "workflow_dependency_inventory": DEPENDENCY_INVENTORY,
         "bundle": {"contract": "qar.preview_bundle.v1", "source": manifest["source"], "files": files},
         "repeat_build": {"independent_invocations": 2, "bytes_equal": True, "files": files},
@@ -96,6 +117,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--political-events", required=True)
     parser.add_argument("--political-watchlist", required=True)
     parser.add_argument("--frozen-generated-at", required=True)
+    parser.add_argument("--uv-version", required=True)
+    parser.add_argument("--lock-path", type=Path, default=Path("uv.lock"))
     return parser.parse_args()
 
 
@@ -109,4 +132,6 @@ if __name__ == "__main__":
         expected_events=args.political_events,
         expected_watchlist=args.political_watchlist,
         frozen_generated_at=args.frozen_generated_at,
+        uv_version=args.uv_version,
+        lock_path=args.lock_path,
     )

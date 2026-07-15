@@ -16,6 +16,7 @@ def test_d3_harness_builds_two_equal_workspaces_and_verifies_full_evidence(tmp_p
     evidence = tmp_path / "evidence" / "build_evidence.json"
     workspace_file = tmp_path / "workspace.txt"
     env = {"PYTHONPATH": str(ROOT / "src")}
+    uv_version = subprocess.check_output(["uv", "--version"], text=True).strip()
     build = subprocess.run(
         [
             sys.executable,
@@ -30,6 +31,10 @@ def test_d3_harness_builds_two_equal_workspaces_and_verifies_full_evidence(tmp_p
             "2026-07-15T00:00:00Z",
             "--base-sha",
             "a" * 40,
+            "--uv-version",
+            uv_version,
+            "--lock-path",
+            str(ROOT / "uv.lock"),
             "--temp-root",
             str(tmp_path),
             "--evidence-path",
@@ -61,6 +66,10 @@ def test_d3_harness_builds_two_equal_workspaces_and_verifies_full_evidence(tmp_p
             str(evidence),
             "--base-sha",
             "a" * 40,
+            "--uv-version",
+            uv_version,
+            "--lock-path",
+            str(ROOT / "uv.lock"),
             "--as-of",
             "2026-06-20",
             "--political-events",
@@ -92,4 +101,24 @@ def test_d3_harness_builds_two_equal_workspaces_and_verifies_full_evidence(tmp_p
             expected_events=str(EVENTS),
             expected_watchlist=str(WATCHLIST),
             frozen_generated_at="2026-07-15T00:00:00Z",
+            uv_version=uv_version,
+            lock_path=ROOT / "uv.lock",
         )
+
+
+def test_d3_workflow_requires_pull_request_paths_and_locked_pinned_toolchain():
+    workflow = (ROOT / ".github/workflows/qar_d3_daily_preview_artifact.yml").read_text()
+    assert "pull_request:" in workflow
+    for path in ("pyproject.toml", "uv.lock", "scripts/d3_build_daily_preview.py", "scripts/d3_verify_daily_preview.py", "src/quant_advisor_research/**", "tests/test_d3_preview_artifact.py"):
+        assert f'      - "{path}"' in workflow
+    assert "uv sync --locked --extra test" in workflow
+    assert "uv run --no-sync" in workflow
+    assert "pip install" not in workflow
+    for action in (
+        "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10",
+        "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1",
+        "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e",
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131",
+    ):
+        assert action in workflow
