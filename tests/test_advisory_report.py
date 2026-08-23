@@ -209,6 +209,29 @@ def test_contract_rejects_account_action_fields() -> None:
         validate_advisory_report(report)
 
 
+@pytest.mark.parametrize(
+    "nested_action",
+    [
+        {"account_action": {"order": {"target_weight": 0.1}}},
+        {"analysis": {"broker": "alpaca"}},
+        {"analysis": [{"orderIntent": {"targetWeight": 0.1}}]},
+        {"analysis": {"TARGET_WEIGHT": 0.1}},
+    ],
+)
+def test_contract_rejects_nested_account_action_fields(nested_action: dict[str, object]) -> None:
+    report = build_advisory_report(
+        as_of="2026-05-30",
+        cadence="weekly",
+        political_events_path=ROOT / "examples/political_events.example.csv",
+        political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
+        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+    )
+    report["recommendations"][0]["nested_context"] = nested_action
+
+    with pytest.raises(AdvisoryValidationError, match="account-action fields are forbidden"):
+        validate_advisory_report(report)
+
+
 def test_contract_rejects_theme_candidate_account_action_fields() -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
