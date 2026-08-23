@@ -120,4 +120,6 @@ def write_report_manifest(
         "policy": dict(on_disk_report.get("policy") or {}),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+    if on_disk_report.get("schema_version") == "6":
+        payload["input_digest"] = on_disk_report["input_digest"]
     return write_json(manifest_path, payload)

@@ -111,7 +111,7 @@ def _is_compatibility_warning(value: Any) -> bool:
 def report_content_fingerprint(report: dict[str, Any]) -> str:
     ignored_top_level_keys = {
         "as_of", "generated_at", "reference_time", "expires_at", "schema_version",
-        "contract_version", "source_artifacts",
+        "contract_version", "source_artifacts", "input_digest",
     }
     normalized = {key: value for key, value in report.items() if key not in ignored_top_level_keys}
     freshness = normalized.get("freshness")
