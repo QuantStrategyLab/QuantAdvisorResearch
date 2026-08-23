@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -38,17 +39,52 @@ ALLOWED_STRATEGY_STYLES = frozenset(
 )
 DISALLOWED_ACCOUNT_ACTION_KEYS = frozenset(
     {
+        "account_action",
+        "account_actions",
         "account_id",
         "broker",
+        "broker_account",
+        "broker_id",
+        "broker_order",
+        "broker_orders",
+        "order",
+        "orders",
+        "order_id",
+        "order_intent",
+        "order_intents",
         "order_type",
         "shares",
+        "target_quantities",
         "target_quantity",
         "target_weight",
+        "target_weights",
         "portfolio_weight",
         "entry_order",
         "exit_order",
     }
 )
+
+
+def _normalize_contract_key(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    snake_case = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value.strip())
+    return re.sub(r"[^a-z0-9]+", "_", snake_case.lower()).strip("_")
+
+
+def _find_account_action_fields(value: Any, *, path: str = "$") -> tuple[str, ...]:
+    findings: list[str] = []
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            normalized = _normalize_contract_key(key)
+            child_path = f"{path}.{key}"
+            if normalized in DISALLOWED_ACCOUNT_ACTION_KEYS:
+                findings.append(child_path)
+            findings.extend(_find_account_action_fields(item, path=child_path))
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        for index, item in enumerate(value):
+            findings.extend(_find_account_action_fields(item, path=f"{path}[{index}]"))
+    return tuple(findings)
 
 
 def _require_mapping(value: Any, name: str) -> Mapping[str, Any]:
@@ -187,6 +223,11 @@ def _require_number_0_1(value: Any, name: str) -> None:
 
 
 def validate_advisory_report(payload: Mapping[str, Any]) -> None:
+    account_action_fields = _find_account_action_fields(payload)
+    if account_action_fields:
+        raise AdvisoryValidationError(
+            "account-action fields are forbidden: " + ", ".join(account_action_fields)
+        )
     required = (
         "schema_version",
         "as_of",
