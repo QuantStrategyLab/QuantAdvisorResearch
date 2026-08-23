@@ -11,7 +11,7 @@ QuantStrategyLab 现有仓库已经天然分层：
 - `QuantStrategyPlugins`：sidecar 风控、事件和通知 artifact 层。
 - 券商平台仓库：执行、通知、凭证和运行时适配层。
 
-`QuantAdvisorResearch` 只协调事件证据和 AI shadow context，不侵入其他量化策略、快照或券商执行仓库。
+`QuantAdvisorResearch` 是 AssetIdeaAdvisor（标的研究顾问）：只协调事件证据和 AI shadow context，不侵入其他量化策略、快照或券商执行仓库，也不负责账户级组合配置或 broker 执行。
 
 ## 智慧投顾研究数据流
 
