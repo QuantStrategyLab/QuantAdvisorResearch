@@ -19,6 +19,43 @@ final_decisions: object, optional
 policy: object
 ```
 
+The current CLI and scheduled workflows remain explicit v5 producers. Readers
+accept both v5 and v6, but a producer must opt in to v6 only after it can emit
+all v6 provenance fields. No v6 field is silently added to, or accepted on, a
+v5 report.
+
+### V6 dual-read migration contract
+
+A v6 report uses `contract_version = model_recommendations.v6` and adds these
+required top-level fields:
+
+```text
+reference_time: exclusive start of the UTC day after as_of
+expires_at: generated_at + 7 days
+input_digest: 64 lowercase hexadecimal SHA-256 characters
+freshness.ai_signal
+freshness.theme_momentum
+```
+
+`freshness` is evaluated relative to the report's fixed `reference_time`, not
+the reader's wall clock. Declared source context and freshness state must agree;
+malformed, future, stale, or expired context fails closed. The checked-in
+contract fixture is `tests/fixtures/advisory_report_v6.json`.
+
+For a v6 producer, `input_digest` is the aggregate content identity of the
+complete logical input set. The producer computes the SHA-256 of canonical JSON
+whose keys are the sorted logical source roles and whose values are each source
+file's lowercase SHA-256, or `null` when that optional role is absent. Canonical
+JSON uses UTF-8, sorted keys, and separators `(',', ':')`. This binds the output
+to source contents instead of mutable file paths. Changing this algorithm
+requires a later schema version.
+
+Readers validate the digest shape and the full report artifact digest. A reader
+that also holds the original inputs may recompute `input_digest`; a report alone
+cannot prove that its producer hashed honest source bytes. V6 manifests repeat
+the report's exact `input_digest` so downstream lineage checks do not need to
+infer it from `source_artifacts` paths.
+
 ## Policy
 
 The policy block allows non-personalized intelligent-advisory research output but keeps account
@@ -284,6 +321,9 @@ artifacts.markdown.sha256
 policy
 generated_at
 ```
+
+For a v6 report, the manifest additionally carries the exact top-level
+`input_digest`. V5 manifests remain unchanged and omit this field.
 
 ## Source Mode
 

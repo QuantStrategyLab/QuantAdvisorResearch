@@ -129,6 +129,12 @@ def _require_contract_datetime(value: Any, name: str) -> dt.datetime:
         raise AdvisoryValidationError(f"{name}_invalid") from exc
 
 
+def _require_sha256_digest(value: Any, name: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise AdvisoryValidationError(f"{name}_invalid")
+    return value
+
+
 def _validate_v6_freshness(
     freshness: Any,
     *,
@@ -255,13 +261,13 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     if actual_contract is not None and actual_contract != expected_contract:
         raise AdvisoryValidationError("contract_version_mismatch")
     if schema_version == "5":
-        v6_only_keys = {"reference_time", "expires_at", "freshness"} & set(payload)
+        v6_only_keys = {"reference_time", "expires_at", "freshness", "input_digest"} & set(payload)
         if v6_only_keys:
             raise AdvisoryValidationError("v6_fields_on_v5")
     elif schema_version == "6":
         if actual_contract != "model_recommendations.v6":
             raise AdvisoryValidationError("v6_contract_version_required")
-        for key in ("reference_time", "expires_at", "freshness"):
+        for key in ("reference_time", "expires_at", "freshness", "input_digest"):
             if key not in payload:
                 raise AdvisoryValidationError("v6_fields_incomplete")
     else:
@@ -280,6 +286,7 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
             raise AdvisoryValidationError("generated_at_before_reference")
         if expires_at != report_generated_at + dt.timedelta(days=REPORT_EXPIRY_DAYS):
             raise AdvisoryValidationError("expires_at_mismatch")
+        _require_sha256_digest(payload["input_digest"], "input_digest")
         _validate_v6_freshness(
             payload["freshness"],
             report_as_of=report_as_of,

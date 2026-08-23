@@ -21,6 +21,7 @@ from quant_advisor_research.time_contract import canonical_reference_time
 
 
 ROOT = Path(__file__).resolve().parents[1]
+V6_INPUT_DIGEST = "a" * 64
 
 
 def build_v5(as_of: str = "2026-06-20") -> dict:
@@ -41,6 +42,7 @@ def build_v6(as_of: str = "2026-06-20") -> dict:
             "reference_time": canonical_reference_time(dt.date.fromisoformat(as_of)).isoformat().replace("+00:00", "Z"),
             "generated_at": "2026-06-21T12:00:00.123456Z",
             "expires_at": "2026-06-28T12:00:00.123456Z",
+            "input_digest": V6_INPUT_DIGEST,
             "freshness": {
                 "ai_signal": {"present": False, "valid": False, "reason": "not_provided"},
                 "theme_momentum": {"present": False, "valid": False, "reason": "not_provided"},

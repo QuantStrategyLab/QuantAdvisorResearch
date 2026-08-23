@@ -1,0 +1,41 @@
+{
+  "as_of": "2026-08-22",
+  "audience_scope": "non_personalized_model_research",
+  "cadence": "daily",
+  "contract_version": "model_recommendations.v6",
+  "expires_at": "2026-08-30T00:00:00Z",
+  "freshness": {
+    "ai_signal": {
+      "present": false,
+      "reason": "not_provided",
+      "valid": false
+    },
+    "theme_momentum": {
+      "present": false,
+      "reason": "not_provided",
+      "valid": false
+    }
+  },
+  "generated_at": "2026-08-23T00:00:00Z",
+  "input_digest": "f9b98eb8d22f5ee5c403480c797757240afd76e117f4f7edf157dc330a87d014",
+  "mode": "model_recommendations",
+  "policy": {
+    "account_specific_advice_allowed": false,
+    "downstream_use": "Asset idea research observation only; do not route to portfolio allocation or broker execution.",
+    "execution_allowed": false,
+    "non_personalized_recommendations_allowed": true,
+    "personalized_advice_allowed": false,
+    "portfolio_allocation_allowed": false
+  },
+  "recommendations": [],
+  "reference_time": "2026-08-23T00:00:00Z",
+  "schema_version": "6",
+  "source_artifacts": {
+    "ai_signal": "",
+    "market_confirmation": "",
+    "political_events": "",
+    "political_watchlist": "",
+    "theme_momentum": ""
+  },
+  "summary": {}
+}

@@ -25,6 +25,7 @@ from quant_advisor_research.time_contract import TimeContractError, canonical_re
 
 
 ROOT = Path(__file__).resolve().parents[1]
+V6_INPUT_DIGEST = "a" * 64
 
 
 def build_report(*, schema_version: str = "5") -> dict:
@@ -43,6 +44,7 @@ def build_report(*, schema_version: str = "5") -> dict:
                 "contract_version": "model_recommendations.v6",
                 "reference_time": reference_time.isoformat().replace("+00:00", "Z"),
                 "expires_at": (generated_at + dt.timedelta(days=7)).isoformat().replace("+00:00", "Z"),
+                "input_digest": V6_INPUT_DIGEST,
                 "freshness": {
                     "ai_signal": {"present": False, "valid": False, "reason": "not_provided"},
                     "theme_momentum": {"present": False, "valid": False, "reason": "not_provided"},
@@ -91,6 +93,14 @@ def test_v6_time_metadata_changes_artifact_digest_but_not_semantic_digest(field:
         generated_at = normalize_aware_datetime(report[field]) + dt.timedelta(seconds=1)
         changed[field] = generated_at.isoformat().replace("+00:00", "Z")
         changed["expires_at"] = (generated_at + dt.timedelta(days=7)).isoformat().replace("+00:00", "Z")
+
+    assert report_content_fingerprint(changed) == report_content_fingerprint(report)
+    assert artifact_integrity_digest(changed) != artifact_integrity_digest(report)
+
+
+def test_v6_input_digest_changes_artifact_digest_but_not_semantic_digest() -> None:
+    report = build_report(schema_version="6")
+    changed = dict(report, input_digest="b" * 64)
 
     assert report_content_fingerprint(changed) == report_content_fingerprint(report)
     assert artifact_integrity_digest(changed) != artifact_integrity_digest(report)

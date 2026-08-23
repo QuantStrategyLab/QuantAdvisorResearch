@@ -15,6 +15,7 @@ from quant_advisor_research.time_contract import canonical_reference_time
 
 
 ROOT = Path(__file__).resolve().parents[1]
+V6_INPUT_DIGEST = "a" * 64
 
 
 def build_v5() -> dict:
@@ -35,6 +36,7 @@ def build_v6() -> dict:
             "reference_time": canonical_reference_time(dt.date(2026, 5, 30)).isoformat().replace("+00:00", "Z"),
             "generated_at": "2026-05-31T12:00:00.123456Z",
             "expires_at": "2026-06-07T12:00:00.123456Z",
+            "input_digest": V6_INPUT_DIGEST,
             "freshness": {
                 "ai_signal": {"present": False, "valid": False, "reason": "not_provided"},
                 "theme_momentum": {"present": False, "valid": False, "reason": "not_provided"},
@@ -70,6 +72,37 @@ def test_v5_legacy_missing_marker_remains_readable() -> None:
     report = build_v5()
     report.pop("contract_version", None)
     validate_advisory_report(report)
+
+
+@pytest.mark.parametrize("input_digest", [None, "", "a" * 63, "A" * 64, "sha256:" + "a" * 64, True])
+def test_v6_input_digest_is_required_lowercase_sha256(input_digest: object) -> None:
+    report = build_v6()
+    if input_digest is None:
+        report.pop("input_digest")
+        expected = "v6_fields_incomplete"
+    else:
+        report["input_digest"] = input_digest
+        expected = "input_digest_invalid"
+    with pytest.raises(AdvisoryValidationError, match=expected):
+        validate_advisory_report(report)
+
+
+def test_v5_does_not_silently_accept_v6_input_digest() -> None:
+    report = build_v5()
+    report["input_digest"] = V6_INPUT_DIGEST
+    with pytest.raises(AdvisoryValidationError, match="v6_fields_on_v5"):
+        validate_advisory_report(report)
+
+
+def test_checked_in_v6_contract_fixture_is_readable() -> None:
+    fixture = json.loads((ROOT / "tests/fixtures/advisory_report_v6.json").read_text(encoding="utf-8"))
+    empty_input_set = {
+        name: None
+        for name in ("political_events", "political_watchlist", "ai_signal", "theme_momentum", "market_confirmation")
+    }
+    canonical = json.dumps(empty_input_set, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    assert fixture["input_digest"] == hashlib.sha256(canonical).hexdigest()
+    validate_advisory_report(fixture)
 
 
 @pytest.mark.parametrize(
@@ -280,7 +313,12 @@ def test_manifest_version_is_report_derived_without_global_v6_contamination(tmp_
             markdown_path=markdown_path,
             manifest_path=tmp_path / f"{name}.manifest.json",
         )
-        assert json.loads(manifest.read_text(encoding="utf-8"))["contract_version"] == expected
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+        assert payload["contract_version"] == expected
+        if name == "v6":
+            assert payload["input_digest"] == V6_INPUT_DIGEST
+        else:
+            assert "input_digest" not in payload
 
 
 def test_manifest_rejects_incomplete_v6_but_keeps_v5_legacy_omission(tmp_path: Path) -> None:
