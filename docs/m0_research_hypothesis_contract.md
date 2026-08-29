@@ -49,3 +49,14 @@ platform, change a runtime target, or submit an order.
 The next repository-owned stage may map a valid M0 hypothesis to a bounded
 research task.  Only later P1--P3 data, backtest, and audit evidence can create
 an immutable strategy candidate for P0 Shadow selection.
+
+## Weekly artifact snapshot
+
+The weekly advisory workflow first writes the explicit local report path
+`data/output/weekly_advisory_review/advisory_report_<as_of>.json`.  Once that
+file exists, the same job invokes the offline
+`quant_advisor_research.m0_research_source_snapshot` CLI and writes
+`m0_research_source_snapshot_<as_of>.json` beside it.  Both files remain in the
+existing `weekly-model-recommendations` artifact.  This producer performs no
+external synchronization and does not change the weekly report inputs,
+schedule, publication site, runtime, platform, or execution state.

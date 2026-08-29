@@ -25,6 +25,13 @@ def test_public_workflows_default_to_live_event_inputs() -> None:
         assert "--market-cache-dir .cache/market-data" in text
         assert "--recommendation-review" in text
 
+    weekly = (ROOT / ".github" / "workflows" / "weekly_advisory_review.yml").read_text(encoding="utf-8")
+    assert "ADVISORY_REPORT_PATH=data/output/weekly_advisory_review/advisory_report_${AS_OF}.json" in weekly
+    assert "M0_RESEARCH_SOURCE_SNAPSHOT_PATH=data/output/weekly_advisory_review/m0_research_source_snapshot_${AS_OF}.json" in weekly
+    assert "python -m quant_advisor_research.m0_research_source_snapshot" in weekly
+    assert "--report \"${ADVISORY_REPORT_PATH}\"" in weekly
+    assert "--output-json \"${M0_RESEARCH_SOURCE_SNAPSHOT_PATH}\"" in weekly
+
 
 def test_cross_repo_smoke_workflow_uses_live_artifacts_and_no_network_market_fallback() -> None:
     text = (ROOT / ".github" / "workflows" / "cross_repo_smoke.yml").read_text(encoding="utf-8")
