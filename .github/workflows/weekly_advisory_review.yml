@@ -123,6 +123,17 @@ jobs:
             ARGS+=(--market-proxy-pool-url "${MARKET_DATA_PROXY_POOL_URL}")
           fi
           python scripts/build_advisory_artifacts.py "${ARGS[@]}"
+          echo "ADVISORY_REPORT_PATH=data/output/weekly_advisory_review/advisory_report_${AS_OF}.json" >> "$GITHUB_ENV"
+          echo "M0_RESEARCH_SOURCE_SNAPSHOT_PATH=data/output/weekly_advisory_review/m0_research_source_snapshot_${AS_OF}.json" >> "$GITHUB_ENV"
+      - name: Build offline M0 research source snapshot
+        working-directory: advisor
+        run: |
+          set -euo pipefail
+          test -f "${ADVISORY_REPORT_PATH}"
+          python -m quant_advisor_research.m0_research_source_snapshot \
+            --report "${ADVISORY_REPORT_PATH}" \
+            --output-json "${M0_RESEARCH_SOURCE_SNAPSHOT_PATH}"
+          test -f "${M0_RESEARCH_SOURCE_SNAPSHOT_PATH}"
       - name: Save market data cache
         if: ${{ success() }}
         uses: actions/cache/save@v5
