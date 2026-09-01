@@ -5,9 +5,15 @@
 Required top-level fields:
 
 ```text
-schema_version: "5"
+schema_version: "6"
+contract_version: "model_recommendations.v6"
 as_of: ISO date
+reference_time: exclusive start of the UTC day after as_of
 generated_at: ISO datetime
+expires_at: generated_at + 7 days
+input_digest: 64 lowercase hexadecimal SHA-256 characters
+freshness.ai_signal
+freshness.theme_momentum
 mode: "model_recommendations"
 cadence: "daily" | "weekly" | "monthly"
 audience_scope: "non_personalized_model_research"
@@ -19,12 +25,10 @@ final_decisions: object, optional
 policy: object
 ```
 
-The current CLI and scheduled workflows remain explicit v5 producers. Readers
-accept both v5 and v6, but a producer must opt in to v6 only after it can emit
-all v6 provenance fields. No v6 field is silently added to, or accepted on, a
-v5 report.
+The current CLI and scheduled workflows produce v6. Readers continue to accept
+legacy v5 reports, but no v6 field is silently accepted on a v5 report.
 
-### V6 dual-read migration contract
+### V6 default contract
 
 A v6 report uses `contract_version = model_recommendations.v6` and adds these
 required top-level fields:
@@ -307,9 +311,9 @@ Required manifest fields:
 ```text
 manifest_type = model_recommendation_report
 artifact_type = model_recommendations
-contract_version = model_recommendations.v5
-schema_version = 5
-version = <as_of>-<cadence>-schema-5-<run-or-sha>
+contract_version = model_recommendations.v6
+schema_version = 6
+version = <as_of>-<cadence>-schema-6-<run-or-sha>
 source_project = QuantAdvisorResearch
 producer.repository
 producer.git_sha
@@ -320,10 +324,11 @@ artifacts.json.sha256
 artifacts.markdown.sha256
 policy
 generated_at
+input_digest
 ```
 
-For a v6 report, the manifest additionally carries the exact top-level
-`input_digest`. V5 manifests remain unchanged and omit this field.
+The v6 manifest carries the exact top-level `input_digest`. Legacy v5 manifests
+remain readable and omit this field.
 
 ## Source Mode
 

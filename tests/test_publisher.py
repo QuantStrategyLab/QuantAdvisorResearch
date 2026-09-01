@@ -131,6 +131,9 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
 
 def make_report_for_date(base_report: dict, as_of: str) -> dict:
     report = deepcopy(base_report)
+    report.update(schema_version="5", contract_version="model_recommendations.v5")
+    for key in ("reference_time", "expires_at", "freshness", "input_digest"):
+        report.pop(key)
     report["as_of"] = as_of
     report["generated_at"] = f"{as_of}T00:00:00+00:00"
     return report

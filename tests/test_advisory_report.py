@@ -149,9 +149,9 @@ def test_long_horizon_window_is_measured_in_years() -> None:
 
     by_symbol = {item["symbol"]: item for item in report["recommendations"]}
 
-    assert by_symbol["IDX1"]["primary_horizon"] == "long"
-    assert by_symbol["IDX1"]["primary_horizon_window"] == "1-3年"
-    assert "超过3年" in by_symbol["IDX1"]["horizon_note"]
+    assert by_symbol["IDX1"]["ai_context"]["horizon"] == "long"
+    assert by_symbol["IDX1"]["ai_context"]["horizon_window"] == "1-3年"
+    assert by_symbol["IDX1"]["primary_horizon"] == "not_applicable"
 
 
 def test_contract_rejects_execution_enabled_report() -> None:
@@ -273,8 +273,8 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["manifest_type"] == "model_recommendation_report"
-    assert manifest["contract_version"] == "model_recommendations.v5"
-    assert manifest["version"] == "2026-05-30-weekly-schema-5-run-123-attempt-2"
+    assert manifest["contract_version"] == "model_recommendations.v6"
+    assert manifest["version"] == "2026-05-30-weekly-schema-6-run-123-attempt-2"
     assert manifest["producer"]["git_sha"] == "abcdef1234567890"
     assert manifest["artifacts"]["json"]["sha256"]
     assert manifest["artifacts"]["markdown"]["sha256"]

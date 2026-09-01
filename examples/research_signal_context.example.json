@@ -1,5 +1,7 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
+  "model_version": "shadow-v2",
+  "scoring_version": "rules-v2",
   "as_of": "2026-05-28",
   "generated_at": "2026-05-28T14:38:47.474891Z",
   "mode": "shadow",
@@ -19,7 +21,7 @@
     "semiconductor_and_leveraged_etf_high_volatility",
     "no_point_in_time_replay_evidence"
   ],
-  "research_bias": {
+  "candidate_bias": {
     "IDX1": "positive",
     "IDX2": "positive",
     "SECT1": "watch",

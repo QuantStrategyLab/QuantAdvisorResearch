@@ -23,6 +23,7 @@ DEPENDENCY_INVENTORY = [
     "src/quant_advisor_research/time_contract.py", "tests/test_d3_exact_bundle.py",
     "examples/political_events.example.csv", "examples/political_watchlist.example.csv",
 ]
+SOURCE_CONTRACTS = {"5": "model_recommendations.v5", "6": "model_recommendations.v6"}
 
 
 class EvidenceContractError(ValueError):
@@ -47,6 +48,33 @@ class BundleSnapshot:
             if item.name == name:
                 return item
         raise EvidenceContractError("bundle_member_set_invalid")
+
+
+def preview_source_contract(
+    manifest: Mapping[str, object],
+    *,
+    as_of: str,
+    generated_at: str,
+) -> dict[str, object]:
+    source = manifest.get("source")
+    if not isinstance(source, Mapping) or set(source) != {
+        "schema_version",
+        "contract_version",
+        "cadence",
+        "as_of",
+        "generated_at",
+    }:
+        raise EvidenceContractError("source_contract_mismatch")
+    schema_version = source.get("schema_version")
+    if (
+        type(schema_version) is not str
+        or source.get("contract_version") != SOURCE_CONTRACTS.get(schema_version)
+        or source.get("cadence") != "daily"
+        or source.get("as_of") != as_of
+        or source.get("generated_at") != generated_at
+    ):
+        raise EvidenceContractError("source_contract_mismatch")
+    return dict(source)
 
 
 def _directory_flags() -> int:

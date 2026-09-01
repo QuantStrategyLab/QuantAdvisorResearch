@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       as_of:
-        description: "Smoke date. Defaults to current UTC date when empty."
+        description: "Smoke date. Defaults to the most recently closed UTC date when empty."
         required: false
         type: string
   schedule:
@@ -48,7 +48,11 @@ jobs:
           INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
         run: |
           set -euo pipefail
-          AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
+          if [ -n "${INPUT_AS_OF}" ]; then
+            AS_OF="${INPUT_AS_OF}"
+          else
+            AS_OF="$(python -c 'from quant_advisor_research.build_pipeline import default_daily_as_of; print(default_daily_as_of().isoformat())')"
+          fi
           python scripts/run_cross_repo_smoke.py \
             --as-of "${AS_OF}" \
             --political-events ../political-events/data/live/political_events.csv \

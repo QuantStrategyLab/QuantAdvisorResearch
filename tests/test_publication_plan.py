@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime as dt
 import hashlib
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from quant_advisor_research.publication_plan import (
     build_publication_plan,
 )
 from quant_advisor_research.time_contract import contract_version_for_schema
+from quant_advisor_research.time_contract import normalize_aware_datetime
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +38,8 @@ def report(*, as_of: str = "2026-06-20", generated_at: str | None = None) -> dic
     )
     if generated_at is not None:
         value["generated_at"] = generated_at
+        generated = normalize_aware_datetime(generated_at)
+        value["expires_at"] = (generated + dt.timedelta(days=7)).isoformat().replace("+00:00", "Z")
     return value
 
 

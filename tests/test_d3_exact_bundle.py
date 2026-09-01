@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
-from d3_evidence import EvidenceContractError, canonical_distribution_snapshot, validate_exact_bundle
+from d3_evidence import EvidenceContractError, canonical_distribution_snapshot, preview_source_contract, validate_exact_bundle
 
 
 def _normal_bundle(path: Path) -> None:
@@ -66,6 +66,25 @@ def test_distribution_snapshot_uses_pep503_and_rejects_conflict():
     assert values == ["alpha==2.0", "zed==1.0"]
     with pytest.raises(EvidenceContractError, match="distribution_snapshot_conflict"):
         canonical_distribution_snapshot(["alpha_.==1.0", "ALPHA-==2.0"])
+
+
+def test_preview_source_contract_accepts_v5_and_v6() -> None:
+    for schema_version, contract_version in (
+        ("5", "model_recommendations.v5"),
+        ("6", "model_recommendations.v6"),
+    ):
+        source = {
+            "schema_version": schema_version,
+            "contract_version": contract_version,
+            "cadence": "daily",
+            "as_of": "2026-05-30",
+            "generated_at": "2026-05-31T00:00:00Z",
+        }
+        assert preview_source_contract(
+            {"source": source},
+            as_of="2026-05-30",
+            generated_at="2026-05-31T00:00:00Z",
+        ) == source
 
 
 def test_workflow_uses_exact_paths_and_immutable_actions():

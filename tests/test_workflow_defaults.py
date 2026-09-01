@@ -43,3 +43,16 @@ def test_cross_repo_smoke_workflow_uses_live_artifacts_and_no_network_market_fal
     assert "data/output/latest_signal.json" in text
     assert "data/output/theme_momentum_snapshot.json" in text
     assert "scripts/run_cross_repo_smoke.py" in text
+
+
+def test_workflow_default_as_of_uses_only_closed_period_helpers() -> None:
+    expected_helpers = {
+        "weekly_advisory_review.yml": "default_weekly_as_of",
+        "publish_advisory_site.yml": "default_weekly_as_of",
+        "monthly_advisory_review.yml": "default_monthly_as_of",
+        "cross_repo_smoke.yml": "default_daily_as_of",
+    }
+    for workflow, helper in expected_helpers.items():
+        text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+        assert helper in text
+        assert "date -u +%F" not in text

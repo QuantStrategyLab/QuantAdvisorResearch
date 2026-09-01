@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       as_of:
-        description: "Report date. Defaults to the most recent Saturday when empty."
+        description: "Report date. Defaults to the most recent fully closed Saturday when empty."
         required: false
         type: string
       site_url:

@@ -52,8 +52,8 @@ def test_adapter_projects_public_report_to_closed_research_only_hypotheses() -> 
         dict.fromkeys(report["recommendations"][0]["suitable_horizons"])
     )
     assert first["research_context"]["primary_horizon"] in first["research_context"]["suitable_horizons"]
-    assert first["provenance"]["source_schema_version"] == "5"
-    assert first["provenance"]["source_input_digest"] is None
+    assert first["provenance"]["source_schema_version"] == "6"
+    assert first["provenance"]["source_input_digest"] == report["input_digest"]
     assert first["expires_at"] > first["generated_at"]
     assert "target_weight" not in first
     assert "recommendations" not in first
