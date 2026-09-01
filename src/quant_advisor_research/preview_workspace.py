@@ -17,7 +17,8 @@ from typing import Any
 
 from .artifact_integrity import ArtifactIntegrityError, snapshot_json_wire
 from .contracts import AdvisoryValidationError, validate_advisory_report
-from .preview_bundle import BUNDLE_CONTRACT, PreviewBundleError, SOURCE_CONTRACT_VERSION, read_preview_bundle
+from .preview_bundle import BUNDLE_CONTRACT, PreviewBundleError, SOURCE_SCHEMA_VERSIONS, read_preview_bundle
+from .time_contract import contract_version_for_schema
 
 _FIXED_FILES = frozenset({"report.json", "report.html", "manifest.json"})
 _NOFOLLOW = getattr(os, "O_NOFOLLOW", None)
@@ -58,9 +59,10 @@ def _validated_source(report: Mapping[str, Any]) -> dict[str, object]:
         validate_advisory_report(snapshot)
     except (ArtifactIntegrityError, AdvisoryValidationError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
         raise _error("source_invalid") from None
-    if snapshot.get("schema_version") != "5":
+    schema_version = snapshot.get("schema_version")
+    if schema_version not in SOURCE_SCHEMA_VERSIONS:
         raise _error("source_schema_unsupported")
-    if "contract_version" in snapshot or snapshot.get("cadence") != "daily":
+    if (schema_version == "5" and "contract_version" in snapshot) or snapshot.get("cadence") != "daily":
         raise _error("source_contract_invalid")
     if type(snapshot.get("as_of")) is not str or type(snapshot.get("generated_at")) is not str:
         raise _error("source_time_invalid")
@@ -93,8 +95,8 @@ def _manifest(snapshot: Mapping[str, object], report_bytes: bytes, html_bytes: b
     return {
         "bundle_contract": BUNDLE_CONTRACT,
         "source": {
-            "schema_version": "5",
-            "contract_version": SOURCE_CONTRACT_VERSION,
+            "schema_version": snapshot["schema_version"],
+            "contract_version": contract_version_for_schema(str(snapshot["schema_version"])),
             "cadence": "daily",
             "as_of": snapshot["as_of"],
             "generated_at": snapshot["generated_at"],

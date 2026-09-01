@@ -9,7 +9,7 @@ import json
 import platform
 from pathlib import Path
 
-from d3_evidence import DEPENDENCY_INVENTORY, EVIDENCE_VERSION, BundleSnapshot, EvidenceContractError, locked_environment_evidence, repository_file_hashes, validate_exact_bundle, validate_preview_snapshot
+from d3_evidence import DEPENDENCY_INVENTORY, EVIDENCE_VERSION, BundleSnapshot, EvidenceContractError, locked_environment_evidence, preview_source_contract, repository_file_hashes, validate_exact_bundle, validate_preview_snapshot
 
 EXPECTED_KEYS = frozenset({"evidence_version", "base_sha", "head_sha", "source", "deterministic_clock", "workflow_dependency_inventory", "dependency_files", "locked_environment", "bundle", "repeat_build"})
 
@@ -31,10 +31,14 @@ def verify(args: argparse.Namespace) -> None:
         if evidence["workflow_dependency_inventory"] != DEPENDENCY_INVENTORY or evidence["dependency_files"] != dependency_files:
             raise EvidenceContractError("dependency_evidence_mismatch")
         environment = locked_environment_evidence(lock_sha256=hashlib.sha256(Path(args.lock_path).read_bytes()).hexdigest(), uv_version=args.uv_version, python_version=platform.python_version(), distributions=_distributions())
-        expected_source = {"schema_version": "5", "contract_version": "model_recommendations.v5", "cadence": "daily", "as_of": args.as_of, "generated_at": args.frozen_generated_at}
         snapshot = validate_exact_bundle(args.workspace)
         _, manifest = validate_preview_snapshot(snapshot)
-        if manifest.get("bundle_contract") != "qar.preview_bundle.v1" or manifest.get("source") != expected_source:
+        expected_source = preview_source_contract(
+            manifest,
+            as_of=args.as_of,
+            generated_at=args.frozen_generated_at,
+        )
+        if manifest.get("bundle_contract") != "qar.preview_bundle.v1":
             raise EvidenceContractError("source_contract_mismatch")
         files = _hashes(snapshot)
         expected = {

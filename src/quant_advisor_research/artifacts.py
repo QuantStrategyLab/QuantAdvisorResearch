@@ -41,6 +41,15 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def input_digest_for_payloads(sources: Mapping[str, bytes | str | None]) -> str:
+    identities = {
+        name: sha256_bytes(payload) if isinstance(payload, bytes) else payload
+        for name, payload in sources.items()
+    }
+    canonical = json.dumps(identities, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return sha256_bytes(canonical)
+
+
 def write_json(path: str | Path, payload: Mapping[str, Any]) -> Path:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

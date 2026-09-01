@@ -55,10 +55,20 @@ def parse_date(value: str) -> dt.date:
     return dt.date.fromisoformat(value.strip())
 
 
+def default_daily_as_of(today: dt.date | None = None) -> dt.date:
+    current = today or dt.datetime.now(dt.UTC).date()
+    return current - dt.timedelta(days=1)
+
+
 def default_weekly_as_of(today: dt.date | None = None) -> dt.date:
     current = today or dt.datetime.now(dt.UTC).date()
-    days_since_saturday = (current.weekday() - 5) % 7
+    days_since_saturday = (current.weekday() - 5) % 7 or 7
     return current - dt.timedelta(days=days_since_saturday)
+
+
+def default_monthly_as_of(today: dt.date | None = None) -> dt.date:
+    current = today or dt.datetime.now(dt.UTC).date()
+    return current.replace(day=1) - dt.timedelta(days=1)
 
 
 def existing_optional_path(value: str | Path | None) -> Path | None:

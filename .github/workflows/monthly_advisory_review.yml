@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       as_of:
-        description: "Report date. Defaults to current UTC date when empty."
+        description: "Report date. Defaults to the last day of the most recently closed UTC month when empty."
         required: false
         type: string
       previous_report_path:
@@ -104,7 +104,11 @@ jobs:
           MARKET_DATA_PROXY_POOL_URL: ${{ github.event.inputs.market_data_proxy_pool_url || vars.MARKET_DATA_PROXY_POOL_URL || '' }}
         run: |
           set -euo pipefail
-          AS_OF="${INPUT_AS_OF:-$(date -u +%F)}"
+          if [ -n "${INPUT_AS_OF}" ]; then
+            AS_OF="${INPUT_AS_OF}"
+          else
+            AS_OF="$(python -c 'from quant_advisor_research.build_pipeline import default_monthly_as_of; print(default_monthly_as_of().isoformat())')"
+          fi
           mkdir -p .cache/market-data
           ARGS=(
             --as-of "${AS_OF}"

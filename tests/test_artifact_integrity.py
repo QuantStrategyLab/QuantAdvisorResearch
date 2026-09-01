@@ -35,7 +35,11 @@ def build_report(*, schema_version: str = "5") -> dict:
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
     )
-    if schema_version == "6":
+    if schema_version == "5":
+        report.update(schema_version="5")
+        for key in ("contract_version", "reference_time", "expires_at", "freshness", "input_digest"):
+            report.pop(key)
+    else:
         generated_at = normalize_aware_datetime(report["generated_at"])
         reference_time = canonical_reference_time(dt.date.fromisoformat(report["as_of"]))
         report.update(

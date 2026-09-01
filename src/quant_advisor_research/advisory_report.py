@@ -5,13 +5,22 @@ import datetime as dt
 import json
 import os
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .artifacts import write_report_manifest
+from .artifacts import input_digest_for_payloads, write_report_manifest
 from .contracts import ALLOWED_CADENCES, validate_advisory_report
-from .csv_utils import read_csv_rows
+from .csv_utils import read_csv_rows, read_csv_rows_bytes
+from .time_contract import (
+    REPORT_EXPIRY_DAYS,
+    ContextFreshness,
+    assess_context_freshness,
+    contract_version_for_schema,
+    normalize_aware_datetime,
+    report_time_bounds,
+)
 
 
 EVENT_WEIGHTS = {
@@ -46,6 +55,48 @@ AI_BIAS_WEIGHTS = {
     "avoid": -4,
     "negative": -3,
 }
+
+AI_LONG_CONTEXT_SCORES = {
+    "positive": 0.5,
+    "watch": 0.35,
+}
+
+AI_SIGNAL_REQUIRED_KEYS = frozenset(
+    {
+        "schema_version",
+        "as_of",
+        "generated_at",
+        "mode",
+        "horizon",
+        "universe",
+        "regime",
+        "risk_flags",
+        "candidate_bias",
+        "confidence",
+        "evidence",
+        "expires_at",
+        "policy",
+    }
+)
+AI_SIGNAL_ALLOWED_KEYS = AI_SIGNAL_REQUIRED_KEYS | frozenset(
+    {
+        "model_version",
+        "scoring_version",
+        "theme_bias",
+        "symbol_bias",
+        "symbol_theme_exposure",
+    }
+)
+AI_SIGNAL_SCHEMA_VERSIONS = frozenset({"1", "2"})
+AI_SIGNAL_REGIMES = frozenset({"risk_on", "risk_off", "neutral", "mixed", "unknown"})
+AI_SIGNAL_BIASES = frozenset({"positive", "negative", "neutral", "watch", "avoid"})
+AI_SIGNAL_HORIZON = "1-3 years"
+AI_BIAS_ALLOWED_KEYS = frozenset({"bias", "confidence", "rationale", "horizon", "risk_flags", "linked_themes"})
+AI_EVIDENCE_ALLOWED_KEYS = frozenset({"sources", "summary", "data_gaps"})
+AI_POLICY_ALLOWED_KEYS = frozenset({"execution_allowed", "portfolio_allocation_allowed", "downstream_use"})
+AI_POLICY_FORBIDDEN_TERMS = frozenset({"live", "allocation", "broker", "execution", "order", "position", "account"})
+AI_POLICY_BLOCKING_TERMS = frozenset({"blocked", "not allowed", "do not", "never", "no "})
+_UNAVAILABLE_INPUT = object()
 
 HORIZON_WINDOWS = {
     "short": "1-10个交易日",
@@ -214,6 +265,10 @@ class MarketConfirmation:
     price_observation_count: int = 0
 
 
+class AISignalValidationError(ValueError):
+    """Raised with a sanitized reason when AI context is not consumable."""
+
+
 def parse_date(value: str) -> dt.date:
     return dt.date.fromisoformat(value.strip())
 
@@ -222,9 +277,156 @@ def utc_now_iso() -> str:
     return dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def load_events(path: str | Path, as_of: dt.date) -> list[Event]:
+def utc_iso(value: dt.datetime) -> str:
+    return value.astimezone(dt.UTC).isoformat().replace("+00:00", "Z")
+
+
+def _ai_contract_invalid() -> None:
+    raise AISignalValidationError("ai_signal_contract_invalid")
+
+
+def _valid_ai_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _valid_ai_string_list(value: Any, *, allow_empty: bool = False) -> bool:
+    return (
+        isinstance(value, list)
+        and (allow_empty or bool(value))
+        and all(_valid_ai_string(item) for item in value)
+    )
+
+
+def _valid_ai_confidence(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 1
+
+
+def _validate_ai_bias_value(value: Any) -> None:
+    if isinstance(value, str):
+        bias = value
+    elif isinstance(value, Mapping):
+        if set(value) - AI_BIAS_ALLOWED_KEYS:
+            _ai_contract_invalid()
+        bias = value.get("bias")
+        if not _valid_ai_string(bias):
+            _ai_contract_invalid()
+        if "confidence" in value and not _valid_ai_confidence(value["confidence"]):
+            _ai_contract_invalid()
+        if any(key in value and not _valid_ai_string(value[key]) for key in ("rationale", "horizon")):
+            _ai_contract_invalid()
+        if any(
+            key in value and not _valid_ai_string_list(value[key], allow_empty=True)
+            for key in ("risk_flags", "linked_themes")
+        ):
+            _ai_contract_invalid()
+    else:
+        _ai_contract_invalid()
+    if not _valid_ai_string(bias) or bias not in AI_SIGNAL_BIASES:
+        _ai_contract_invalid()
+
+
+def _validate_ai_bias_mapping(value: Any) -> None:
+    if not isinstance(value, Mapping):
+        _ai_contract_invalid()
+    for key, bias in value.items():
+        if not _valid_ai_string(key):
+            _ai_contract_invalid()
+        _validate_ai_bias_value(bias)
+
+
+def validate_ai_signal(payload: Any) -> None:
+    if not isinstance(payload, Mapping) or not AI_SIGNAL_REQUIRED_KEYS <= set(payload):
+        _ai_contract_invalid()
+    if set(payload) - AI_SIGNAL_ALLOWED_KEYS:
+        _ai_contract_invalid()
+    schema_version = payload["schema_version"]
+    if not _valid_ai_string(schema_version) or schema_version not in AI_SIGNAL_SCHEMA_VERSIONS:
+        _ai_contract_invalid()
+    if schema_version == "2" and any(
+        not _valid_ai_string(payload.get(key)) for key in ("model_version", "scoring_version")
+    ):
+        _ai_contract_invalid()
+    try:
+        if not _valid_ai_string(payload["as_of"]):
+            _ai_contract_invalid()
+        dt.date.fromisoformat(payload["as_of"])
+        if not _valid_ai_string(payload["generated_at"]):
+            _ai_contract_invalid()
+        normalize_aware_datetime(payload["generated_at"])
+        if not _valid_ai_string(payload["expires_at"]):
+            _ai_contract_invalid()
+        dt.date.fromisoformat(payload["expires_at"])
+    except (TypeError, ValueError):
+        _ai_contract_invalid()
+    if payload["mode"] != "shadow" or payload["horizon"] != AI_SIGNAL_HORIZON:
+        _ai_contract_invalid()
+    if not _valid_ai_string(payload["regime"]) or payload["regime"] not in AI_SIGNAL_REGIMES:
+        _ai_contract_invalid()
+    if not _valid_ai_string_list(payload["universe"]):
+        _ai_contract_invalid()
+    if not _valid_ai_string_list(payload["risk_flags"], allow_empty=True):
+        _ai_contract_invalid()
+    _validate_ai_bias_mapping(payload["candidate_bias"])
+    for key in ("theme_bias", "symbol_bias"):
+        if key in payload:
+            _validate_ai_bias_mapping(payload[key])
+    if "symbol_theme_exposure" in payload:
+        exposure = payload["symbol_theme_exposure"]
+        if not isinstance(exposure, Mapping):
+            _ai_contract_invalid()
+        for symbol, theme_ids in exposure.items():
+            if not _valid_ai_string(symbol) or not _valid_ai_string_list(theme_ids):
+                _ai_contract_invalid()
+    if not _valid_ai_confidence(payload["confidence"]):
+        _ai_contract_invalid()
+    evidence = payload["evidence"]
+    if not isinstance(evidence, Mapping) or set(evidence) - AI_EVIDENCE_ALLOWED_KEYS:
+        _ai_contract_invalid()
+    if not _valid_ai_string_list(evidence.get("sources")):
+        _ai_contract_invalid()
+    if not _valid_ai_string(evidence.get("summary")):
+        _ai_contract_invalid()
+    if not _valid_ai_string_list(evidence.get("data_gaps", []), allow_empty=True):
+        _ai_contract_invalid()
+    policy = payload["policy"]
+    if not isinstance(policy, Mapping) or set(policy) - AI_POLICY_ALLOWED_KEYS:
+        _ai_contract_invalid()
+    downstream_use = policy.get("downstream_use")
+    if (
+        policy.get("execution_allowed") is not False
+        or policy.get("portfolio_allocation_allowed", False) is not False
+        or not _valid_ai_string(downstream_use)
+    ):
+        _ai_contract_invalid()
+    normalized_use = str(downstream_use).lower()
+    if not any(term in normalized_use for term in ("research", "advisory", "shadow")):
+        _ai_contract_invalid()
+    if "live" in normalized_use or (
+        any(term in normalized_use for term in AI_POLICY_FORBIDDEN_TERMS)
+        and not any(term in normalized_use for term in AI_POLICY_BLOCKING_TERMS)
+    ):
+        _ai_contract_invalid()
+
+
+def freshness_record(result: ContextFreshness, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "present": result.present,
+        "valid": result.valid,
+        "reason": result.reason,
+    }
+    if result.present and payload is not None:
+        for key in ("as_of", "generated_at", "expires_at"):
+            if key in payload:
+                record[key] = payload[key]
+        if result.reason == "legacy_expiry_compatibility":
+            record["compatibility_warning"] = "missing_expires_at"
+    return record
+
+
+def load_events(path: str | Path, as_of: dt.date, *, source_bytes: bytes | None = None) -> list[Event]:
     events: list[Event] = []
-    for row in read_csv_rows(path):
+    rows = read_csv_rows_bytes(source_bytes) if source_bytes is not None else read_csv_rows(path)
+    for row in rows:
         event_date = parse_date(row["event_date"])
         if event_date > as_of:
             continue
@@ -270,9 +472,10 @@ def entity_evidence_details(events: list[Event]) -> list[dict[str, Any]]:
     ]
 
 
-def load_watchlist(path: str | Path) -> dict[str, WatchlistItem]:
+def load_watchlist(path: str | Path, *, source_bytes: bytes | None = None) -> dict[str, WatchlistItem]:
     items: dict[str, WatchlistItem] = {}
-    for row in read_csv_rows(path):
+    rows = read_csv_rows_bytes(source_bytes) if source_bytes is not None else read_csv_rows(path)
+    for row in rows:
         symbol = row["symbol"].upper()
         items[symbol] = WatchlistItem(
             symbol=symbol,
@@ -285,24 +488,24 @@ def load_watchlist(path: str | Path) -> dict[str, WatchlistItem]:
     return items
 
 
-def load_ai_signal(path: str | Path | None) -> dict[str, Any] | None:
+def load_ai_signal(path: str | Path | None, *, source_bytes: bytes | None = None) -> dict[str, Any] | None:
     if path is None:
         return None
-    with Path(path).open(encoding="utf-8") as handle:
-        payload = json.load(handle)
-    if payload.get("mode") != "shadow":
-        raise ValueError("AI signal input must remain mode=shadow.")
-    if payload.get("policy", {}).get("execution_allowed") is not False:
-        raise ValueError("AI signal input must not allow execution.")
+    try:
+        payload = json.loads(source_bytes.decode("utf-8")) if source_bytes is not None else json.loads(Path(path).read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeError):
+        raise AISignalValidationError("ai_signal_invalid_json") from None
+    except OSError:
+        raise AISignalValidationError("ai_signal_unavailable") from None
+    validate_ai_signal(payload)
     return payload
 
 
 
-def load_theme_momentum(path: str | Path | None) -> dict[str, Any] | None:
+def load_theme_momentum(path: str | Path | None, *, source_bytes: bytes | None = None) -> dict[str, Any] | None:
     if path is None:
         return None
-    with Path(path).open(encoding="utf-8") as handle:
-        payload = json.load(handle)
+    payload = json.loads(source_bytes.decode("utf-8")) if source_bytes is not None else json.loads(Path(path).read_text(encoding="utf-8"))
     if payload.get("mode") != "theme_momentum_snapshot":
         raise ValueError("Theme momentum input must remain mode=theme_momentum_snapshot.")
     if payload.get("policy", {}).get("execution_allowed") is not False:
@@ -368,11 +571,17 @@ def optional_date(value: Any) -> dt.date | None:
     return parse_date(text)
 
 
-def load_market_confirmation(path: str | Path | None, as_of: dt.date) -> dict[str, MarketConfirmation]:
+def load_market_confirmation(
+    path: str | Path | None,
+    as_of: dt.date,
+    *,
+    source_bytes: bytes | None = None,
+) -> dict[str, MarketConfirmation]:
     if path is None:
         return {}
     confirmations: dict[str, MarketConfirmation] = {}
-    for row in read_csv_rows(path):
+    rows = read_csv_rows_bytes(source_bytes) if source_bytes is not None else read_csv_rows(path)
+    for row in rows:
         symbol = str(row.get("symbol", "")).upper().strip()
         if not symbol:
             continue
@@ -493,7 +702,7 @@ def resolve_ai_bias(symbol: str, ai_signal: dict[str, Any] | None) -> tuple[str 
         return None, [], None
     normalized_symbol = symbol.upper()
     explicit_bias: dict[str, Any] = {}
-    for key in ("candidate_bias", "research_bias", "symbol_bias"):
+    for key in ("candidate_bias", "symbol_bias"):
         explicit_bias.update(normalize_ai_mapping(ai_signal.get(key) or {}))
     if normalized_symbol in explicit_bias:
         raw_value = explicit_bias[normalized_symbol]
@@ -784,8 +993,6 @@ def build_recommendation(
         evidence_score += AI_BIAS_WEIGHTS.get(ai_bias, 0)
         if ai_bias in {"avoid", "negative"}:
             risk_score += 4
-        if ai_bias == "positive":
-            evidence_score += round(ai_confidence * 2)
 
     risk_flags = list(ai_signal.get("risk_flags", [])) if ai_signal else []
     if any("volatility" in flag or "high_vol" in flag for flag in risk_flags):
@@ -858,9 +1065,7 @@ def build_recommendation(
         ]
     )
 
-    long_horizon_ai_score = 0.0
-    if ai_bias in {"positive", "watch", "neutral"}:
-        long_horizon_ai_score = round(clamp(ai_confidence, 0, 1), 3)
+    long_horizon_ai_score = AI_LONG_CONTEXT_SCORES.get(ai_bias or "", 0.0)
 
     return {
         "symbol": symbol,
@@ -1460,6 +1665,17 @@ def infer_long_context_missing_reason(ai_signal: dict[str, Any] | None) -> str:
     return "current_candidates_do_not_meet_long_context_gate"
 
 
+def _snapshot_input(path: str | Path | None, *, fail_on_unavailable: bool) -> bytes | object | None:
+    if path is None:
+        return None
+    try:
+        return Path(path).read_bytes()
+    except OSError:
+        if fail_on_unavailable:
+            raise
+        return _UNAVAILABLE_INPUT
+
+
 def build_advisory_report(
     *,
     as_of: str,
@@ -1474,11 +1690,119 @@ def build_advisory_report(
     if cadence not in ALLOWED_CADENCES:
         raise ValueError(f"cadence must be one of: {', '.join(sorted(ALLOWED_CADENCES))}")
     as_of_date = parse_date(as_of)
-    watchlist = load_watchlist(political_watchlist_path)
-    events = load_events(political_events_path, as_of_date)
-    ai_signal = load_ai_signal(ai_signal_path)
-    theme_momentum = load_theme_momentum(theme_momentum_path)
-    market_confirmations = load_market_confirmation(market_confirmation_path, as_of_date)
+    report_bounds = report_time_bounds(as_of_date, utc_now_iso())
+    input_payloads = {
+        "political_events": _snapshot_input(political_events_path, fail_on_unavailable=True),
+        "political_watchlist": _snapshot_input(political_watchlist_path, fail_on_unavailable=True),
+        "ai_signal": _snapshot_input(ai_signal_path, fail_on_unavailable=False),
+        "theme_momentum": _snapshot_input(theme_momentum_path, fail_on_unavailable=False),
+        "market_confirmation": _snapshot_input(market_confirmation_path, fail_on_unavailable=True),
+    }
+    events_bytes = input_payloads["political_events"]
+    watchlist_bytes = input_payloads["political_watchlist"]
+    if not isinstance(events_bytes, bytes) or not isinstance(watchlist_bytes, bytes):
+        raise ValueError("required advisory input unavailable")
+    watchlist = load_watchlist(political_watchlist_path, source_bytes=watchlist_bytes)
+    events = load_events(political_events_path, as_of_date, source_bytes=events_bytes)
+    ai_signal: dict[str, Any] | None = None
+    ai_source_artifact = ""
+    ai_freshness_result = assess_context_freshness(
+        None,
+        report_as_of=as_of_date,
+        reference_time=report_bounds.reference_time,
+        report_generated_at=report_bounds.generated_at,
+        max_age_days=REPORT_EXPIRY_DAYS,
+    )
+    ai_freshness_payload: Mapping[str, Any] | None = None
+    ai_quality_warnings: list[str] = []
+    if ai_signal_path:
+        ai_bytes = input_payloads["ai_signal"]
+        if ai_bytes is _UNAVAILABLE_INPUT:
+            ai_quality_warnings.append("ai_signal_unavailable")
+        else:
+            try:
+                candidate_ai_signal = load_ai_signal(
+                    ai_signal_path,
+                    source_bytes=ai_bytes if isinstance(ai_bytes, bytes) else None,
+                )
+            except AISignalValidationError as exc:
+                ai_quality_warnings.append(str(exc))
+            else:
+                ai_freshness_payload = candidate_ai_signal
+                ai_freshness_result = assess_context_freshness(
+                    candidate_ai_signal,
+                    report_as_of=as_of_date,
+                    reference_time=report_bounds.reference_time,
+                    report_generated_at=report_bounds.generated_at,
+                    max_age_days=REPORT_EXPIRY_DAYS,
+                )
+                ai_source_artifact = str(ai_signal_path)
+                if ai_freshness_result.valid:
+                    ai_signal = candidate_ai_signal
+                else:
+                    ai_quality_warnings.append(f"ai_signal_{ai_freshness_result.reason}")
+
+    theme_momentum: dict[str, Any] | None = None
+    theme_source_artifact = ""
+    theme_freshness_result = assess_context_freshness(
+        None,
+        report_as_of=as_of_date,
+        reference_time=report_bounds.reference_time,
+        report_generated_at=report_bounds.generated_at,
+        max_age_days=REPORT_EXPIRY_DAYS,
+    )
+    theme_freshness_payload: Mapping[str, Any] | None = None
+    theme_quality_warnings: list[str] = []
+    if theme_momentum_path:
+        theme_bytes = input_payloads["theme_momentum"]
+        if theme_bytes is _UNAVAILABLE_INPUT:
+            theme_quality_warnings.append("theme_momentum_contract_invalid")
+        else:
+            try:
+                candidate_theme_momentum = load_theme_momentum(
+                    theme_momentum_path,
+                    source_bytes=theme_bytes if isinstance(theme_bytes, bytes) else None,
+                )
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                theme_quality_warnings.append("theme_momentum_contract_invalid")
+            else:
+                theme_freshness_payload = candidate_theme_momentum
+                if not candidate_theme_momentum.get("expires_at"):
+                    theme_freshness_payload = {
+                        **candidate_theme_momentum,
+                        "reason": "legacy_expiry_compatibility",
+                        "compatibility_warning": "missing_expires_at",
+                    }
+                theme_freshness_result = assess_context_freshness(
+                    theme_freshness_payload,
+                    report_as_of=as_of_date,
+                    reference_time=report_bounds.reference_time,
+                    report_generated_at=report_bounds.generated_at,
+                    max_age_days=REPORT_EXPIRY_DAYS,
+                    allow_legacy_expiry=True,
+                )
+                if theme_freshness_result.valid:
+                    theme_source_artifact = str(theme_momentum_path)
+                    theme_momentum = candidate_theme_momentum
+                else:
+                    theme_quality_warnings.append(f"theme_momentum_{theme_freshness_result.reason}")
+                    if not candidate_theme_momentum.get("expires_at"):
+                        theme_freshness_payload = None
+                        theme_freshness_result = assess_context_freshness(
+                            None,
+                            report_as_of=as_of_date,
+                            reference_time=report_bounds.reference_time,
+                            report_generated_at=report_bounds.generated_at,
+                            max_age_days=REPORT_EXPIRY_DAYS,
+                        )
+                    else:
+                        theme_source_artifact = str(theme_momentum_path)
+    market_bytes = input_payloads["market_confirmation"]
+    market_confirmations = load_market_confirmation(
+        market_confirmation_path,
+        as_of_date,
+        source_bytes=market_bytes if isinstance(market_bytes, bytes) else None,
+    )
     theme_momentum_summary = summarize_theme_momentum(theme_momentum)
     source_mode, data_quality_warnings = source_mode_for_paths(
         political_events_path,
@@ -1487,6 +1811,7 @@ def build_advisory_report(
         theme_momentum_path,
         market_confirmation_path,
     )
+    data_quality_warnings = dedupe(data_quality_warnings + ai_quality_warnings + theme_quality_warnings)
 
     events_by_symbol: dict[str, list[Event]] = defaultdict(list)
     for event in events:
@@ -1495,7 +1820,7 @@ def build_advisory_report(
     symbols = set(watchlist) | set(events_by_symbol)
     if ai_signal:
         symbols |= {symbol.upper() for symbol in ai_signal.get("universe", [])}
-        for key in ("symbol_bias", "research_bias", "candidate_bias"):
+        for key in ("symbol_bias", "candidate_bias"):
             symbols |= {symbol.upper() for symbol in normalize_ai_mapping(ai_signal.get(key) or {})}
 
     all_recommendations = [
@@ -1514,18 +1839,30 @@ def build_advisory_report(
     final_decisions = build_final_decisions(all_recommendations, theme_momentum, market_confirmations)
     long_context_symbols = long_context_symbols_from_decisions(final_decisions)
 
+    digest_payloads = {
+        name: "unavailable" if payload is _UNAVAILABLE_INPUT else payload
+        for name, payload in input_payloads.items()
+    }
     report = {
-        "schema_version": "5",
+        "schema_version": "6",
+        "contract_version": contract_version_for_schema("6"),
         "as_of": as_of_date.isoformat(),
-        "generated_at": utc_now_iso(),
+        "reference_time": utc_iso(report_bounds.reference_time),
+        "generated_at": utc_iso(report_bounds.generated_at),
+        "expires_at": utc_iso(report_bounds.expires_at),
+        "input_digest": input_digest_for_payloads(digest_payloads),
+        "freshness": {
+            "ai_signal": freshness_record(ai_freshness_result, ai_freshness_payload),
+            "theme_momentum": freshness_record(theme_freshness_result, theme_freshness_payload),
+        },
         "mode": "model_recommendations",
         "cadence": cadence,
         "audience_scope": "non_personalized_model_research",
         "source_artifacts": {
             "political_events": str(political_events_path),
             "political_watchlist": str(political_watchlist_path),
-            "ai_signal": str(ai_signal_path) if ai_signal_path else "",
-            "theme_momentum": str(theme_momentum_path) if theme_momentum_path else "",
+            "ai_signal": ai_source_artifact,
+            "theme_momentum": theme_source_artifact,
             "market_confirmation": str(market_confirmation_path) if market_confirmation_path else "",
         },
         "summary": {

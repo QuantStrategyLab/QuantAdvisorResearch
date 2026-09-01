@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import os
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -38,8 +39,9 @@ def test_workspace_is_private_exact_three_files_and_readback_valid(tmp_path):
 
 
 def test_equivalent_reports_produce_identical_bytes_in_distinct_workspaces(tmp_path):
-    first = build_preview_workspace(report(), tmp_path)
-    second = build_preview_workspace(report(), tmp_path)
+    payload = report()
+    first = build_preview_workspace(payload, tmp_path)
+    second = build_preview_workspace(deepcopy(payload), tmp_path)
 
     assert first != second
     assert {p.name: p.read_bytes() for p in first.iterdir()} == {

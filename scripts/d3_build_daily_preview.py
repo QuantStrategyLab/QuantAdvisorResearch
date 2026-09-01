@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from d3_evidence import DEPENDENCY_INVENTORY, EVIDENCE_VERSION, BundleSnapshot, EvidenceContractError, locked_environment_evidence, repository_file_hashes, validate_exact_bundle, validate_preview_snapshot
+from d3_evidence import DEPENDENCY_INVENTORY, EVIDENCE_VERSION, BundleSnapshot, EvidenceContractError, locked_environment_evidence, preview_source_contract, repository_file_hashes, validate_exact_bundle, validate_preview_snapshot
 from quant_advisor_research.advisory_report import build_advisory_report
 from quant_advisor_research.preview_workspace import build_preview_workspace
 
@@ -45,13 +45,14 @@ def build_evidence(args: argparse.Namespace) -> None:
             raise EvidenceContractError("repeat_workspace_not_distinct")
         first_snapshot = validate_exact_bundle(first)
         second_snapshot = validate_exact_bundle(second)
-        validate_preview_snapshot(first_snapshot); validate_preview_snapshot(second_snapshot)
+        validate_preview_snapshot(first_snapshot)
+        validate_preview_snapshot(second_snapshot)
         first_files, second_files = _bundle_hashes(first_snapshot), _bundle_hashes(second_snapshot)
         if first_files != second_files or any(first_snapshot.member(name).content != second_snapshot.member(name).content for name in ("manifest.json", "report.html", "report.json")):
             raise EvidenceContractError("repeat_build_not_equal")
         manifest = json.loads(first_snapshot.member("manifest.json").content.decode("utf-8"))
-        source = {"schema_version": "5", "contract_version": "model_recommendations.v5", "cadence": "daily", "as_of": args.as_of, "generated_at": args.frozen_generated_at}
-        if manifest.get("bundle_contract") != "qar.preview_bundle.v1" or manifest.get("source") != source:
+        source = preview_source_contract(manifest, as_of=args.as_of, generated_at=args.frozen_generated_at)
+        if manifest.get("bundle_contract") != "qar.preview_bundle.v1":
             raise EvidenceContractError("source_contract_mismatch")
         evidence = {
             "evidence_version": EVIDENCE_VERSION, "base_sha": args.base_sha, "head_sha": args.head_sha,

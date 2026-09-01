@@ -25,12 +25,16 @@ V6_INPUT_DIGEST = "a" * 64
 
 
 def build_v5(as_of: str = "2026-06-20") -> dict:
-    return build_advisory_report(
+    report = build_advisory_report(
         as_of=as_of,
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
     )
+    report.update(schema_version="5", contract_version="model_recommendations.v5")
+    for key in ("reference_time", "expires_at", "freshness", "input_digest"):
+        report.pop(key)
+    return report
 
 
 def build_v6(as_of: str = "2026-06-20") -> dict:

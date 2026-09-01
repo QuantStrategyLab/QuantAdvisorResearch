@@ -30,7 +30,8 @@ def report(*, cadence="daily", as_of="2026-06-20"):
 
 def test_daily_bundle_builds_and_readback_validates(tmp_path):
     output = tmp_path / "preview"
-    result = build_preview_bundle(report(), output)
+    value = report()
+    result = build_preview_bundle(value, output)
 
     assert result.bundle_contract == BUNDLE_CONTRACT
     assert sorted(path.name for path in output.iterdir()) == ["manifest.json", "report.html", "report.json"]
@@ -40,11 +41,11 @@ def test_daily_bundle_builds_and_readback_validates(tmp_path):
     assert manifest == {
         "bundle_contract": BUNDLE_CONTRACT,
         "source": {
-            "schema_version": "5",
+            "schema_version": "6",
             "contract_version": SOURCE_CONTRACT_VERSION,
             "cadence": "daily",
             "as_of": "2026-06-20",
-            "generated_at": report()["generated_at"],
+            "generated_at": value["generated_at"],
         },
         "artifacts": {
             "report.json": {
@@ -70,7 +71,7 @@ def test_non_daily_source_is_rejected_before_output(cadence, tmp_path):
 
 
 @pytest.mark.parametrize("mutation", [
-    lambda value: value.update(schema_version="6"),
+    lambda value: value.update(schema_version="7"),
     lambda value: value.update(contract_version="wrong"),
     lambda value: value.update(generated_at="not-a-datetime"),
 ])
@@ -81,6 +82,17 @@ def test_source_contract_mutations_fail_closed_without_partial_output(mutation, 
     with pytest.raises(PreviewBundleError):
         build_preview_bundle(value, output)
     assert not output.exists()
+
+
+def test_legacy_v5_source_remains_readable(tmp_path):
+    value = report()
+    value.update(schema_version="5")
+    for key in ("contract_version", "reference_time", "expires_at", "freshness", "input_digest"):
+        value.pop(key)
+
+    build_preview_bundle(value, tmp_path / "preview")
+
+    assert read_preview_bundle(tmp_path / "preview").report["schema_version"] == "5"
 
 
 def test_build_is_deterministic_for_equivalent_mapping_order(tmp_path):

@@ -14,10 +14,12 @@ from typing import Any
 
 from .artifact_integrity import ArtifactIntegrityError, snapshot_json_wire
 from .contracts import AdvisoryValidationError, validate_advisory_report
+from .time_contract import contract_version_for_schema
 
 BUNDLE_CONTRACT = "qar.preview_bundle.v1"
-SOURCE_SCHEMA_VERSION = "5"
-SOURCE_CONTRACT_VERSION = "model_recommendations.v5"
+SOURCE_SCHEMA_VERSION = "6"
+SOURCE_SCHEMA_VERSIONS = frozenset({"5", "6"})
+SOURCE_CONTRACT_VERSION = "model_recommendations.v6"
 _FIXED_FILES = frozenset({"report.json", "report.html", "manifest.json"})
 _MANIFEST_KEYS = frozenset({"bundle_contract", "source", "artifacts"})
 _SOURCE_KEYS = frozenset({"schema_version", "contract_version", "cadence", "as_of", "generated_at"})
@@ -63,9 +65,10 @@ def _validated_source(report: Mapping[str, Any]) -> dict[str, object]:
         validate_advisory_report(snapshot)
     except (ArtifactIntegrityError, AdvisoryValidationError, TypeError, ValueError, OverflowError, UnicodeError, RecursionError):
         raise _error("source_invalid") from None
-    if snapshot.get("schema_version") != SOURCE_SCHEMA_VERSION:
+    schema_version = snapshot.get("schema_version")
+    if schema_version not in SOURCE_SCHEMA_VERSIONS:
         raise _error("source_schema_unsupported")
-    if "contract_version" in snapshot:
+    if schema_version == "5" and "contract_version" in snapshot:
         raise _error("source_contract_field_forbidden")
     if snapshot.get("cadence") != "daily":
         raise _error("daily_only")
@@ -93,8 +96,8 @@ def _manifest(snapshot: Mapping[str, object], report_bytes: bytes, html_bytes: b
     return {
         "bundle_contract": BUNDLE_CONTRACT,
         "source": {
-            "schema_version": SOURCE_SCHEMA_VERSION,
-            "contract_version": SOURCE_CONTRACT_VERSION,
+            "schema_version": snapshot["schema_version"],
+            "contract_version": contract_version_for_schema(str(snapshot["schema_version"])),
             "cadence": "daily",
             "as_of": snapshot["as_of"],
             "generated_at": snapshot["generated_at"],
@@ -197,6 +200,6 @@ def read_preview_bundle(output_dir: str | Path) -> PreviewBundleEvidence:
 
 
 __all__ = [
-    "BUNDLE_CONTRACT", "SOURCE_CONTRACT_VERSION", "PreviewBundleError", "PreviewBundleEvidence",
+    "BUNDLE_CONTRACT", "SOURCE_CONTRACT_VERSION", "SOURCE_SCHEMA_VERSIONS", "PreviewBundleError", "PreviewBundleEvidence",
     "build_preview_bundle", "read_preview_bundle",
 ]
