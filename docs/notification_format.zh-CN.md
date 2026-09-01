@@ -147,5 +147,6 @@ Subject: 智慧投顾研究周度复盘 - 2026-05-30
 - GitHub Pages：`.github/workflows/publish_advisory_site.yml` 发布 HTML、JSON、Markdown 和 RSS。
 - RSS：`scripts/publish_advisory_site.py` 生成 `feed.xml`。
 - Telegram：可选。如果仓库 secrets 配置了 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID`，`scripts/notify_advisory_telegram.py` 会在 Pages 部署成功后发送短摘要；如果缺少任一 secret，会跳过通知但不让发布失败。
+- 通知语言：Telegram 支持 `NOTIFY_LANG=zh|en`，默认中文。英文通知只展示可稳定翻译的决策事实并链接到原始报告，不会把尚未英文化的中文理由混进英文消息；公开 HTML/RSS 目前仍默认简体中文。
 
 通知默认只展示最终推荐、股票背景、推荐理由、周期、综合分和完整报告链接；不能包含订单、目标仓位、目标股数、账户适当性或账户级配置建议。主题候选只保留在 JSON/Markdown 审计材料中，不进入默认通知摘要。

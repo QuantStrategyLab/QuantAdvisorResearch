@@ -11,8 +11,11 @@
   repository secrets, `scripts/notify_advisory_telegram.py` sends a short summary
   after a successful Pages deployment. Missing secrets skip notification without
   failing the publish job.
-- Locale: the public HTML/RSS/Telegram copy defaults to Simplified Chinese
-  (`zh-CN`). JSON contract keys remain in English for downstream stability.
+- Locale: public HTML/RSS defaults to Simplified Chinese (`zh-CN`). Telegram
+  accepts `NOTIFY_LANG=zh|en` and defaults to Chinese. English Telegram keeps
+  stable decision facts in English and links to the source-language report,
+  rather than mixing untranslated natural-language rationale into the message.
+  JSON contract keys remain in English for downstream stability.
 
 ## Boundary
 
