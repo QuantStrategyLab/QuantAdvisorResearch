@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+import re
 
 from quant_advisor_research.advisory_report import build_advisory_report, write_json
 from quant_advisor_research.publisher import (
@@ -492,3 +493,34 @@ def test_format_telegram_message_is_direct_and_links_report() -> None:
     assert "不包含下单" not in message
     assert "MU" in message
     assert "https://example.com/advisor/2026-05-30-weekly-model-recommendations.html" in message
+
+
+def test_format_telegram_message_can_render_an_english_summary_without_chinese_prose() -> None:
+    from quant_advisor_research.notifications import format_telegram_message
+
+    report = build_sample_report()
+    report["final_decisions"] = {
+        "recommendations": [
+            {
+                "symbol": "MU",
+                "primary_horizon": "medium",
+                "primary_horizon_label": "中线",
+                "combined_score": 0.82,
+                "business_summary": "科技 / HBM / 存储",
+                "prospect_summary": "中文理由不应混进英文通知。",
+            }
+        ],
+        "horizon_buckets": {"short": [], "medium": ["MU"], "long": []},
+    }
+
+    message = format_telegram_message(
+        report,
+        site_url="https://example.com/advisor",
+        lang="en-US",
+    )
+
+    assert "Quant Advisor Research | Weekly | 2026-05-30" in message
+    assert "MU | Medium term | Composite score=0.82" in message
+    assert "Rationale and source-language background" in message
+    assert "Full report: https://example.com/advisor/2026-05-30-weekly-model-recommendations.html" in message
+    assert not re.search(r"[\u4e00-\u9fff]", message)

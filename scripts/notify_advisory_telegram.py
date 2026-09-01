@@ -17,11 +17,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Send a non-personalized advisory report summary to Telegram.")
     parser.add_argument("--report", required=True, help="Advisory report JSON path")
     parser.add_argument("--site-url", default="https://quantstrategylab.github.io/QuantAdvisorResearch")
+    parser.add_argument(
+        "--lang",
+        default=os.environ.get("NOTIFY_LANG", "zh"),
+        help="Notification language: zh or en. Defaults to NOTIFY_LANG or zh.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print the message instead of sending")
     args = parser.parse_args(argv)
 
     report = json.loads(Path(args.report).read_text(encoding="utf-8"))
-    message = format_telegram_message(report, site_url=args.site_url)
+    message = format_telegram_message(report, site_url=args.site_url, lang=args.lang)
     if args.dry_run:
         print(message)
         return 0

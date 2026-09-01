@@ -173,6 +173,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NOTIFY_LANG: ${{ vars.NOTIFY_LANG || 'zh' }}
           SITE_URL: ${{ github.event.inputs.site_url || 'https://quantstrategylab.github.io/QuantAdvisorResearch' }}
           REPORT_PATH: ${{ steps.build_report.outputs.report_path }}
         run: |

@@ -9,6 +9,25 @@ from .advisory_report import display_number, display_percent, theme_label
 from .publisher import cadence_label, report_filename
 
 
+def notification_locale(value: object | None = None) -> str:
+    """Normalize the compact operator-notification locale."""
+
+    return "zh" if str(value or "zh").strip().lower().replace("_", "-").startswith("zh") else "en"
+
+
+def _english_cadence_label(report: dict[str, Any]) -> str:
+    cadence = str(report.get("cadence", "")).strip().lower()
+    return {"weekly": "Weekly", "monthly": "Monthly"}.get(cadence, cadence.title() or "Advisory")
+
+
+def _english_horizon_label(item: dict[str, Any]) -> str:
+    horizon = str(item.get("primary_horizon", "")).strip().lower()
+    return {"short": "Short term", "medium": "Medium term", "long": "Long term"}.get(
+        horizon,
+        horizon.replace("_", " ").title() or "Unspecified horizon",
+    )
+
+
 def report_public_url(report: dict[str, Any], *, site_url: str) -> str:
     return f"{site_url.rstrip('/')}/{quote(report_filename(report))}"
 
@@ -48,6 +67,40 @@ def _format_final_decisions(report: dict[str, Any]) -> list[str]:
         medium=", ".join(buckets.get("medium", [])) or "暂无",
         long=", ".join(buckets.get("long", [])) or "暂无",
     ))
+    return lines
+
+
+def _format_final_decisions_en(report: dict[str, Any]) -> list[str]:
+    """Render an English summary without embedding Chinese source prose.
+
+    Recommendation background and rationale are produced as Chinese natural
+    language in the report artifact today.  An English notification therefore
+    keeps only stable identifiers and numeric decision facts, then points the
+    reader to the full report instead of presenting a mixed-language summary.
+    """
+
+    decisions = report.get("final_decisions", {})
+    picks = decisions.get("recommendations", [])
+    if not picks:
+        return ["Recommendations: none for this period"]
+    lines = ["Recommendations:"]
+    for item in picks:
+        lines.append(
+            "- {symbol} | {horizon} | Composite score={score}".format(
+                symbol=item.get("symbol", ""),
+                horizon=_english_horizon_label(item),
+                score=display_number(item.get("combined_score")),
+            )
+        )
+    buckets = decisions.get("horizon_buckets", {})
+    lines.append(
+        "Horizons: short={short}; medium={medium}; long={long}".format(
+            short=", ".join(buckets.get("short", [])) or "none",
+            medium=", ".join(buckets.get("medium", [])) or "none",
+            long=", ".join(buckets.get("long", [])) or "none",
+        )
+    )
+    lines.append("Rationale and source-language background are available in the linked report.")
     return lines
 
 
@@ -101,7 +154,19 @@ def format_telegram_message(
     site_url: str,
     max_recommendations: int = 8,
     max_themes: int = 5,
+    lang: str | None = None,
 ) -> str:
+    locale = notification_locale(lang)
+    if locale == "en":
+        lines = [
+            f"Quant Advisor Research | {_english_cadence_label(report)} | {report.get('as_of', '')}",
+            "",
+            *_format_final_decisions_en(report),
+            "",
+            f"Full report: {report_public_url(report, site_url=site_url)}",
+        ]
+        return "\n".join(str(line) for line in lines if line is not None)
+
     lines = [
         f"智慧投顾研究系统 | {cadence_label(report)} | {report.get('as_of', '')}",
         "",
