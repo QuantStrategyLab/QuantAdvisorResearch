@@ -183,7 +183,7 @@ def test_index_limits_recent_history_and_archive_keeps_all_reports() -> None:
     assert '"json": "advisory_report_2026-05-01.json"' in report_index
 
 
-def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_path: Path) -> None:
+def test_render_report_html_treats_manifestless_operator_ai_as_no_op(tmp_path: Path) -> None:
     live_dir = tmp_path / "live"
     live_dir.mkdir()
     political_events = live_dir / "political_events.csv"
@@ -206,7 +206,8 @@ def test_render_report_html_does_not_show_fixture_warning_for_live_paths(tmp_pat
     html = render_report_html(report)
 
     assert report["summary"]["source_mode"] == "operator_supplied"
-    assert report["summary"]["data_quality_warnings"] == []
+    assert report["summary"]["data_quality_warnings"] == ["ai_signal_provenance_untrusted"]
+    assert report["source_artifacts"]["ai_signal"] == ""
     assert "来源模式" not in html
     assert "Input artifacts include example fixture paths" not in html
 

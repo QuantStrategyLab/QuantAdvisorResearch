@@ -11,9 +11,17 @@ from pathlib import Path
 from urllib.parse import quote
 from urllib.request import urlopen
 
-from .advisory_report import build_advisory_report, render_markdown, write_json, write_text
+from .advisory_report import (
+    AISignalValidationError,
+    build_advisory_report,
+    load_trusted_ai_signal,
+    render_markdown,
+    write_json,
+    write_text,
+)
 from .artifacts import write_report_manifest
 from .market_confirmation import (
+    EXCLUDED_SYMBOLS,
     build_market_confirmation_rows,
     collect_symbols,
     load_proxy_urls,
@@ -119,12 +127,29 @@ def build_market_confirmation_artifact(
     cache_max_age_days: int,
 ) -> Path:
     theme_momentum = load_theme_momentum(theme_momentum_path) if theme_momentum_path else None
-    symbols = collect_symbols(
-        political_watchlist_path=political_watchlist_path,
-        ai_signal_path=ai_signal_path,
-        theme_momentum=theme_momentum,
-        max_symbols=max_symbols,
+    ai_signal = None
+    if ai_signal_path:
+        try:
+            ai_signal = load_trusted_ai_signal(ai_signal_path)
+        except AISignalValidationError:
+            pass
+    symbols = set(
+        collect_symbols(
+            political_watchlist_path=political_watchlist_path,
+            ai_signal_path=None,
+            theme_momentum=theme_momentum,
+            max_symbols=2**31 - 1,
+        )
     )
+    if ai_signal:
+        for symbol in ai_signal.get("universe", []):
+            if isinstance(symbol, str) and symbol.strip():
+                symbols.add(symbol.upper())
+        for key in ("candidate_bias", "research_bias", "symbol_bias", "symbol_theme_exposure"):
+            value = ai_signal.get(key)
+            if isinstance(value, dict):
+                symbols.update(str(symbol).upper() for symbol in value if str(symbol).strip())
+    symbols = sorted(symbols - EXCLUDED_SYMBOLS)[:max_symbols]
     proxy_urls = load_proxy_urls(
         proxy_list_path=proxy_list,
         proxy_urls_text=proxy_urls_text,

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -23,6 +25,55 @@ from quant_advisor_research.contracts import AdvisoryValidationError, validate_a
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def write_trusted_example_ai_signal(tmp_path: Path) -> Path:
+    repo = tmp_path / "ResearchSignalContextPipelines"
+    signal = repo / "data/output/latest_signal.json"
+    signal.parent.mkdir(parents=True)
+    signal.write_bytes((ROOT / "examples/research_signal_context.example.json").read_bytes())
+    payload = json.loads(signal.read_text(encoding="utf-8"))
+    manifest = {
+        "manifest_type": "research_signal_context",
+        "schema_version": 2,
+        "artifact": {
+            "path": "data/output/latest_signal.json",
+            "sha256": hashlib.sha256(signal.read_bytes()).hexdigest(),
+        },
+        "as_of": payload["as_of"],
+        "generated_at": payload["generated_at"],
+        "expires_at": payload["expires_at"],
+        "mode": payload["mode"],
+        "producer": {
+            "repository": "QuantStrategyLab/ResearchSignalContextPipelines",
+            "commit_sha": "a" * 40,
+        },
+        "input_digest": f"sha256:{'b' * 64}",
+        "policy": {"execution_allowed": False},
+    }
+    signal.with_name("latest_signal.manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    subprocess.run(
+        ["git", "-C", repo, "remote", "add", "origin", "https://github.com/QuantStrategyLab/ResearchSignalContextPipelines.git"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", repo, "add", "data/output"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            repo,
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "trusted fixture",
+        ],
+        check=True,
+    )
+    return signal
 
 
 def test_build_advisory_report_blocks_execution_and_allocation() -> None:
@@ -61,13 +112,13 @@ def test_low_confidence_events_remain_verify_source_until_verified() -> None:
     assert by_symbol["EVT1"]["evidence_score"] > by_symbol["EVT4"]["evidence_score"]
 
 
-def test_ai_avoid_bias_defers_research_item() -> None:
+def test_ai_avoid_bias_defers_research_item(tmp_path: Path) -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="monthly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+        ai_signal_path=write_trusted_example_ai_signal(tmp_path),
     )
 
     by_symbol = {item["symbol"]: item for item in report["recommendations"]}
@@ -138,13 +189,13 @@ def test_mixed_confidence_recommendation_is_not_tier_one(tmp_path: Path) -> None
     assert rec["recommendation_tier"] == "tier_2"
 
 
-def test_long_horizon_window_is_measured_in_years() -> None:
+def test_long_horizon_window_is_measured_in_years(tmp_path: Path) -> None:
     report = build_advisory_report(
         as_of="2026-05-30",
         cadence="weekly",
         political_events_path=ROOT / "examples/political_events.example.csv",
         political_watchlist_path=ROOT / "examples/political_watchlist.example.csv",
-        ai_signal_path=ROOT / "examples/research_signal_context.example.json",
+        ai_signal_path=write_trusted_example_ai_signal(tmp_path),
     )
 
     by_symbol = {item["symbol"]: item for item in report["recommendations"]}
@@ -280,7 +331,7 @@ def test_report_manifest_records_contract_version_and_hashes(tmp_path: Path) -> 
     assert manifest["artifacts"]["markdown"]["sha256"]
 
 
-def test_theme_bias_can_lift_static_watchlist_item_without_direct_symbol_bias(tmp_path: Path) -> None:
+def test_legacy_v1_theme_bias_is_untrusted_no_op(tmp_path: Path) -> None:
     events_path = tmp_path / "events.csv"
     events_path.write_text(
         "event_id,event_date,symbol,event_type,direction,confidence,source_url,notes\n",
@@ -339,11 +390,12 @@ def test_theme_bias_can_lift_static_watchlist_item_without_direct_symbol_bias(tm
 
     rec = report["recommendations"][0]
     assert rec["symbol"] == "MU"
-    assert rec["rating"] == "watch"
-    assert rec["evidence_score"] > 4
-    assert any("主题=hbm_memory" in reason for reason in rec["reasons"])
+    assert rec["rating"] == "monitor"
+    assert rec["evidence_score"] == 4
+    assert rec["ai_context"]["source"] == ""
+    assert report["summary"]["data_quality_warnings"] == ["ai_signal_provenance_untrusted"]
     assert report["summary"]["long_context_available"] is False
-    assert report["summary"]["long_context_missing_reason"] == "current_candidates_do_not_meet_long_context_gate"
+    assert report["summary"]["long_context_missing_reason"] == "ai_signal_not_available"
     assert "MU" not in report["summary"]["long_context_symbols"]
     assert report["final_decisions"]["horizon_action_buckets"]["long"]["watch"] == []
 
