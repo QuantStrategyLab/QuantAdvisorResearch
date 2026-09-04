@@ -3,13 +3,16 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 
 import pytest
 
 from quant_advisor_research import advisory_report as advisory_report_module
+from quant_advisor_research import build_pipeline as build_pipeline_module
 from quant_advisor_research.advisory_report import build_advisory_report
+from quant_advisor_research.build_pipeline import build_advisory_artifacts
 from quant_advisor_research.contracts import validate_advisory_report
 
 
@@ -76,6 +79,63 @@ def build_report(tmp_path: Path, ai_signal: Path | None = None) -> dict[str, obj
 def write_signal(path: Path, payload: dict[str, object]) -> Path:
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     return path
+
+
+def write_trusted_signal(
+    tmp_path: Path,
+    payload: dict[str, object] | None = None,
+    *,
+    manifest_updates: dict[str, object] | None = None,
+) -> Path:
+    repo = tmp_path / "research-signal-context"
+    signal = repo / "data/output/latest_signal.json"
+    signal.parent.mkdir(parents=True)
+    signal.write_text(json.dumps(payload or valid_v2_signal()) + "\n", encoding="utf-8")
+    signal_payload = json.loads(signal.read_text(encoding="utf-8"))
+    manifest: dict[str, object] = {
+        "manifest_type": "research_signal_context",
+        "schema_version": 2,
+        "artifact": {
+            "path": "data/output/latest_signal.json",
+            "sha256": hashlib.sha256(signal.read_bytes()).hexdigest(),
+        },
+        "as_of": signal_payload["as_of"],
+        "generated_at": signal_payload["generated_at"],
+        "expires_at": signal_payload["expires_at"],
+        "mode": signal_payload["mode"],
+        "producer": {
+            "repository": "QuantStrategyLab/ResearchSignalContextPipelines",
+            "commit_sha": "a" * 40,
+        },
+        "input_digest": f"sha256:{'b' * 64}",
+        "policy": {"execution_allowed": False},
+    }
+    if manifest_updates:
+        manifest.update(manifest_updates)
+    manifest_path = signal.with_name("latest_signal.manifest.json")
+    manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", repo], check=True)
+    subprocess.run(
+        ["git", "-C", repo, "remote", "add", "origin", "https://github.com/QuantStrategyLab/ResearchSignalContextPipelines.git"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", repo, "add", "data/output/latest_signal.json", "data/output/latest_signal.manifest.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            repo,
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "test fixture",
+        ],
+        check=True,
+    )
+    return signal
 
 
 def replace_nested(payload: dict[str, object], path: tuple[str, ...], value: object) -> None:
@@ -186,6 +246,121 @@ def test_unavailable_ai_signal_is_sanitized_no_op(tmp_path: Path) -> None:
     assert missing_signal.name not in json.dumps(report)
 
 
+def test_missing_ai_manifest_is_sanitized_no_op(tmp_path: Path) -> None:
+    signal = write_signal(tmp_path / "signal.json", valid_v2_signal())
+
+    report = build_report(tmp_path, signal)
+
+    assert "AI1" not in {item["symbol"] for item in report["recommendations"]}
+    assert report["summary"]["data_quality_warnings"] == ["ai_signal_provenance_untrusted"]
+    assert signal.name not in json.dumps(report)
+
+
+@pytest.mark.parametrize(
+    "manifest_updates",
+    [
+        {"schema_version": 1},
+        {"schema_version": 3},
+        {"artifact": {"path": "data/output/latest_signal.json", "sha256": "0" * 64}},
+        {"as_of": "2026-05-29"},
+        {"generated_at": "2026-05-29T12:00:00Z"},
+        {"expires_at": "2026-06-29"},
+        {"mode": "unknown"},
+        {"producer": {"repository": "untrusted/repository", "commit_sha": "a" * 40}},
+        {
+            "producer": {
+                "repository": "QuantStrategyLab/ResearchSignalContextPipelines",
+                "commit_sha": "main",
+            }
+        },
+        {"input_digest": "sha256:invalid"},
+        {"policy": {"execution_allowed": True}},
+        {"publisher_commit": "c" * 40},
+    ],
+)
+def test_untrusted_ai_manifest_is_no_op(tmp_path: Path, manifest_updates: dict[str, object]) -> None:
+    signal = write_trusted_signal(tmp_path, manifest_updates=manifest_updates)
+
+    report = build_report(tmp_path / "report", signal)
+
+    assert "AI1" not in {item["symbol"] for item in report["recommendations"]}
+    assert report["summary"]["data_quality_warnings"] == ["ai_signal_provenance_untrusted"]
+
+
+def test_ai_signal_and_manifest_must_match_checkout_head_blobs(tmp_path: Path) -> None:
+    signal = write_trusted_signal(tmp_path)
+    payload = valid_v2_signal(confidence=0.9)
+    signal.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    manifest_path = signal.with_name("latest_signal.manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact"]["sha256"] = hashlib.sha256(signal.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+
+    report = build_report(tmp_path / "report", signal)
+
+    assert "AI1" not in {item["symbol"] for item in report["recommendations"]}
+    assert report["summary"]["data_quality_warnings"] == ["ai_signal_provenance_untrusted"]
+
+
+def test_ai_signal_checkout_remote_must_match_producer_repository(tmp_path: Path) -> None:
+    signal = write_trusted_signal(tmp_path)
+    repo = signal.parents[2]
+    subprocess.run(
+        ["git", "-C", repo, "remote", "set-url", "origin", "https://github.com/untrusted/repository.git"],
+        check=True,
+    )
+
+    report = build_report(tmp_path / "report", signal)
+
+    assert "AI1" not in {item["symbol"] for item in report["recommendations"]}
+    assert report["summary"]["data_quality_warnings"] == ["ai_signal_provenance_untrusted"]
+
+
+def test_valid_immutable_ai_provenance_can_score(tmp_path: Path) -> None:
+    signal = write_trusted_signal(tmp_path)
+
+    report = build_report(tmp_path / "report", signal)
+
+    recommendation = next(item for item in report["recommendations"] if item["symbol"] == "AI1")
+    assert recommendation["ai_context"]["bias"] == "positive"
+    assert report["summary"]["data_quality_warnings"] == []
+
+
+def test_untrusted_ai_signal_does_not_expand_market_universe(tmp_path: Path, monkeypatch) -> None:
+    signal = write_signal(tmp_path / "signal.json", valid_v2_signal())
+    events, watchlist = write_base_inputs(tmp_path / "inputs")
+    captured_symbols: list[str] = []
+
+    def capture_rows(*, symbols, **_kwargs):
+        captured_symbols.extend(symbols)
+        return []
+
+    monkeypatch.setattr(build_pipeline_module, "build_market_confirmation_rows", capture_rows)
+    build_advisory_artifacts(
+        as_of=dt.date(2026, 5, 30),
+        cadence="weekly",
+        political_events_path=events,
+        political_watchlist_path=watchlist,
+        ai_signal_path=signal,
+        theme_momentum_path=None,
+        market_confirmation_path=None,
+        output_dir=tmp_path / "output",
+        max_candidates=12,
+        market_benchmark="SPY",
+        market_max_symbols=80,
+        market_request_pause_seconds=0,
+        market_proxy_list=None,
+        market_proxy_urls="",
+        market_proxy_pool_url="",
+        market_use_network=False,
+        market_cache_dir=None,
+        market_cache_max_age_days=14,
+    )
+
+    assert "BASE" in captured_symbols
+    assert "AI1" not in captured_symbols
+
+
 @pytest.mark.parametrize(
     ("updates", "reason"),
     [
@@ -209,7 +384,7 @@ def test_temporally_invalid_ai_signal_is_reported_and_does_not_score(
 ) -> None:
     payload = valid_v2_signal()
     payload.update(updates)
-    signal = write_signal(tmp_path / "signal.json", payload)
+    signal = write_trusted_signal(tmp_path, payload)
 
     report = build_report(tmp_path, signal)
 
@@ -262,7 +437,7 @@ def test_new_builder_emits_v6_time_contract_and_content_bound_digest(tmp_path: P
 
 def test_input_digest_binds_the_bytes_consumed_before_source_replacement(tmp_path: Path, monkeypatch) -> None:
     events, watchlist = write_base_inputs(tmp_path)
-    signal = write_signal(tmp_path / "signal.json", valid_v2_signal())
+    signal = write_trusted_signal(tmp_path / "signal-repo")
     original_signal_bytes = signal.read_bytes()
     original_loader = advisory_report_module.load_ai_signal
 
@@ -297,10 +472,10 @@ def test_input_digest_binds_the_bytes_consumed_before_source_replacement(tmp_pat
 
 
 def test_positive_ai_confidence_is_display_only_for_recommendation_scoring(tmp_path: Path) -> None:
-    low_path = write_signal(tmp_path / "low.json", valid_v2_signal(confidence=0.0))
-    high_path = write_signal(tmp_path / "high.json", valid_v2_signal(confidence=1.0))
-    low = build_report(tmp_path / "low", low_path)
-    high = build_report(tmp_path / "high", high_path)
+    low_path = write_trusted_signal(tmp_path / "low", valid_v2_signal(confidence=0.0))
+    high_path = write_trusted_signal(tmp_path / "high", valid_v2_signal(confidence=1.0))
+    low = build_report(tmp_path / "low-report", low_path)
+    high = build_report(tmp_path / "high-report", high_path)
 
     low_rec = next(item for item in low["recommendations"] if item["symbol"] == "AI1")
     high_rec = next(item for item in high["recommendations"] if item["symbol"] == "AI1")

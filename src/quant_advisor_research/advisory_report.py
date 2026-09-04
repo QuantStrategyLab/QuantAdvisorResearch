@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
+import re
+import subprocess
 from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -96,6 +99,13 @@ AI_EVIDENCE_ALLOWED_KEYS = frozenset({"sources", "summary", "data_gaps"})
 AI_POLICY_ALLOWED_KEYS = frozenset({"execution_allowed", "portfolio_allocation_allowed", "downstream_use"})
 AI_POLICY_FORBIDDEN_TERMS = frozenset({"live", "allocation", "broker", "execution", "order", "position", "account"})
 AI_POLICY_BLOCKING_TERMS = frozenset({"blocked", "not allowed", "do not", "never", "no "})
+AI_SIGNAL_MANIFEST_NAME = "latest_signal.manifest.json"
+AI_SIGNAL_MANIFEST_PATH = "data/output/latest_signal.manifest.json"
+AI_SIGNAL_PATH = "data/output/latest_signal.json"
+AI_SIGNAL_PRODUCER_REPOSITORY = "QuantStrategyLab/ResearchSignalContextPipelines"
+AI_SIGNAL_PROVENANCE_WARNING = "ai_signal_provenance_untrusted"
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+GIT_SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 _UNAVAILABLE_INPUT = object()
 
 HORIZON_WINDOWS = {
@@ -498,6 +508,114 @@ def load_ai_signal(path: str | Path | None, *, source_bytes: bytes | None = None
     except OSError:
         raise AISignalValidationError("ai_signal_unavailable") from None
     validate_ai_signal(payload)
+    return payload
+
+
+def _ai_provenance_untrusted() -> None:
+    raise AISignalValidationError(AI_SIGNAL_PROVENANCE_WARNING)
+
+
+def _git_output(repo: Path, *args: str) -> bytes:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        _ai_provenance_untrusted()
+    return result.stdout
+
+
+def _repository_from_remote(remote: str) -> str:
+    value = remote.strip().removesuffix("/").removesuffix(".git")
+    for prefix in ("https://github.com/", "git@github.com:", "ssh://git@github.com/"):
+        if value.startswith(prefix):
+            return value.removeprefix(prefix)
+    return ""
+
+
+def load_trusted_ai_signal(
+    path: str | Path | None,
+    *,
+    source_bytes: bytes | None = None,
+) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    signal_path = Path(path).resolve()
+    signal_bytes = source_bytes
+    if signal_bytes is None:
+        try:
+            signal_bytes = signal_path.read_bytes()
+        except OSError:
+            raise AISignalValidationError("ai_signal_unavailable") from None
+    payload = load_ai_signal(signal_path, source_bytes=signal_bytes)
+    if payload is None:
+        return None
+    manifest_path = signal_path.with_name(AI_SIGNAL_MANIFEST_NAME)
+    try:
+        manifest_bytes = manifest_path.read_bytes()
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        _ai_provenance_untrusted()
+    if not isinstance(manifest, Mapping):
+        _ai_provenance_untrusted()
+    required_keys = {
+        "manifest_type",
+        "schema_version",
+        "artifact",
+        "as_of",
+        "generated_at",
+        "expires_at",
+        "mode",
+        "producer",
+        "input_digest",
+        "policy",
+    }
+    artifact = manifest.get("artifact")
+    producer = manifest.get("producer")
+    policy = manifest.get("policy")
+    if (
+        set(manifest) != required_keys
+        or manifest.get("manifest_type") != "research_signal_context"
+        or manifest.get("schema_version") != 2
+        or not isinstance(artifact, Mapping)
+        or set(artifact) != {"path", "sha256"}
+        or artifact.get("path") != AI_SIGNAL_PATH
+        or not isinstance(artifact.get("sha256"), str)
+        or SHA256_PATTERN.fullmatch(artifact["sha256"]) is None
+        or artifact["sha256"] != hashlib.sha256(signal_bytes).hexdigest()
+        or not isinstance(producer, Mapping)
+        or set(producer) != {"repository", "commit_sha"}
+        or producer.get("repository") != AI_SIGNAL_PRODUCER_REPOSITORY
+        or not isinstance(producer.get("commit_sha"), str)
+        or GIT_SHA_PATTERN.fullmatch(producer["commit_sha"]) is None
+        or not isinstance(manifest.get("input_digest"), str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", manifest["input_digest"]) is None
+        or not isinstance(policy, Mapping)
+        or set(policy) != {"execution_allowed"}
+        or policy.get("execution_allowed") is not False
+        or any(manifest.get(key) != payload.get(key) for key in ("as_of", "generated_at", "expires_at", "mode"))
+    ):
+        _ai_provenance_untrusted()
+
+    try:
+        repo = Path(_git_output(signal_path.parent, "rev-parse", "--show-toplevel").decode("utf-8").strip()).resolve()
+        signal_relative = signal_path.relative_to(repo).as_posix()
+        manifest_relative = manifest_path.resolve().relative_to(repo).as_posix()
+        head = _git_output(repo, "rev-parse", "HEAD").decode("ascii").strip()
+        remote = _git_output(repo, "remote", "get-url", "origin").decode("utf-8").strip()
+    except (UnicodeError, ValueError):
+        _ai_provenance_untrusted()
+    if (
+        signal_relative != AI_SIGNAL_PATH
+        or manifest_relative != AI_SIGNAL_MANIFEST_PATH
+        or GIT_SHA_PATTERN.fullmatch(head) is None
+        or _repository_from_remote(remote) != AI_SIGNAL_PRODUCER_REPOSITORY
+        or _git_output(repo, "show", f"{head}:{signal_relative}") != signal_bytes
+        or _git_output(repo, "show", f"{head}:{manifest_relative}") != manifest_bytes
+    ):
+        _ai_provenance_untrusted()
     return payload
 
 
@@ -1721,7 +1839,7 @@ def build_advisory_report(
             ai_quality_warnings.append("ai_signal_unavailable")
         else:
             try:
-                candidate_ai_signal = load_ai_signal(
+                candidate_ai_signal = load_trusted_ai_signal(
                     ai_signal_path,
                     source_bytes=ai_bytes if isinstance(ai_bytes, bytes) else None,
                 )
