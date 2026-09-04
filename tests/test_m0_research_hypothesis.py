@@ -108,14 +108,7 @@ def test_adapter_supports_existing_v6_public_report_contract() -> None:
             "expires_at": (reference_time + dt.timedelta(days=7)).isoformat().replace("+00:00", "Z"),
             "input_digest": "a" * 64,
             "freshness": {
-                "ai_signal": {
-                    "present": True,
-                    "valid": True,
-                    "reason": "fresh",
-                    "as_of": "2026-05-30",
-                    "generated_at": "2026-05-30T00:00:00Z",
-                    "expires_at": "2026-06-30",
-                },
+                "ai_signal": {"present": False, "valid": False, "reason": "not_provided"},
                 "theme_momentum": {"present": False, "valid": False, "reason": "not_provided"},
             },
         }
