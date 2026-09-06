@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime as dt
+
 import json
 from typing import Any
 from urllib.parse import quote
@@ -7,6 +9,7 @@ from urllib.request import Request, urlopen
 
 from .advisory_report import display_number, display_percent, theme_label
 from .publisher import cadence_label, report_filename
+from .time_contract import is_report_expired
 
 
 def notification_locale(value: object | None = None) -> str:
@@ -155,11 +158,14 @@ def format_telegram_message(
     max_recommendations: int = 8,
     max_themes: int = 5,
     lang: str | None = None,
+    now: dt.datetime | None = None,
 ) -> str:
     locale = notification_locale(lang)
+    expired = is_report_expired(report, now=now)
     if locale == "en":
         lines = [
             f"Quant Advisor Research | {_english_cadence_label(report)} | {report.get('as_of', '')}",
+            *(["EXPIRED — this report is past expires_at and is not a current public recommendation."] if expired else []),
             "",
             *_format_final_decisions_en(report),
             "",
@@ -169,6 +175,7 @@ def format_telegram_message(
 
     lines = [
         f"智慧投顾研究系统 | {cadence_label(report)} | {report.get('as_of', '')}",
+        *(["【已过期】该报告已超过 expires_at，不再作为当前公开推荐。"] if expired else []),
         "",
         *_format_final_decisions(report),
         "",

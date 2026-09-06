@@ -159,3 +159,23 @@ def schema_for_contract_version(contract_version: str) -> str:
         if version == contract_version:
             return schema
     raise TimeContractError(f"unsupported contract_version: {contract_version}")
+
+def is_report_expired(
+    report: Mapping[str, Any],
+    *,
+    now: dt.datetime | None = None,
+) -> bool:
+    """True when expires_at is present and strictly before the reference instant."""
+
+    expires_text = str(report.get("expires_at") or "").strip()
+    if not expires_text:
+        return False
+    try:
+        expires_at = normalize_aware_datetime(expires_text)
+    except TimeContractError:
+        return False
+    reference = now or dt.datetime.now(dt.UTC)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=dt.UTC)
+    return reference > expires_at
+

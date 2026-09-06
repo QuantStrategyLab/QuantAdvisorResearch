@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import datetime as dt
 import re
 from collections.abc import Mapping, Sequence
@@ -224,6 +226,8 @@ def _validate_v6_freshness(
 def _require_number_0_1(value: Any, name: str) -> None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise AdvisoryValidationError(f"{name} must be numeric")
+    if not math.isfinite(value):
+        raise AdvisoryValidationError(f"{name} must be a finite number between 0 and 1")
     if value < 0 or value > 1:
         raise AdvisoryValidationError(f"{name} must be between 0 and 1")
 

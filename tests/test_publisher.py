@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime as dt
+
 from copy import deepcopy
 from pathlib import Path
 import re
@@ -528,3 +530,43 @@ def test_format_telegram_message_can_render_an_english_summary_without_chinese_p
     assert "Rationale and source-language background" in message
     assert "Full report: https://example.com/advisor/2026-05-30-weekly-model-recommendations.html" in message
     assert not re.search(r"[\u4e00-\u9fff]", message)
+
+
+def test_render_index_html_prefers_non_expired_report_as_latest() -> None:
+    fresh = build_sample_report()
+    fresh["as_of"] = "2026-05-20"
+    fresh["expires_at"] = "2099-01-01T00:00:00Z"
+    expired = build_sample_report()
+    expired["as_of"] = "2026-05-30"
+    expired["expires_at"] = "2020-01-01T00:00:00Z"
+
+    html = render_index_html([expired, fresh], now=dt.datetime(2026, 6, 1, tzinfo=dt.UTC))
+    latest_section = html.split('class="latest-panel"', 1)[1].split('class="archive"', 1)[0]
+
+    assert "2026-05-20" in latest_section
+    assert "2026-05-30" not in latest_section
+    assert "打开最新报告" in latest_section
+
+
+def test_render_index_html_marks_expired_when_only_expired_reports_remain() -> None:
+    expired = build_sample_report()
+    expired["as_of"] = "2026-05-30"
+    expired["expires_at"] = "2020-01-01T00:00:00Z"
+
+    html = render_index_html([expired], now=dt.datetime(2026, 6, 1, tzinfo=dt.UTC))
+    latest_section = html.split('class="latest-panel"', 1)[1]
+
+    assert "过期" in latest_section
+
+
+def test_format_telegram_message_marks_expired_report() -> None:
+    from quant_advisor_research.notifications import format_telegram_message
+
+    report = build_sample_report()
+    report["expires_at"] = "2020-01-01T00:00:00Z"
+    message = format_telegram_message(
+        report,
+        site_url="https://example.com/advisor",
+        now=dt.datetime(2026, 6, 1, tzinfo=dt.UTC),
+    )
+    assert "过期" in message
