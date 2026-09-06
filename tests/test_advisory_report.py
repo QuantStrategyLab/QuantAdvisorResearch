@@ -684,3 +684,79 @@ def test_contract_rejects_final_decision_section_action_mismatch() -> None:
 
     with pytest.raises(AdvisoryValidationError, match="watchlist.*action must be watch"):
         validate_advisory_report(report)
+
+
+def test_duplicate_news_rows_do_not_inflate_rating_before_dedupe() -> None:
+    item = WatchlistItem(
+        symbol="AAA",
+        name="Aaa Corp",
+        bucket="named_mentioned",
+        research_status="active",
+        thesis="Named in coverage.",
+        source_url="",
+    )
+    duplicate_events = [
+        Event(
+            event_id="news-1",
+            event_date=dt.date(2026, 1, 10),
+            symbol="AAA",
+            event_type="market_reaction",
+            direction="bullish",
+            confidence="medium",
+            source_url="https://example.com/same-news",
+            notes="Duplicate row A",
+            entity_match_type="issuer",
+            match_evidence="AAA is named in the release.",
+            relationship_type="issuer",
+        ),
+        Event(
+            event_id="news-2",
+            event_date=dt.date(2026, 1, 10),
+            symbol="AAA",
+            event_type="market_reaction",
+            direction="bullish",
+            confidence="medium",
+            source_url="https://example.com/same-news",
+            notes="Duplicate row B",
+            entity_match_type="issuer",
+            match_evidence="AAA is named in the release.",
+            relationship_type="issuer",
+        ),
+    ]
+
+    single = build_recommendation("AAA", item, duplicate_events[:1], None, dt.date(2026, 1, 20))
+    duplicated = build_recommendation("AAA", item, duplicate_events, None, dt.date(2026, 1, 20))
+
+    assert single["rating"] == "watch"
+    assert duplicated["rating"] == single["rating"]
+    assert duplicated["evidence_score"] == single["evidence_score"]
+
+
+def test_official_event_entity_fields_roundtrip_into_recommendation_evidence(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.csv"
+    events_path.write_text(
+        "event_id,event_date,symbol,event_type,direction,confidence,source_url,notes,"
+        "entity_match_type,match_evidence,relationship_type\n"
+        "official-1,2026-01-10,EVT1,disclosure_buy,bullish,high,https://www.sec.gov/example/1,"
+        "Official filing.,issuer,SEC filing names EVT1,issuer\n",
+        encoding="utf-8",
+    )
+    watchlist_path = tmp_path / "watchlist.csv"
+    watchlist_path.write_text(
+        "symbol,name,bucket,research_status,thesis,source_url\n"
+        "EVT1,Event One,named_mentioned,active,Thesis,https://example.com/evt1\n",
+        encoding="utf-8",
+    )
+
+    report = build_advisory_report(
+        as_of="2026-01-20",
+        cadence="weekly",
+        political_events_path=events_path,
+        political_watchlist_path=watchlist_path,
+    )
+    rec = next(item for item in report["recommendations"] if item["symbol"] == "EVT1")
+    entity = rec["entity_evidence"][0]
+    assert entity["entity_match_type"] == "issuer"
+    assert entity["match_evidence"] == "SEC filing names EVT1"
+    assert entity["relationship_type"] == "issuer"
+    assert entity["accepted"] is True

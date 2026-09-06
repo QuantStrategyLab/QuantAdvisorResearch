@@ -465,6 +465,20 @@ def event_has_company_entity_acceptance(event: Event) -> bool:
     )
 
 
+
+def dedupe_events_for_scoring(events: list[Event]) -> list[Event]:
+    """Keep one row per news URL (or event_id) before score accumulation."""
+
+    seen: set[str] = set()
+    unique: list[Event] = []
+    for event in events:
+        key = event.source_url.strip() or event.event_id
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(event)
+    return unique
+
 def accepted_entity_events(events: list[Event]) -> list[Event]:
     return [event for event in events if event_has_company_entity_acceptance(event)]
 
@@ -1074,7 +1088,7 @@ def build_recommendation(
     ai_signal: dict[str, Any] | None,
     as_of: dt.date,
 ) -> dict[str, Any]:
-    accepted_events = accepted_entity_events(events)
+    accepted_events = dedupe_events_for_scoring(accepted_entity_events(events))
     rejected_events = [event for event in events if event not in accepted_events]
     ai_bias, ai_bias_source_themes, ai_bias_confidence = resolve_ai_bias(symbol, ai_signal)
     ai_confidence = (
