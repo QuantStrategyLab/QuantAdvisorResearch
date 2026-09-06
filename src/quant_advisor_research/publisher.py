@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 from .advisory_report import display_number, display_percent, sector_label, theme_label
 from .contracts import AdvisoryValidationError, validate_advisory_report
+from .time_contract import is_report_expired
 from .period_contract import CanonicalPeriod, PeriodContractError, canonical_period_identity
 
 
@@ -952,9 +953,12 @@ def render_horizon_snapshot(report: dict[str, Any], *, linked: bool = False) -> 
     return f'<div class="snapshot-grid">{"".join(columns)}</div>'
 
 
-def render_index_html(reports: list[dict[str, Any]]) -> str:
+def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None = None) -> str:
     sorted_reports = sorted(reports, key=lambda item: item["as_of"], reverse=True)
-    latest = sorted_reports[0] if sorted_reports else None
+    reference_now = now or dt.datetime.now(dt.UTC)
+    latest = next((item for item in sorted_reports if not is_report_expired(item, now=reference_now)), None)
+    if latest is None and sorted_reports:
+        latest = sorted_reports[0]
     latest_block = ""
     if latest:
         latest_filename = report_filename(latest)
@@ -963,9 +967,9 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
         latest_block = f"""
         <section class="latest-panel">
           <div class="latest-copy">
-            <p class="eyebrow">Latest advisory</p>
-            <h2>{html.escape(latest['as_of'])} {html.escape(cadence_label(latest))}智慧投顾研究</h2>
-            <p class="lead">结合主题动量、市场确认和事件证据，生成普通投资者更容易阅读的研究结论。</p>
+            <p class="eyebrow">{"已过期报告" if is_report_expired(latest, now=reference_now) else "Latest advisory"}</p>
+            <h2>{html.escape(latest['as_of'])} {html.escape(cadence_label(latest))}智慧投顾研究{"（已过期）" if is_report_expired(latest, now=reference_now) else ""}</h2>
+            <p class="lead">{"该报告已过期，不再作为当前公开推荐。" if is_report_expired(latest, now=reference_now) else "结合主题动量、市场确认和事件证据，生成普通投资者更容易阅读的研究结论。"}</p>
             <div class="theme-line"><span>主要信号</span>{html.escape(top_themes or '无')}</div>
             <div class="symbol-strip hero-symbols">{render_symbol_tags([str(symbol) for symbol in top_symbols])}</div>
             <a class="primary-action" href="{html.escape(latest_filename)}">打开最新报告</a>
@@ -974,7 +978,7 @@ def render_index_html(reports: list[dict[str, Any]]) -> str:
         </section>
         """
     items = []
-    recent_reports = sorted_reports[1 : INDEX_HISTORY_LIMIT + 1]
+    recent_reports = [item for item in sorted_reports if item is not latest][:INDEX_HISTORY_LIMIT]
     for report in recent_reports:
         filename = report_filename(report)
         top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))

@@ -4,6 +4,8 @@ import datetime as dt
 import json
 from pathlib import Path
 
+import pytest
+
 from quant_advisor_research.market_confirmation import PriceBar, write_cached_bars
 from quant_advisor_research.recommendation_review import (
     build_recommendation_review,
@@ -197,3 +199,58 @@ def test_recommendation_review_marks_same_day_report_as_pending(tmp_path: Path) 
     assert review["review_items"][0]["outcome"] == "pending"
     assert review["summary"]["pending_count"] == 1
     assert review["summary"]["insufficient_price_data_count"] == 0
+
+
+def test_recommendation_review_uses_generated_at_as_public_availability_start(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "market-cache"
+    # Prices move sharply between as_of (Jan 5) and public availability (Jan 15).
+    write_cached_bars(
+        "MU",
+        make_bars(dt.date(2026, 1, 5), [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 150, 151, 152, 153, 154, 155]),
+        cache_dir=cache_dir,
+    )
+    write_cached_bars(
+        "SPY",
+        make_bars(dt.date(2026, 1, 5), [100] * 16),
+        cache_dir=cache_dir,
+    )
+    report_path = tmp_path / "advisory_report_2026-01-05.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "as_of": "2026-01-05",
+                "generated_at": "2026-01-15T12:00:00Z",
+                "cadence": "weekly",
+                "final_decisions": {
+                    "recommendations": [
+                        {
+                            "symbol": "MU",
+                            "name": "Micron Technology",
+                            "primary_horizon": "short",
+                            "primary_horizon_label": "短线",
+                            "combined_score": 0.84,
+                            "source_score": 0.2,
+                            "momentum_score": 0.9,
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    review = build_recommendation_review(
+        report_paths=[report_path],
+        as_of=dt.date(2026, 1, 20),
+        benchmark="SPY",
+        cache_dir=cache_dir,
+        cache_max_age_days=30,
+        use_network=False,
+    )
+
+    item = review["review_items"][0]
+    assert item["report_as_of"] == "2026-01-15"
+    assert item["start_price_date"] == "2026-01-15"
+    assert item["elapsed_calendar_days"] == 5
+    # From 150 -> 155 is ~3.3%, not the 55% jump from as_of close 100.
+    assert item["absolute_return"] == pytest.approx(155 / 150 - 1, abs=1e-6)

@@ -124,6 +124,23 @@ def load_review_bars(
     )
 
 
+
+def publicly_available_date(report: dict[str, Any]) -> dt.date:
+    """Return the first date the recommendation was publicly available.
+
+    Review returns and maturity must start from publication time (`generated_at`),
+    not the research cutoff (`as_of`), to avoid scoring look-ahead before release.
+    """
+
+    generated_at = str(report.get("generated_at") or "").strip()
+    if generated_at:
+        normalized = generated_at.replace("Z", "+00:00")
+        try:
+            return dt.datetime.fromisoformat(normalized).date()
+        except ValueError:
+            pass
+    return parse_date(str(report.get("as_of", "")))
+
 def build_review_item(
     *,
     pick: dict[str, Any],
@@ -298,7 +315,7 @@ def build_recommendation_review(
         data_quality_warnings.append(f"Benchmark {benchmark} price bars are unavailable; relative returns may be missing.")
 
     for report in reports:
-        report_as_of = parse_date(str(report.get("as_of", "")))
+        report_as_of = publicly_available_date(report)
         for pick in final_recommendations(report):
             symbol = str(pick.get("symbol", "")).upper()
             if symbol not in bars_by_symbol:
