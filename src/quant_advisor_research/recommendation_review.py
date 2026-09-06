@@ -56,14 +56,13 @@ def first_bar_on_or_after(bars: list[PriceBar], target: dt.date) -> PriceBar | N
 
 
 def start_bar_for_report(bars: list[PriceBar], target: dt.date) -> PriceBar | None:
-    ordered = sorted(bars, key=lambda item: item.date)
-    exact = next((bar for bar in ordered if bar.date == target), None)
-    if exact:
-        return exact
-    previous = last_bar_on_or_before(ordered, target)
-    if previous and (target - previous.date).days <= MAX_START_BAR_DELAY_DAYS:
-        return previous
-    return first_bar_on_or_after(ordered, target)
+    """First publicly available/tradable bar on or after publication date.
+
+    Never fall back to a prior close before publication — weekend (or other
+    non-session) releases must start at the next session, not Friday's close.
+    """
+
+    return first_bar_on_or_after(bars, target)
 
 
 def last_bar_on_or_before(bars: list[PriceBar], target: dt.date) -> PriceBar | None:

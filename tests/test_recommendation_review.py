@@ -133,7 +133,7 @@ def test_long_horizon_cannot_be_labeled_lagging_after_a_few_weeks(tmp_path: Path
     assert item["outcome"] == "in_progress"
 
 
-def test_review_requires_price_coverage_on_or_before_report_date(tmp_path: Path) -> None:
+def test_review_requires_price_coverage_on_or_after_report_date(tmp_path: Path) -> None:
     cache_dir = tmp_path / "market-cache"
     write_cached_bars("MU", make_bars(dt.date(2026, 2, 1), [100] * 300), cache_dir=cache_dir)
     write_cached_bars("SPY", make_bars(dt.date(2026, 2, 1), [100] * 300), cache_dir=cache_dir)
@@ -151,20 +151,95 @@ def test_review_requires_price_coverage_on_or_before_report_date(tmp_path: Path)
     assert item["outcome"] == "insufficient_price_data"
 
 
-def test_weekend_report_uses_previous_trading_close(tmp_path: Path) -> None:
+def test_weekend_report_starts_at_next_session_not_prior_close(tmp_path: Path) -> None:
+    """Weekend publication must not score the Fri→Mon gap before public availability."""
+    cache_dir = tmp_path / "market-cache"
+    # Audit reproducer: generated_at Sat 2026-01-10; Fri=100, Mon=200, Tue=200.
+    # Start must be on/after publication; absolute return Mon→Tue is 0%, not +100% from Fri.
+    trading_bars = [
+        PriceBar(date=dt.date(2026, 1, 9), close=100, volume=1000),
+        PriceBar(date=dt.date(2026, 1, 12), close=200, volume=1001),
+        PriceBar(date=dt.date(2026, 1, 13), close=200, volume=1002),
+    ]
+    write_cached_bars("MU", trading_bars, cache_dir=cache_dir)
+    write_cached_bars(
+        "SPY",
+        [
+            PriceBar(date=dt.date(2026, 1, 9), close=100, volume=1000),
+            PriceBar(date=dt.date(2026, 1, 12), close=110, volume=1001),
+            PriceBar(date=dt.date(2026, 1, 13), close=110, volume=1002),
+        ],
+        cache_dir=cache_dir,
+    )
+    report_path = tmp_path / "advisory_report_2026-01-10.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "as_of": "2026-01-09",
+                "generated_at": "2026-01-10T18:00:00Z",
+                "cadence": "weekly",
+                "final_decisions": {
+                    "recommendations": [
+                        {
+                            "symbol": "MU",
+                            "name": "Micron Technology",
+                            "primary_horizon": "short",
+                            "primary_horizon_label": "短线",
+                            "combined_score": 0.84,
+                            "source_score": 0.2,
+                            "momentum_score": 0.9,
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    review = build_recommendation_review(
+        report_paths=[report_path],
+        as_of=dt.date(2026, 1, 13),
+        benchmark="SPY",
+        cache_dir=cache_dir,
+        cache_max_age_days=14,
+        use_network=False,
+    )
+
+    item = review["review_items"][0]
+    assert item["report_as_of"] == "2026-01-10"
+    assert item["start_price_date"] >= "2026-01-10"
+    assert item["start_price_date"] == "2026-01-12"
+    assert item["absolute_return"] == 0.0
+    # Benchmark must share the same post-publication start rule (not Fri prior close).
+    assert item["benchmark_return"] == 0.0
+
+
+def test_weekend_as_of_without_generated_at_also_skips_prior_close(tmp_path: Path) -> None:
     cache_dir = tmp_path / "market-cache"
     trading_dates = [dt.date(2026, 1, 9), dt.date(2026, 1, 12), dt.date(2026, 1, 13)]
-    write_cached_bars("MU", [PriceBar(date=date, close=100 + index, volume=1000) for index, date in enumerate(trading_dates)], cache_dir=cache_dir)
-    write_cached_bars("SPY", [PriceBar(date=date, close=100, volume=1000) for date in trading_dates], cache_dir=cache_dir)
+    write_cached_bars(
+        "MU",
+        [PriceBar(date=date, close=100 + index, volume=1000) for index, date in enumerate(trading_dates)],
+        cache_dir=cache_dir,
+    )
+    write_cached_bars(
+        "SPY",
+        [PriceBar(date=date, close=100, volume=1000) for date in trading_dates],
+        cache_dir=cache_dir,
+    )
     report_path = tmp_path / "advisory_report_2026-01-10.json"
     write_report(report_path, as_of="2026-01-10", horizon="short")
 
     review = build_recommendation_review(
-        report_paths=[report_path], as_of=dt.date(2026, 1, 20), benchmark="SPY",
-        cache_dir=cache_dir, cache_max_age_days=14, use_network=False,
+        report_paths=[report_path],
+        as_of=dt.date(2026, 1, 20),
+        benchmark="SPY",
+        cache_dir=cache_dir,
+        cache_max_age_days=14,
+        use_network=False,
     )
 
-    assert review["review_items"][0]["start_price_date"] == "2026-01-09"
+    assert review["review_items"][0]["start_price_date"] == "2026-01-12"
 
 
 def test_pre_maturity_item_stays_in_progress_when_benchmark_is_unavailable(tmp_path: Path) -> None:
