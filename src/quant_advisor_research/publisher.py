@@ -954,12 +954,11 @@ def render_report_html(report: dict[str, Any]) -> str:
     </nav>
     <section class="report-hero">
       <div class="report-hero-copy">
-        <p class="eyebrow">Advisory briefing</p>
         <h1>{html.escape(display_title)}</h1>
         <p class="report-lead">{html.escape(render_report_lead(report))}</p>
       </div>
       <aside class="date-card" aria-label="报告日期">
-        <p class="date-label">Report date</p>
+        <p class="date-label">报告日期</p>
         <p class="date-value">{html.escape(str(report['as_of']))}</p>
         <p class="cadence-value">{html.escape(cadence_label(report))}更新</p>
       </aside>
@@ -1039,7 +1038,7 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
         latest_block = f"""
         <section class="latest-panel">
           <div class="latest-copy">
-            <p class="eyebrow">{"已过期报告" if is_report_expired(latest, now=reference_now) else "Latest advisory"}</p>
+            {'<p class="eyebrow">已过期报告</p>' if is_report_expired(latest, now=reference_now) else ""}
             <h2>{html.escape(latest['as_of'])} {html.escape(cadence_label(latest))}智慧投顾研究{"（已过期）" if is_report_expired(latest, now=reference_now) else ""}</h2>
             <p class="lead">{"该报告已过期，不再作为当前公开推荐。" if is_report_expired(latest, now=reference_now) else "结合主题动量、市场确认和事件证据，生成普通投资者更容易阅读的研究结论。"}</p>
             <div class="theme-line"><span>主要信号</span>{html.escape(top_themes or '无')}</div>
@@ -1093,7 +1092,7 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
     <section class="hero">
       <div class="hero-copy">
         <h1>智慧投顾研究系统</h1>
-        <p>把主题动量、市场确认和政策/新闻证据整理成普通投资者能读懂的研究结论。页面只展示推荐、周期、背景、理由和风险。投资有风险，不构成投资建议。</p>
+        <p>把主题动量、市场确认和政策/新闻证据整理成普通投资者能读懂的研究结论。投资有风险，不构成投资建议。</p>
       </div>
     </section>
     {latest_block}
@@ -1172,7 +1171,7 @@ def render_archive_html(reports: list[dict[str, Any]]) -> str:
     </nav>
     <section class="hero">
       <h1>历史归档</h1>
-      <p>报告文件长期保留，便于复盘系统结论、观察风格漂移和检查不同阶段的主题变化。首页只展示最新和近期记录，这里按月份列出全部报告。</p>
+      <p>按月份列出全部历史报告。</p>
     </section>
     {archive}
   </main>
