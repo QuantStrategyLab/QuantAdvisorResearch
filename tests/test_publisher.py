@@ -46,7 +46,7 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     assert "Songti SC" in html
     assert "返回首页" in html
     assert "RSS 订阅" in html
-    assert "Report date" in html
+    assert 'date-label">报告日期' in html
     assert 'rel="icon" type="image/svg+xml" href="favicon.svg"' in html
     assert "site-mark" in html
     assert "2-12周" in html
@@ -113,7 +113,7 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "site-mark" in index_html
     assert "<svg" in favicon
     assert "#172033" in favicon
-    assert "Latest advisory" in index_html
+    assert "打开最新报告" in index_html
     assert "历史归档" in index_html
     assert "投资有风险，不构成投资建议。" in index_html
     assert "周度更新 · 静态页面" not in index_html
