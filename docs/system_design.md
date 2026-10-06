@@ -168,6 +168,51 @@ monthly, and publish workflows generate it automatically. Short-horizon gates
 require market confirmation, medium-horizon gates are led by theme and symbol
 momentum, and long-horizon gates require durable AI shadow or context strength.
 
+## Input Publication Recovery (2026-10-06)
+
+The bounded recovery changes scheduling and documents publication handoff. It does
+not change renderers, score thresholds, account boundaries, or source contracts.
+The [recovery checklist](data_factor_roadmap.md#2026-10-06-input-publication-recovery-planned)
+tracks implementation and acceptance separately.
+
+At incident capture, the weekly jobs ran on Saturday while `default_weekly_as_of()` selects
+the last *fully closed* Saturday. For example, a 2026-10-03 Saturday run selects
+2026-09-26, whose `reference_time` is 2026-09-27 00:00 UTC. A theme generated on
+2026-10-03 must not pass that earlier cutoff. The local candidate schedules weekly
+review at 12:30 UTC Sunday and publication at 13:00 UTC Sunday, preserving the
+existing times. Both use
+the same helper after 00:00 UTC, so the new report's cutoff includes Saturday's
+already-generated context. A delayed run must still use authentic source dates;
+changing `generated_at`, expiry, or freshness limits is not a recovery mechanism.
+
+`ResearchSignalContextPipelines` is public, and current workflows check out its
+public Git content. That is not proof that the Advisor's job token can download
+cross-repository Actions artifacts. The documented artifact download API needs
+Actions read access to the producer repository. The current workflow exposes no
+verified publisher identity or token with that target-repository permission.
+Connector read access during investigation is not a substitute for CI access.
+No cross-repository artifact reader is enabled by this plan.
+
+The current theme job has `contents: write` only. It cannot be assumed to create
+PRs, and required checks cannot be assumed to run automatically. GitHub's current
+[`GITHUB_TOKEN` documentation](https://docs.github.com/en/actions/concepts/security/github_token)
+says PR opened/synchronize/reopened events created with that token produce
+approval-required runs. A normal reviewed PR must still have its actual head's
+required checks completed. Do not change branch protection or grant new access
+as part of this recovery.
+
+An exact retained artifact may be considered for a separately reviewed one-time
+PR. Before import, verify repository ID, approved workflow path and source SHA,
+same-repository `main` run, event, conclusion, run attempt, artifact ID/name,
+expiry, archive digest, exact member path and file hash, and the snapshot's
+schema/policy/coverage/time contract. Extraction alone proves none of these.
+Record generated, review-required, published, and consumer-accepted as distinct
+states. A reviewed PR does not solve the remaining unattended CI identity gap.
+
+References: [artifact API](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact),
+[fixed producer run](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/actions/runs/37132550227),
+[consumer build](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37460712408).
+
 ## Fixture vs Live Inputs
 
 Reports built from `examples/` are `source_mode=fixture` and are suitable for

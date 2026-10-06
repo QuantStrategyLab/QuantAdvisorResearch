@@ -2,6 +2,35 @@
 
 [English](system_design.md) | [简体中文](system_design.zh-CN.md)
 
+## 2026-10-06 输入发布恢复
+
+本次计划只修改周任务截止时点并记录主题发布交接，不改网页、评分门槛、账户边界或可信输入合同。
+进度见[恢复清单](data_factor_roadmap.zh-CN.md#2026-10-06-输入发布恢复待实施)。
+
+事件核查时，周六运行却选“最近完全闭合的周六”：10/03 的运行选 09/26，参考截止时间为
+09/27 00:00 UTC，因此 10/03 新生成的主题不能合法用于这一旧截止日。本地候选将两条周任务
+移到 UTC 周日 12:30/13:00，保留原有时分和周期函数，使当周六生成的上下文处于报告截止前。
+延迟执行仍按真实来源时间验证，不补假日期、不延长 freshness 或 expiry 来消除告警。
+
+RSCP 是公开仓库；当前 QAR 能 checkout 公开 Git 内容，不代表其 job token 能读取
+RSCP 的 Actions artifact 下载。下载 API 要求生产者仓库的 Actions read 权限，当前
+工作流没有已验证的跨仓库读取身份。诊断连接器读取成功不能替代 CI 身份证明，本方案
+暂不新增消费者 artifact 下载器。
+
+主题任务当前只有 contents:write，不能假定可开 PR。按 GitHub 当前官方文档，
+GITHUB_TOKEN 创建或更新 PR 会产生 approval-required 的 opened/synchronize/reopened
+运行，仍须人工批准并核验实际 PR head 的必需检查；不以修改分支保护或扩大权限解决。
+
+固定既有 artifact 的一次正常 PR 导入须另行审核：核实仓库 ID、批准的 workflow 路径与
+源码 SHA、同仓 main、event、run attempt、成功结论、artifact ID/name/有效期、压缩包
+digest、唯一文件路径和 hash，以及快照 schema/policy/覆盖率/时间合同。解压复制不等于
+可信通过。生成、待审、发布、被消费者接受是不同状态；一次 PR 不代表持续自动化已恢复。
+
+依据：[固定生产运行](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/actions/runs/37132550227)、
+[GITHUB_TOKEN 触发规则](https://docs.github.com/en/actions/concepts/security/github_token)、
+[artifact 下载规则](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact)。
+
+
 ## 当前架构理解
 
 QuantStrategyLab 现有仓库已经天然分层：
