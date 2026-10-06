@@ -1,13 +1,5 @@
 # Contributing
 
-## 中文摘要
-
-- 用途：本文档说明如何向 `QuantAdvisorResearch` 提交低风险、可审阅的变更。
-- 主要覆盖：`Ground Rules`、`Documentation Standards`、`Branching and Pull Requests`、`Local Verification`。
-- 阅读顺序：先确认仓库边界和变更范围，再运行适合本仓库的本地校验。
-- 风险提示：涉及策略、artifact、自动化、密钥、云资源、券商或交易所行为的变更，必须先用测试环境、dry-run 或只读证据验证；不要只凭示例修改生产。
-- 英文正文保留更完整的命令、字段名和配置键；如果摘要和正文不一致，以正文中的实际命令和配置为准。
-
 Thanks for contributing to `QuantAdvisorResearch`.
 
 ## Ground Rules
@@ -16,6 +8,7 @@ Thanks for contributing to `QuantAdvisorResearch`.
 - Keep refactors separate from behavior, contract, workflow, or documentation changes.
 - Preserve this repository's boundary as a research publishing system; do not move broker execution, live-allocation decisions, private credentials, or unrelated platform logic into it.
 - Add or update tests, examples, docs, or reproducible evidence when changing behavior or public contracts.
+- Validate changes that touch automation, credentials, cloud resources, or broker/exchange-facing behavior with tests, dry-run, or read-only evidence before they reach production; do not rely on a worked example alone.
 
 ## Documentation Standards
 
