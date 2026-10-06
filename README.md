@@ -1,14 +1,5 @@
 # QuantAdvisorResearch
 
-
-## QSL architecture role
-
-- **Layer**: `research`.
-- **Responsibility**: research-oriented advisory publishing system.
-- **Owns**: traceable advisory reports and web/RSS evidence summaries.
-- **Consumes**: public web/RSS inputs and research signal context.
-- **Must not**: submit orders, allocation changes, or account advice automatically.
-
 [Chinese README](README.zh-CN.md)
 
 > Investing involves risk. This project does not provide investment advice and is for education, research, and engineering review only.
@@ -18,6 +9,14 @@
 QuantAdvisorResearch is a QuantStrategyLab research publishing system. It publishes research-oriented advisory content from web and RSS evidence without placing orders.
 
 It produces research, audit, or orchestration artifacts. It should not submit broker orders or mutate live allocations by itself.
+
+## QSL architecture role
+
+- **Layer**: `research`.
+- **Responsibility**: research-oriented advisory publishing system.
+- **Owns**: traceable advisory reports and web/RSS evidence summaries.
+- **Consumes**: public web/RSS inputs and research signal context.
+- **Must not**: submit orders, allocation changes, or account advice automatically.
 
 ## Output boundary
 
