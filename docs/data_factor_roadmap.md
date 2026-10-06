@@ -80,6 +80,39 @@ Priority order:
 6. Macro/risk regime: VIX, rates, dollar, credit spreads, oil, yield curve, and
    sector beta.
 
+## 2026-10-06 input publication recovery (planned)
+
+Read-only evidence shows that the Advisor still builds and publishes, but its
+checked-out upstream inputs do not reflect the latest generated artifacts.
+The [October 6 report build](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37460712408)
+has `as_of=2026-10-03`, 42 market-confirmation rows, and zero final picks. The
+rejections are `ai_signal_provenance_untrusted` and
+`theme_momentum_stale_as_of`; these gates must remain unchanged.
+
+- [x] Separate generation, protected publication, and consumer acceptance:
+  RSCP's [fresh theme artifact](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/actions/runs/37132550227)
+  was retained after a protected-main push rejection; PETR produced a manual
+  publication handoff; the latest AI request failed without pushing files
+- [x] Prepare and locally test the two weekly Advisor schedules for Sunday
+  12:30/13:00 UTC, retaining their clock times, closed-period helper, and freshness
+  contract; remote publication remains pending
+- [x] Record the RSCP generation-versus-publication distinction and fixed-artifact
+  review requirements; workflow identity changes remain deferred
+- [ ] Review the exact existing theme artifact and publish it through a normal
+  PR only after its producer metadata, bytes, time bounds, and policy pass
+  verification; verify the actual PR head's required `test` check
+- [ ] Resolve event-entity evidence and AI signal/manifest recovery in their
+  owning workstreams, without broadening this bounded change
+- [ ] After separately authorized publication, verify the upstream commit or
+  artifact digest actually consumed, report freshness, and deployed report hash
+
+A successful generation run is not completed publication. A one-time reviewed
+PR restores one snapshot only; it does not establish unattended weekly delivery.
+Zero final picks remain an acceptable result when valid evidence is insufficient.
+See [the recovery constraints](system_design.md#input-publication-recovery-2026-10-06)
+for the verified identity and timing limits. This checklist records planned work,
+not a completed repair.
+
 ## Low-Risk Implementation Order
 
 1. Keep public output focused on final recommendations. Preserve

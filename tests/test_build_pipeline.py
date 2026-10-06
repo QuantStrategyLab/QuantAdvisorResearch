@@ -15,6 +15,7 @@ from quant_advisor_research.build_pipeline import (
     default_weekly_as_of,
 )
 from quant_advisor_research.cross_repo_smoke import run_cross_repo_smoke
+from quant_advisor_research.time_contract import assess_context_freshness, report_time_bounds
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +56,56 @@ def test_default_as_of_values_use_only_closed_periods() -> None:
     assert default_weekly_as_of(dt.date(2026, 6, 24)) == dt.date(2026, 6, 20)
     assert default_monthly_as_of(dt.date(2026, 6, 1)) == dt.date(2026, 5, 31)
     assert default_monthly_as_of(dt.date(2026, 6, 20)) == dt.date(2026, 5, 31)
+
+
+@pytest.mark.parametrize(
+    ("run_date", "expected_as_of"),
+    [
+        (dt.date(2026, 10, 3), dt.date(2026, 9, 26)),
+        (dt.date(2026, 10, 4), dt.date(2026, 10, 3)),
+        (dt.date(2026, 1, 3), dt.date(2025, 12, 27)),
+        (dt.date(2026, 1, 4), dt.date(2026, 1, 3)),
+        (dt.date(2026, 2, 1), dt.date(2026, 1, 31)),
+        (dt.date(2026, 11, 1), dt.date(2026, 10, 31)),
+    ],
+)
+def test_weekly_cutoff_keeps_saturday_closed_and_rolls_on_sunday(
+    run_date: dt.date, expected_as_of: dt.date
+) -> None:
+    assert default_weekly_as_of(run_date) == expected_as_of
+    generated_at = dt.datetime.combine(run_date, dt.time(12, 30), tzinfo=dt.UTC)
+    bounds = report_time_bounds(expected_as_of, generated_at)
+    assert bounds.reference_time == dt.datetime.combine(
+        expected_as_of + dt.timedelta(days=1), dt.time.min, tzinfo=dt.UTC
+    )
+    assert bounds.reference_time <= generated_at
+
+
+def test_sunday_weekly_cutoff_accepts_saturday_context_without_rewriting_its_time() -> None:
+    context = {
+        "as_of": "2026-10-02",
+        "generated_at": "2026-10-03T11:45:00Z",
+        "expires_at": "2026-10-09T23:59:59Z",
+    }
+    for run_date, expected_reason in (
+        (dt.date(2026, 10, 3), "as_of_in_future"),
+        (dt.date(2026, 10, 4), "fresh"),
+    ):
+        as_of = default_weekly_as_of(run_date)
+        bounds = report_time_bounds(
+            as_of, dt.datetime.combine(run_date, dt.time(13), tzinfo=dt.UTC)
+        )
+        freshness = assess_context_freshness(
+            context,
+            report_as_of=as_of,
+            reference_time=bounds.reference_time,
+            report_generated_at=bounds.generated_at,
+            max_age_days=7,
+        )
+        assert freshness.reason == expected_reason
+        assert freshness.valid is (expected_reason == "fresh")
+
+    assert context["generated_at"] == "2026-10-03T11:45:00Z"
 
 
 def test_build_advisory_artifacts_builds_market_report_and_site(tmp_path: Path) -> None:
