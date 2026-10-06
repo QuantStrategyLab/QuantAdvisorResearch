@@ -1,22 +1,30 @@
 # 数据源与因子完善路线
 
-## 2026-10-06 输入发布恢复（待实施）
+## 2026-10-06 输入发布恢复（阶段验收）
 
-只读核查确认投顾仍在生成和发布，但 checkout 的上游 main 文件没有跟上新产物。
-[10/06 构建](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37460712408)
+事件核查时，投顾仍在生成和发布，但 checkout 的上游 main 文件没有跟上新产物。
+[较早的 10/06 构建](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37460712408)
 报告截止日为 10/03，有 42 条市场确认，最终推荐和观察均为 0；质量告警为
-`ai_signal_provenance_untrusted` 和 `theme_momentum_stale_as_of`，保留这些门槛。
+`ai_signal_provenance_untrusted` 和 `theme_momentum_stale_as_of`，这些门槛保持不变。
 
 - [x] 区分生成、受保护发布和消费者接受：RSCP 新主题因保护规则拒绝推 main 后只留 artifact；PETR 只产人工交接；最新 AI 请求失败且未推文件
-- [x] 已准备并本地测试两条周任务的 UTC 周日 12:30/13:00 候选，保留原有时分、周期算法和时间合同；远端发布待处理
-- [x] 已记录 RSCP 生成与发布的区别及固定 artifact 审核要求；持续发布身份改动暂缓
-- [ ] 对固定主题 artifact 验证生产者元数据、原始字节、时间和政策后，另行审核正常 PR；核实该 PR 实际 head 的必需 test
-- [ ] 事件实体证据与 AI signal/manifest 恢复由各自负责工作线处理，不扩大本次有限写集
-- [ ] 发布另获授权后，核验真正消费的上游 commit 或 artifact digest、报告新鲜度及部署报告 hash
+- [x] 已合并并验证 [QAR #79](https://github.com/QuantStrategyLab/QuantAdvisorResearch/pull/79)：UTC 周日 12:30/13:00，保留闭合周期函数和新鲜度合同
+- [x] 核实准确生产者元数据、字节、日期和政策，经 [RSCP #55](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/pull/55) 正常 PR 一次补入主题；实际 PR head 与合并 main 的必需 `test` 均通过
+- [x] [Weekly run 37515064136](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37515064136) 真实消费验收：实际上游 commit、schema-2 主题 hash、五输入 digest、报告/manifest hash 和离线 M0 报告 digest 均吻合；未用 fixture 或改日期
+- [ ] 在各自工作线恢复可信 AI signal/manifest 和可接受的公司实体证据；代码校验修复不等于数据缺口闭环
+- [ ] 核定既有发布入口的通知副作用，发布并验证部署报告 hash
+- [ ] 建立持续、受审的上游发布；一次导入不代表此环节已闭合
 
-一次正常 PR 只恢复一个快照，不代表每周自动交付闭环。有效证据不足时，最终数量为 0
-仍是合法结果；不得降低门槛或改写历史生成时间来制造非零结果。身份和截止时点约束见
-[系统设计恢复说明](system_design.zh-CN.md#2026-10-06-输入发布恢复)。当前清单表示计划，并非修复已完成。
+验收报告截止日为 10/03（`reference_time=2026-10-04T00:00:00Z`）。43 条行情均为直接
+`yahoo_chart`、10/02 价格、318 个观测、`price_age_days=1`、`price_observed`，无告警、代理、缓存或主题 fallback。
+最终推荐为 `MU、DELL、INTC、AMD`，观察为 `CRWD、PANW、TSM、SMCI`，两个最终列表互不重叠；
+分周期列表可跨周期重复同一标的。8 项的公司来源分与长周期 AI 贡献均为 0，结果来自既有主题动量和市场确认规则。
+11 个来源事件仍未通过公司实体接受，`ai_signal_provenance_untrusted` 告警仍保留。
+
+这次只产 artifact 的验收未更新 Pages 或 Telegram。既有前端重发布只重渲染公开 archive，
+不能导入本次 weekly artifact。10/02 主题对 10/10 报告仍超过 7 天新鲜度上限，不能用较晚的声明 expiry 绕过限制。
+有效证据不足时，最终数量为 0 仍是合法结果。hash、实际源码 commit 和现有 `ai_signal_score` 别名语义见
+[系统设计恢复说明](system_design.zh-CN.md#2026-10-06-输入发布恢复)。
 
 [English](data_factor_roadmap.md) | [简体中文](data_factor_roadmap.zh-CN.md)
 

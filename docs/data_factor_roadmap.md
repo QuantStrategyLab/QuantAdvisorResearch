@@ -80,38 +80,47 @@ Priority order:
 6. Macro/risk regime: VIX, rates, dollar, credit spreads, oil, yield curve, and
    sector beta.
 
-## 2026-10-06 input publication recovery (planned)
+## 2026-10-06 input publication recovery (staged evidence)
 
-Read-only evidence shows that the Advisor still builds and publishes, but its
-checked-out upstream inputs do not reflect the latest generated artifacts.
-The [October 6 report build](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37460712408)
-has `as_of=2026-10-03`, 42 market-confirmation rows, and zero final picks. The
-rejections are `ai_signal_provenance_untrusted` and
-`theme_momentum_stale_as_of`; these gates must remain unchanged.
+At incident capture, the Advisor still built and published, but its checked-out
+upstream inputs lagged generated artifacts. The
+[earlier October 6 build](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37460712408)
+had `as_of=2026-10-03`, 42 market-confirmation rows, and zero final picks; its
+warnings were `ai_signal_provenance_untrusted` and `theme_momentum_stale_as_of`.
+Those gates remain unchanged.
 
 - [x] Separate generation, protected publication, and consumer acceptance:
   RSCP's [fresh theme artifact](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/actions/runs/37132550227)
   was retained after a protected-main push rejection; PETR produced a manual
   publication handoff; the latest AI request failed without pushing files
-- [x] Prepare and locally test the two weekly Advisor schedules for Sunday
-  12:30/13:00 UTC, retaining their clock times, closed-period helper, and freshness
-  contract; remote publication remains pending
-- [x] Record the RSCP generation-versus-publication distinction and fixed-artifact
-  review requirements; workflow identity changes remain deferred
-- [ ] Review the exact existing theme artifact and publish it through a normal
-  PR only after its producer metadata, bytes, time bounds, and policy pass
-  verification; verify the actual PR head's required `test` check
-- [ ] Resolve event-entity evidence and AI signal/manifest recovery in their
-  owning workstreams, without broadening this bounded change
-- [ ] After separately authorized publication, verify the upstream commit or
-  artifact digest actually consumed, report freshness, and deployed report hash
+- [x] Merge and verify [QAR #79](https://github.com/QuantStrategyLab/QuantAdvisorResearch/pull/79):
+  Sunday 12:30/13:00 UTC schedules, unchanged closed-period helper and freshness contract
+- [x] Review exact producer metadata, bytes, dates, and policy; merge the one-time
+  theme import through [RSCP #55](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/pull/55)
+  with successful required `test` checks on the actual PR head and merged main
+- [x] Verify real consumption in [Weekly run 37515064136](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37515064136):
+  actual upstream commits, schema-2 theme hash, five-input digest, report/manifest
+  hashes, and offline M0 report digest all match; no fixtures or date edits
+- [ ] Recover trusted AI signal/manifest and accepted company-entity evidence in
+  their owning workstreams; code validation fixes alone do not close these data gaps
+- [ ] Confirm notification side effects of the existing publication entry point, publish, and verify the deployed report hash
+- [ ] Establish recurring reviewed upstream publication; a one-time import does not close this loop
 
-A successful generation run is not completed publication. A one-time reviewed
-PR restores one snapshot only; it does not establish unattended weekly delivery.
-Zero final picks remain an acceptable result when valid evidence is insufficient.
-See [the recovery constraints](system_design.md#input-publication-recovery-2026-10-06)
-for the verified identity and timing limits. This checklist records planned work,
-not a completed repair.
+The accepted report uses the October 3 cutoff (`reference_time=2026-10-04T00:00:00Z`).
+All 43 market rows are direct `yahoo_chart`, dated October 2, with 318 observations,
+`price_age_days=1`, `price_observed`, and no warnings, proxy, cache, or theme fallback.
+Its disjoint final lists are recommendations `MU, DELL, INTC, AMD` and watchlist
+`CRWD, PANW, TSM, SMCI`; per-horizon buckets can repeat a symbol across horizons.
+All eight items have zero company-source and long-AI contributions: existing theme
+momentum and market-confirmation rules produce the results. All 11 source events
+remain unaccepted as company evidence, and `ai_signal_provenance_untrusted` remains.
+
+Pages and Telegram were not updated by this artifact-only acceptance run. The
+existing frontend republisher only re-renders the already public archive and
+cannot import this weekly artifact. The October 2 theme is stale for the October 10
+report, despite its later declared expiry. Zero final picks remain valid when
+evidence is insufficient. See [the recovery evidence](system_design.md#input-publication-recovery-2026-10-06)
+for hashes, actual source commits, and the existing `ai_signal_score` alias semantics.
 
 ## Low-Risk Implementation Order
 

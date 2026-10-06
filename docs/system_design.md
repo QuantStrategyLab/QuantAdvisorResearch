@@ -170,17 +170,18 @@ momentum, and long-horizon gates require durable AI shadow or context strength.
 
 ## Input Publication Recovery (2026-10-06)
 
-The bounded recovery changes scheduling and documents publication handoff. It does
-not change renderers, score thresholds, account boundaries, or source contracts.
-The [recovery checklist](data_factor_roadmap.md#2026-10-06-input-publication-recovery-planned)
-tracks implementation and acceptance separately.
+The bounded recovery changes scheduling and records one-time theme publication
+and consumer acceptance. It does not change renderers, score thresholds, account
+boundaries, or source contracts. The
+[recovery checklist](data_factor_roadmap.md#2026-10-06-input-publication-recovery-staged-evidence)
+tracks implementation, consumer acceptance, and public-site publication separately.
 
 At incident capture, the weekly jobs ran on Saturday while `default_weekly_as_of()` selects
 the last *fully closed* Saturday. For example, a 2026-10-03 Saturday run selects
 2026-09-26, whose `reference_time` is 2026-09-27 00:00 UTC. A theme generated on
-2026-10-03 must not pass that earlier cutoff. The local candidate schedules weekly
-review at 12:30 UTC Sunday and publication at 13:00 UTC Sunday, preserving the
-existing times. Both use
+2026-10-03 must not pass that earlier cutoff. Merged [PR #79](https://github.com/QuantStrategyLab/QuantAdvisorResearch/pull/79)
+schedules weekly review at 12:30 UTC Sunday and publication at 13:00 UTC Sunday,
+preserving the existing times. Both use
 the same helper after 00:00 UTC, so the new report's cutoff includes Saturday's
 already-generated context. A delayed run must still use authentic source dates;
 changing `generated_at`, expiry, or freshness limits is not a recovery mechanism.
@@ -208,6 +209,26 @@ expiry, archive digest, exact member path and file hash, and the snapshot's
 schema/policy/coverage/time contract. Extraction alone proves none of these.
 Record generated, review-required, published, and consumer-accepted as distinct
 states. A reviewed PR does not solve the remaining unattended CI identity gap.
+
+Verified on October 6: RSCP [PR #55](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/pull/55)
+imported the reviewed schema-2 snapshot without changing its bytes or source dates.
+[Weekly run 37515064136, attempt 1](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37515064136)
+then consumed QAR `fe5b00375a4f5cca821fec07317ec92d61546cac`, PETR
+`96e4d2a8f9cea9684a4594173397fd78e91119dd`, and RSCP
+`0a40f173d98b3d715e59653766c180cf5846dc1c`. The real report has
+`as_of=2026-10-03`, `reference_time=2026-10-04T00:00:00Z`, and
+`generated_at=2026-10-06T18:56:15Z`; theme freshness is `fresh`.
+The theme SHA256 is `f984a3d0b0e0eb14a8f1cf3aac258f909821b06eb2b89e57a766c70aca42ab12`.
+Recomputing all five raw input hashes, including the run's market CSV, matches
+report/manifest `input_digest=1ccd99bc53ebcbd513581ef1ec1061681778f65fbee7802ee1cd39bc939175ce`.
+The [weekly artifact](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37515064136/artifacts/11436757649)
+contains the report, manifest, market CSV, and offline M0 evidence. This workflow
+only writes its artifact and existing market cache; it does not update Pages or notify Telegram.
+
+The existing `final_decisions` compatibility field `ai_signal_score` aliases
+`medium_context_score`, derived from theme context. It does not establish trusted
+long-horizon AI availability; this run still rejects AI provenance. No field or
+protocol change is part of this evidence update.
 
 References: [artifact API](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact),
 [fixed producer run](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/actions/runs/37132550227),
