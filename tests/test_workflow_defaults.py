@@ -1,9 +1,27 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize(
+    ("workflow", "expected_cron"),
+    [
+        ("weekly_advisory_review.yml", "30 12 * * 0"),
+        ("publish_advisory_site.yml", "0 13 * * 0"),
+    ],
+)
+def test_weekly_workflows_run_after_saturday_closes_without_changing_utc_time(
+    workflow: str, expected_cron: str
+) -> None:
+    text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    assert re.findall(r'^\s+- cron: "([^"]+)"$', text, flags=re.MULTILINE) == [expected_cron]
+    assert "default_weekly_as_of" in text
 
 
 def test_public_workflows_default_to_live_event_inputs() -> None:

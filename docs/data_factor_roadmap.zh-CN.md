@@ -1,5 +1,23 @@
 # 数据源与因子完善路线
 
+## 2026-10-06 输入发布恢复（待实施）
+
+只读核查确认投顾仍在生成和发布，但 checkout 的上游 main 文件没有跟上新产物。
+[10/06 构建](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37460712408)
+报告截止日为 10/03，有 42 条市场确认，最终推荐和观察均为 0；质量告警为
+`ai_signal_provenance_untrusted` 和 `theme_momentum_stale_as_of`，保留这些门槛。
+
+- [x] 区分生成、受保护发布和消费者接受：RSCP 新主题因保护规则拒绝推 main 后只留 artifact；PETR 只产人工交接；最新 AI 请求失败且未推文件
+- [x] 已准备并本地测试两条周任务的 UTC 周日 12:30/13:00 候选，保留原有时分、周期算法和时间合同；远端发布待处理
+- [x] 已记录 RSCP 生成与发布的区别及固定 artifact 审核要求；持续发布身份改动暂缓
+- [ ] 对固定主题 artifact 验证生产者元数据、原始字节、时间和政策后，另行审核正常 PR；核实该 PR 实际 head 的必需 test
+- [ ] 事件实体证据与 AI signal/manifest 恢复由各自负责工作线处理，不扩大本次有限写集
+- [ ] 发布另获授权后，核验真正消费的上游 commit 或 artifact digest、报告新鲜度及部署报告 hash
+
+一次正常 PR 只恢复一个快照，不代表每周自动交付闭环。有效证据不足时，最终数量为 0
+仍是合法结果；不得降低门槛或改写历史生成时间来制造非零结果。身份和截止时点约束见
+[系统设计恢复说明](system_design.zh-CN.md#2026-10-06-输入发布恢复)。当前清单表示计划，并非修复已完成。
+
 [English](data_factor_roadmap.md) | [简体中文](data_factor_roadmap.zh-CN.md)
 
 ## 当前结论
