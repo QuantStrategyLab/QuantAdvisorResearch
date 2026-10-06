@@ -4,12 +4,13 @@
 
 ## 2026-10-06 输入发布恢复
 
-本次计划只修改周任务截止时点并记录主题发布交接，不改网页、评分门槛、账户边界或可信输入合同。
-进度见[恢复清单](data_factor_roadmap.zh-CN.md#2026-10-06-输入发布恢复待实施)。
+本次有限恢复修改周任务截止时点，并记录一次主题发布与真实消费验收，不改网页、评分门槛、账户边界或可信输入合同。
+进度见[恢复清单](data_factor_roadmap.zh-CN.md#2026-10-06-输入发布恢复阶段验收)，区分实现、消费者接受和公开站点发布。
 
 事件核查时，周六运行却选“最近完全闭合的周六”：10/03 的运行选 09/26，参考截止时间为
-09/27 00:00 UTC，因此 10/03 新生成的主题不能合法用于这一旧截止日。本地候选将两条周任务
-移到 UTC 周日 12:30/13:00，保留原有时分和周期函数，使当周六生成的上下文处于报告截止前。
+09/27 00:00 UTC，因此 10/03 新生成的主题不能合法用于这一旧截止日。已合并的
+[PR #79](https://github.com/QuantStrategyLab/QuantAdvisorResearch/pull/79) 将两条周任务移到 UTC 周日
+12:30/13:00，保留原有时分和周期函数，使当周六生成的上下文处于报告截止前。
 延迟执行仍按真实来源时间验证，不补假日期、不延长 freshness 或 expiry 来消除告警。
 
 RSCP 是公开仓库；当前 QAR 能 checkout 公开 Git 内容，不代表其 job token 能读取
@@ -25,6 +26,22 @@ GITHUB_TOKEN 创建或更新 PR 会产生 approval-required 的 opened/synchroni
 源码 SHA、同仓 main、event、run attempt、成功结论、artifact ID/name/有效期、压缩包
 digest、唯一文件路径和 hash，以及快照 schema/policy/覆盖率/时间合同。解压复制不等于
 可信通过。生成、待审、发布、被消费者接受是不同状态；一次 PR 不代表持续自动化已恢复。
+
+10/06 已验阶段：RSCP [PR #55](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/pull/55)
+逐字补入已审核 schema-2 快照，未改原始字节或来源日期。随后
+[Weekly run 37515064136，attempt 1](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37515064136)
+实际消费 QAR `fe5b00375a4f5cca821fec07317ec92d61546cac`、PETR
+`96e4d2a8f9cea9684a4594173397fd78e91119dd`、RSCP
+`0a40f173d98b3d715e59653766c180cf5846dc1c`。真实报告为 `as_of=2026-10-03`、
+`reference_time=2026-10-04T00:00:00Z`、`generated_at=2026-10-06T18:56:15Z`；主题 freshness 为 `fresh`。
+主题 SHA256 为 `f984a3d0b0e0eb14a8f1cf3aac258f909821b06eb2b89e57a766c70aca42ab12`。
+包含本次行情 CSV 的五份原始输入逐项复算后，与报告/manifest 的
+`input_digest=1ccd99bc53ebcbd513581ef1ec1061681778f65fbee7802ee1cd39bc939175ce` 完全一致。
+[Weekly artifact](https://github.com/QuantStrategyLab/QuantAdvisorResearch/actions/runs/37515064136/artifacts/11436757649)
+保留报告、manifest、行情 CSV 和离线 M0 证据；该工作流只写 artifact 与既有行情缓存，未更新 Pages 或通知 Telegram。
+
+现有 `final_decisions` 兼容字段 `ai_signal_score` 是主题派生的 `medium_context_score` 别名，
+不能据此认定长周期 AI 已可信可用；本次运行仍拒绝 AI provenance。本次证据更新不改字段或数据协议。
 
 依据：[固定生产运行](https://github.com/QuantStrategyLab/ResearchSignalContextPipelines/actions/runs/37132550227)、
 [GITHUB_TOKEN 触发规则](https://docs.github.com/en/actions/concepts/security/github_token)、
