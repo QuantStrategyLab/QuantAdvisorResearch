@@ -59,3 +59,5 @@ python -m pytest -q
 ## License
 
 See [LICENSE](LICENSE).
+
+[Project scope and operating reference](docs/project-reference.md).
