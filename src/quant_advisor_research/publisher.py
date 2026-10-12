@@ -29,7 +29,7 @@ HORIZON_COLUMNS = (
     ("medium", "中线", "2-12周"),
     ("short", "短线", "1-10个交易日"),
 )
-INDEX_HISTORY_LIMIT = 12
+INDEX_HISTORY_LIMIT = 5
 RSS_ITEM_LIMIT = 20
 
 SITE_ICON_FILENAME = "favicon.svg"
@@ -605,20 +605,30 @@ REPORT_PAGE_CSS = """
 """
 
 INDEX_PAGE_CSS = """
+    :root { --paper: #f7f6f2; --sheet: #fff; --ink: #202124; --ink-soft: #595f66; --muted: #737980; --rule: #dfddd5; --accent: #24587f; --container: 1250px; }
+    @media (prefers-color-scheme: dark) {
+      :root { --paper: #11151b; --sheet: #171c23; --ink: #e5e7ea; --ink-soft: #c5cad2; --muted: #98a0ad; --rule: #2b323c; --accent: #8cbcdf; }
+    }
+    .site-header { background: var(--sheet); border-bottom: 1px solid var(--rule); }
+    .site-header-inner { border: 0; }
+    .brand-link { font-family: var(--font-sans); }
+    .site-nav a { color: var(--accent); font-size: 1rem; text-decoration: underline; }
     main { max-width: var(--container); margin: 0 auto; padding: 0 var(--gutter) 96px; }
-    .hero { padding: clamp(40px, 7vw, 80px) 0 clamp(28px, 4vw, 44px); }
+    .hero { padding: clamp(40px, 5vw, 52px) 0 32px; border-bottom: 2px solid var(--ink); }
     .hero-copy { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px clamp(28px, 5vw, 72px); align-items: end; }
     h1 { margin: 0; font-family: var(--font-display); font-size: clamp(2.375rem, 5.6vw, 4rem); font-weight: 700; line-height: 1.08; letter-spacing: .005em; }
-    .hero p { margin: 0; max-width: 30em; padding-left: 18px; border-left: 2px solid var(--accent); color: var(--ink-soft); font-size: 1rem; line-height: 1.85; }
+    .hero p { margin: 0; max-width: 32em; color: var(--ink-soft); font-size: 1rem; line-height: 1.85; }
+    .risk-notice { display: flex; gap: 14px; align-items: center; margin: 40px 0; padding: 12px 18px; border: 1px solid #e9c77c; border-radius: 8px; background: #fff8e6; color: #705a24; font-size: 1rem; }
+    .risk-notice svg { width: 20px; height: 20px; flex: 0 0 auto; }
+    .index-content { display: grid; grid-template-columns: minmax(0, 1.94fr) minmax(0, 1fr); gap: 26px; align-items: start; }
 
-    /* Latest issue: lead story set against the paper, not a boxed card. */
+    /* Homepage composition follows the approved report overview design. */
     .latest-panel {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-      gap: clamp(28px, 5vw, 72px);
-      padding: 28px 0 36px;
-      border-top: 4px solid var(--rule-strong);
-      border-bottom: 1px solid var(--rule);
+      min-width: 0;
+      padding: 32px;
+      background: var(--sheet);
+      border: 1px solid var(--rule);
+      border-radius: 11px;
     }
     h2 { margin: 0; font-family: var(--font-display); font-size: clamp(1.5rem, 2.8vw, 2.125rem); font-weight: 700; line-height: 1.28; }
     .lead { margin: 14px 0 0; max-width: 32em; color: var(--ink-soft); line-height: 1.85; }
@@ -640,6 +650,24 @@ INDEX_PAGE_CSS = """
     }
     .primary-action:hover { color: var(--accent); }
     .latest-panel > .snapshot-grid { align-self: start; }
+    .latest-meta { display: flex; align-items: center; gap: 12px; margin: 0 0 22px; color: var(--muted); font-family: var(--font-figures); font-size: .875rem; }
+    .latest-meta strong { background: var(--ink); color: var(--sheet); font-family: var(--font-sans); padding: 1px 9px; border-radius: 3px; }
+    .latest-panel .snapshot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; margin: 22px 0; border: 0; }
+    .latest-panel .snapshot-column { display: block; padding: 15px; background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; }
+    .latest-panel .snapshot-label { display: inline; font-family: var(--font-sans); font-size: .9375rem; }
+    .latest-panel .snapshot-window { display: inline; font-size: .875rem; white-space: normal; }
+    .latest-panel .symbol-strip { margin-top: 4px; color: var(--ink-soft); font-size: .9375rem; }
+    .snapshot-reason { margin: 4px 0 0; color: var(--muted); font-size: .8125rem; line-height: 1.6; }
+    .empty-conclusion { margin: 20px 0; color: var(--ink-soft); font-size: .9375rem; }
+    .latest-panel .primary-action { padding: 10px 20px; background: var(--accent); color: var(--sheet); border: 0; border-radius: 6px; font-family: var(--font-sans); font-size: .9375rem; }
+    .latest-panel .primary-action:hover { opacity: .9; }
+    .recent-reports h2 { font-family: var(--font-sans); font-size: 1.0625rem; padding-bottom: 10px; }
+    .recent-list { border-top: 1px solid var(--rule); }
+    .recent-report { display: flex; justify-content: space-between; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--rule); color: var(--ink-soft); text-decoration: none; font-size: .875rem; }
+    .recent-report time, .recent-report small { display: block; }
+    .recent-report small, .recent-count { color: var(--muted); font-size: .8125rem; }
+    .recent-count { align-self: center; }
+    .recent-reports .archive-action { margin-top: 12px; font-size: .9375rem; font-weight: 400; }
 
     .archive { margin-top: clamp(48px, 7vw, 80px); }
     .section-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 0; padding-bottom: 14px; }
@@ -647,9 +675,11 @@ INDEX_PAGE_CSS = """
     .section-title p { margin: 4px 0 0; color: var(--muted); font-size: .875rem; }
     .archive-action { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; white-space: nowrap; text-decoration: underline; }
     @media (max-width: 960px) {
-      .hero-copy, .latest-panel { grid-template-columns: minmax(0, 1fr); }
+      .hero-copy, .index-content { grid-template-columns: minmax(0, 1fr); }
     }
     @media (max-width: 640px) {
+      .latest-panel { padding: 20px; }
+      .latest-panel .snapshot-grid { grid-template-columns: minmax(0, 1fr); }
       .section-title { flex-direction: column; align-items: flex-start; gap: 4px; }
     }
 """
@@ -1024,44 +1054,94 @@ def render_horizon_snapshot(report: dict[str, Any], *, linked: bool = False) -> 
     return f'<div class="snapshot-grid">{"".join(columns)}</div>'
 
 
+def index_inputs_verified(report: dict[str, Any]) -> bool:
+    """Missing legacy/unknown freshness never proves a complete set of inputs."""
+    freshness = report.get("freshness")
+    return isinstance(freshness, dict) and not report.get("summary", {}).get("data_quality_warnings") and all(
+        isinstance(freshness.get(name), dict)
+        and freshness[name].get("present") is True
+        and freshness[name].get("valid") is True
+        and freshness[name].get("reason") == "fresh"
+        for name in ("ai_signal", "theme_momentum")
+    )
+
+
+def index_threshold_unmet(report: dict[str, Any], horizon: str) -> bool:
+    decisions = report.get("final_decisions", {})
+    rankings = decisions.get("horizon_rankings", {}) if isinstance(decisions, dict) else {}
+    candidates = rankings.get(horizon) if isinstance(rankings, dict) else None
+    return index_inputs_verified(report) and isinstance(candidates, list) and bool(candidates) and all(
+        isinstance(item, dict) and item.get("action") in {"watch", "skip"} for item in candidates
+    )
+
+
+def render_index_horizons(report: dict[str, Any]) -> str:
+    """Show final report conclusions without promoting candidates into recommendations."""
+    columns = []
+    for horizon, label, window in HORIZON_COLUMNS:
+        symbols = displayed_horizon_symbols(report, horizon)
+        conclusion = html.escape(join_zh_items(symbols)) if symbols else "本期无推荐"
+        reason = ""
+        if not symbols:
+            reason = (
+                "候选未达到推荐门槛。"
+                if index_threshold_unmet(report, horizon)
+                else "具体原因见完整报告。"
+            )
+        columns.append(f'''<section class="snapshot-column snapshot-{horizon}">
+          <p class="snapshot-label">{label}</p> <p class="snapshot-window">{window.replace('-', '–').replace('年', ' 年').replace('周', ' 周').replace('个', ' 个')}</p>
+          <div class="symbol-strip">{conclusion}</div>
+          {f'<p class="snapshot-reason">{reason}</p>' if reason else ''}
+        </section>''')
+    return f'<div class="snapshot-grid">{"".join(columns)}</div>'
+
+
+def render_index_empty_conclusion(report: dict[str, Any]) -> str:
+    if any(displayed_horizon_symbols(report, horizon) for horizon, _, _ in HORIZON_COLUMNS):
+        return ""
+    thresholds_checked = all(index_threshold_unmet(report, horizon) for horizon, _, _ in HORIZON_COLUMNS)
+    explanation = (
+        "空结果也是结论：说明信号未达门槛，而不是数据缺失。"
+        if thresholds_checked
+        else "输入数据状态和未达门槛的原因请见完整报告。"
+    )
+    return f'<p class="empty-conclusion">本期三个周期均未产生合格推荐。{explanation}</p>'
+
+
 def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None = None) -> str:
     sorted_reports = sorted(reports, key=lambda item: item["as_of"], reverse=True)
     reference_now = now or dt.datetime.now(dt.UTC)
     latest = next((item for item in sorted_reports if not is_report_expired(item, now=reference_now)), None)
     if latest is None and sorted_reports:
         latest = sorted_reports[0]
-    latest_block = ""
+    latest_block = '<section class="latest-panel"><h2>暂无报告</h2></section>'
     if latest:
         latest_filename = report_filename(latest)
-        top_themes = format_theme_ids(latest["summary"].get("top_theme_ids", []))
-        top_symbols = latest["summary"].get("top_recommended_symbols", [])
+        expired = is_report_expired(latest, now=reference_now)
         latest_block = f"""
-        <section class="latest-panel">
-          <div class="latest-copy">
-            {'<p class="eyebrow">已过期报告</p>' if is_report_expired(latest, now=reference_now) else ""}
-            <h2>{html.escape(latest['as_of'])} {html.escape(cadence_label(latest))}智慧投顾研究{"（已过期）" if is_report_expired(latest, now=reference_now) else ""}</h2>
-            <p class="lead">{"该报告已过期，不再作为当前公开推荐。" if is_report_expired(latest, now=reference_now) else "结合主题动量、市场确认和事件证据，生成普通投资者更容易阅读的研究结论。"}</p>
-            <div class="theme-line"><span>主要信号</span>{html.escape(top_themes or '无')}</div>
-            <div class="symbol-strip hero-symbols">{render_symbol_tags([str(symbol) for symbol in top_symbols])}</div>
-            <a class="primary-action" href="{html.escape(latest_filename)}">打开最新报告</a>
-          </div>
-          {render_horizon_snapshot(latest)}
+        <section class="latest-panel" id="latest">
+          <p class="latest-meta"><strong>{"已过期" if expired else "最新"} · {html.escape(cadence_label(latest))}</strong>
+            <time datetime="{html.escape(latest['as_of'])}">{html.escape(latest['as_of'])}</time></p>
+          <h2>{html.escape(cadence_label(latest))}智慧投顾研究{"（已过期）" if expired else ""}</h2>
+          {'<p class="lead">该报告已过期，不再作为当前公开推荐。</p>' if expired else ''}
+          {render_index_horizons(latest)}
+          {render_index_empty_conclusion(latest)}
+          <a class="primary-action" href="{html.escape(latest_filename)}">阅读完整报告</a>
         </section>
         """
     items = []
     recent_reports = [item for item in sorted_reports if item is not latest][:INDEX_HISTORY_LIMIT]
     for report in recent_reports:
         filename = report_filename(report)
-        top_themes = format_theme_ids(report["summary"].get("top_theme_ids", []))
-        top_symbols = [str(symbol) for symbol in report["summary"].get("top_recommended_symbols", [])]
+        decisions = report.get("final_decisions", {})
+        count = len(decisions.get("recommendations", [])) if isinstance(decisions, dict) else 0
         items.append(
             f"""
-            <article class="archive-card">
-              <a class="archive-title" href="{html.escape(filename)}">{html.escape(report['as_of'])} {html.escape(cadence_label(report))}复盘</a>
-              <p>主要信号：{html.escape(top_themes or '无')}</p>
-              <div class="archive-symbols">{render_symbol_tags(top_symbols)}</div>
-              {render_horizon_snapshot(report, linked=True)}
-            </article>
+            <a class="recent-report" href="{html.escape(filename)}">
+              <span><time datetime="{html.escape(report['as_of'])}">{html.escape(report['as_of'])}</time>
+                <small>{html.escape(cadence_label(report))}</small></span>
+              <span class="recent-count">{count} 个推荐</span>
+            </a>
             """
         )
     archive = "".join(items) or '<p class="empty-archive">暂无更多历史报告。</p>'
@@ -1079,12 +1159,13 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
   <header class="site-header">
     <div class="site-header-inner">
       <a class="brand-link" href="index.html">
-        {render_site_mark()}
         <span>QuantStrategyLab</span>
       </a>
       <nav class="site-nav" aria-label="站点导航">
+        <a href="index.html" aria-current="page">最新</a>
         <a href="archive.html">历史归档</a>
-        <a href="feed.xml">RSS 订阅</a>
+        <a href="https://github.com/QuantStrategyLab/QuantAdvisorResearch/blob/main/docs/system_design.zh-CN.md">方法说明</a>
+        <a href="feed.xml">RSS</a>
       </nav>
     </div>
   </header>
@@ -1092,20 +1173,18 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
     <section class="hero">
       <div class="hero-copy">
         <h1>智慧投顾研究系统</h1>
-        <p>把主题动量、市场确认和政策/新闻证据整理成普通投资者能读懂的研究结论。投资有风险，不构成投资建议。</p>
+        <p>把主题动量、市场确认和政策 / 新闻证据整理成普通投资者能读懂的研究结论。</p>
       </div>
     </section>
-    {latest_block}
-    <section class="archive">
-      <div class="section-title">
-        <div>
-          <h2>近期历史报告</h2>
-          <p>首页最多显示最近 {INDEX_HISTORY_LIMIT} 期，完整记录保留在归档页</p>
-        </div>
-        <a class="archive-action" href="archive.html">查看全部</a>
-      </div>
-      <div class="archive-grid">{archive}</div>
-    </section>
+    <p class="risk-notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10.3 3.7 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 8v5m0 3v1"/></svg>投资有风险。本站内容为模型研究输出，不构成投资建议。</p>
+    <div class="index-content">
+      {latest_block}
+      <aside class="recent-reports" aria-labelledby="recent-heading">
+        <h2 id="recent-heading">近期报告</h2>
+        <div class="recent-list">{archive}</div>
+        <a class="archive-action" href="archive.html">查看全部归档</a>
+      </aside>
+    </div>
   </main>
 </body>
 </html>
