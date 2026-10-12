@@ -107,17 +107,17 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     archive_html = (tmp_path / "site" / "archive.html").read_text(encoding="utf-8")
     favicon = (tmp_path / "site" / "favicon.svg").read_text(encoding="utf-8")
     assert "来源：" not in index_html
-    assert "主要信号" in index_html
+    assert "阅读完整报告" in index_html
     assert "最终推荐" not in index_html
     assert 'rel="icon" type="image/svg+xml" href="favicon.svg"' in index_html
     assert "site-mark" in index_html
     assert "<svg" in favicon
     assert "#172033" in favicon
-    assert "打开最新报告" in index_html
+    assert "阅读完整报告" in index_html
     assert "历史归档" in index_html
-    assert "投资有风险，不构成投资建议。" in index_html
+    assert "投资有风险。本站内容为模型研究输出，不构成投资建议。" in index_html
     assert "周度更新 · 静态页面" not in index_html
-    assert "近期历史报告" in index_html
+    assert "近期报告" in index_html
     assert "archive.html" in index_html
     assert "历史归档" in archive_html
     assert "2026 年 05 月" in archive_html
@@ -128,7 +128,7 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "<p class=\"snapshot-label\">长线</p>" in index_html
     assert "<p class=\"snapshot-label\">中线</p>" in index_html
     assert "<p class=\"snapshot-label\">短线</p>" in index_html
-    assert "打开最新报告" in index_html
+    assert "阅读完整报告" in index_html
 
 
 def make_report_for_date(base_report: dict, as_of: str) -> dict:
@@ -168,11 +168,11 @@ def test_index_limits_recent_history_and_archive_keeps_all_reports() -> None:
     feed = render_feed_xml(reports, site_url="https://example.com/advisor", feed_title="Test Feed")
     report_index = render_reports_index_json(reports)
 
-    assert "2026-05-22 周度智慧投顾研究" in index_html
-    assert index_html.count('class="archive-card"') == 12
-    assert "2026-05-21 周度复盘" in index_html
-    assert "2026-05-10 周度复盘" in index_html
-    assert "2026-05-09 周度复盘" not in index_html
+    assert 'datetime="2026-05-22"' in index_html
+    assert index_html.count('class="recent-report"') == 5
+    assert 'datetime="2026-05-21"' in index_html
+    assert 'datetime="2026-05-17"' in index_html
+    assert 'datetime="2026-05-16"' not in index_html
     assert "查看全部" in index_html
     assert "archive.html" in index_html
     assert archive_html.count('class="archive-card"') == 22
@@ -541,11 +541,11 @@ def test_render_index_html_prefers_non_expired_report_as_latest() -> None:
     expired["expires_at"] = "2020-01-01T00:00:00Z"
 
     html = render_index_html([expired, fresh], now=dt.datetime(2026, 6, 1, tzinfo=dt.UTC))
-    latest_section = html.split('class="latest-panel"', 1)[1].split('class="archive"', 1)[0]
+    latest_section = html.split('class="latest-panel"', 1)[1].split('<aside', 1)[0]
 
     assert "2026-05-20" in latest_section
     assert "2026-05-30" not in latest_section
-    assert "打开最新报告" in latest_section
+    assert "阅读完整报告" in latest_section
 
 
 def test_render_index_html_marks_expired_when_only_expired_reports_remain() -> None:
