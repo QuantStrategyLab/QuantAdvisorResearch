@@ -35,7 +35,7 @@
 - 可回测、可执行链路：价格、技术、动量、波动、快照和策略仓库，最后可进入券商平台。
 - 新闻、政策、公开事件、AI shadow 链路：证据不稳定、样本少、回测难，应该只进入非个性化智慧投顾研究和复盘。
 
-因此本仓库短期只消费 `PoliticalEventTrackingResearch` 和 `ResearchSignalContextPipelines` 的研究产物；`UsEquitySnapshotPipelines`、`UsEquityStrategies`、`CryptoSnapshotPipelines`、`CryptoStrategies` 保持独立，只作为方法参考和未来人工复核资料来源。
+因此本仓库短期只消费 `PoliticalEventTrackingResearch` 和 `ResearchSignalContextPipelines` 的研究产物；`UsEquitySnapshotPipelines`、`UsEquityStrategies`、`CryptoLivePoolPipelines`、`CryptoStrategies` 保持独立，只作为方法参考和未来人工复核资料来源。
 
 ## 现有数据源盘点
 
@@ -99,7 +99,7 @@
 
 这些因子可以作为未来人工解释或交叉验证材料，但不应让本仓库直接输出可执行 target allocation。
 
-### CryptoSnapshotPipelines / CryptoStrategies
+### CryptoLivePoolPipelines / CryptoStrategies
 
 这条链路当前是 crypto leader rotation：
 
