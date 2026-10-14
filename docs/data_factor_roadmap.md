@@ -20,7 +20,7 @@ For now, this repository consumes only:
 - `ResearchSignalContextPipelines` for medium-horizon theme context and
   long-horizon AI shadow context.
 
-`UsEquitySnapshotPipelines`, `UsEquityStrategies`, `CryptoSnapshotPipelines`, and
+`UsEquitySnapshotPipelines`, `UsEquityStrategies`, `CryptoLivePoolPipelines`, and
 `CryptoStrategies` remain independent reference material until there is enough
 live evidence to justify a separate integration.
 
