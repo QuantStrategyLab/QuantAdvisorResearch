@@ -49,7 +49,10 @@ def report_time_bounds(as_of: dt.date, generated_at: dt.datetime | str) -> Repor
     reference_time = canonical_reference_time(as_of)
     generated = normalize_aware_datetime(generated_at)
     if generated < reference_time:
-        raise TimeContractError("generated_at must be at or after reference_time")
+        raise TimeContractError(
+            f"generated_at must be at or after reference_time: as_of={as_of.isoformat()} "
+            f"requires generated_at >= {reference_time.isoformat()}; got {generated.isoformat()}"
+        )
     return ReportTimeBounds(reference_time, generated, generated + dt.timedelta(days=REPORT_EXPIRY_DAYS))
 
 
@@ -178,4 +181,3 @@ def is_report_expired(
     if reference.tzinfo is None:
         reference = reference.replace(tzinfo=dt.UTC)
     return reference > expires_at
-

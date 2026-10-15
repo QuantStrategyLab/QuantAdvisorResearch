@@ -35,6 +35,30 @@ def test_reference_and_build_order_are_strict() -> None:
         report_time_bounds(dt.date(2026, 5, 30), "2026-05-30T12:00:00Z")
 
 
+@pytest.mark.parametrize(
+    "generated_at",
+    ["2026-10-15T23:59:59.999999Z", "2026-10-16T07:59:59.999999+08:00"],
+)
+def test_unclosed_as_of_reports_the_required_utc_cutoff(generated_at: str) -> None:
+    with pytest.raises(TimeContractError) as exc:
+        report_time_bounds(dt.date(2026, 10, 15), generated_at)
+
+    assert "as_of=2026-10-15" in str(exc.value)
+    assert "requires generated_at >= 2026-10-16T00:00:00+00:00" in str(exc.value)
+    assert "got 2026-10-15T23:59:59.999999+00:00" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "generated_at",
+    ["2026-10-16T00:00:00Z", "2026-10-16T08:00:00+08:00", "2026-10-15T20:00:00-04:00"],
+)
+def test_closed_as_of_accepts_the_exact_cutoff_in_any_offset(generated_at: str) -> None:
+    bounds = report_time_bounds(dt.date(2026, 10, 15), generated_at)
+
+    assert bounds.reference_time == dt.datetime(2026, 10, 16, tzinfo=dt.UTC)
+    assert bounds.generated_at == bounds.reference_time
+
+
 def test_context_date_only_expiry_uses_original_offset_local_eod() -> None:
     assert context_expiry_instant("2026-06-30", "2026-05-30T00:30:00+08:00") == dt.datetime(
         2026, 6, 30, 15, 59, 59, tzinfo=dt.UTC
