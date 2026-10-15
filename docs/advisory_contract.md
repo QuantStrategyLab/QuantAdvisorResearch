@@ -28,6 +28,20 @@ policy: object
 The current CLI and scheduled workflows produce v6. Readers continue to accept
 legacy v5 reports, but no v6 field is silently accepted on a v5 report.
 
+An explicit `as_of` is a UTC calendar date, not the invocation's local date.
+Its entire UTC day must have ended before a report can be generated:
+`generated_at >= reference_time`. For example, `as_of=2026-10-15` first becomes
+valid at `2026-10-16T00:00:00Z` (`2026-10-16T08:00:00+08:00`). An earlier build
+is rejected with the requested date, required UTC cutoff, and actual generation
+time. Offsets are normalized to UTC before comparison; equality is accepted.
+
+Leave the workflow's `as_of` input empty to select a fully closed period:
+yesterday for daily reports, the latest completed Saturday for weekly reports,
+or the last day of the previous month for monthly reports, all in UTC. A manual
+override keeps its requested date and is rejected if that date has not closed;
+the producer does not shift the cutoff or change generation timestamps to make
+an early request pass.
+
 ### V6 default contract
 
 A v6 report uses `contract_version = model_recommendations.v6` and adds these
