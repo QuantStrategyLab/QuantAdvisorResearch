@@ -7,6 +7,11 @@ on:
         description: "Report date. Defaults to the most recent fully closed Saturday when empty."
         required: false
         type: string
+      notify:
+        description: "Notify subscribers after publication."
+        required: false
+        default: true
+        type: boolean
       site_url:
         description: "Public site URL used in RSS links."
         required: false
@@ -167,7 +172,7 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
       - name: Notify Telegram subscribers
-        if: ${{ success() }}
+        if: ${{ success() && (github.event_name != 'workflow_dispatch' || inputs.notify) }}
         continue-on-error: true
         working-directory: advisor
         env:
