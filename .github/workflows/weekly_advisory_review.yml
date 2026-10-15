@@ -7,6 +7,16 @@ on:
         description: "Report date. Defaults to the most recent fully closed Saturday when empty."
         required: false
         type: string
+      publish_site:
+        description: "Also publish the public site from this report and source snapshot run."
+        required: false
+        default: false
+        type: boolean
+      notify:
+        description: "Notify subscribers when publishing the site."
+        required: false
+        default: true
+        type: boolean
       political_events_path:
         description: "Path inside PoliticalEventTrackingResearch."
         required: false
@@ -56,6 +66,8 @@ jobs:
   build-review:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      as_of: ${{ steps.build_report.outputs.as_of }}
     steps:
       - name: Checkout advisor repository
         uses: actions/checkout@v6
@@ -86,9 +98,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-qar-market-data-v1-
       - name: Build intelligent advisory report
+        id: build_report
         working-directory: advisor
         env:
           INPUT_AS_OF: ${{ github.event.inputs.as_of || '' }}
+          PUBLISH_SITE: ${{ inputs.publish_site }}
           POLITICAL_EVENTS_PATH: ${{ github.event.inputs.political_events_path || 'data/live/political_events.csv' }}
           POLITICAL_WATCHLIST_PATH: ${{ github.event.inputs.political_watchlist_path || 'data/live/political_watchlist.csv' }}
           AI_SIGNAL_PATH: ${{ github.event.inputs.ai_signal_path || 'data/output/latest_signal.json' }}
@@ -114,6 +128,14 @@ jobs:
             --market-cache-dir .cache/market-data
             --recommendation-review
           )
+          if [ "${PUBLISH_SITE}" = "true" ]; then
+            ARGS+=(
+              --site-output-dir site
+              --site-url "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
+              --feed-title "智慧投顾研究系统"
+              --recover-site-archive
+            )
+          fi
           if [ -n "${THEME_MOMENTUM_PATH}" ]; then
             ARGS+=(--theme-momentum "../research-signal-context/${THEME_MOMENTUM_PATH}")
           fi
@@ -151,3 +173,54 @@ jobs:
           name: weekly-model-recommendations
           path: advisor/data/output/weekly_advisory_review/
           if-no-files-found: error
+      - name: Upload site artifact
+        if: ${{ inputs.publish_site }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: model-recommendations-site
+          path: advisor/site
+          if-no-files-found: error
+
+  publish-site:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_site }}
+    needs: build-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout advisor repository
+        uses: actions/checkout@v6
+      - name: Download site artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: model-recommendations-site
+          path: site
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+      - name: Notify Telegram subscribers
+        if: ${{ success() && inputs.notify }}
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NOTIFY_LANG: ${{ vars.NOTIFY_LANG || 'zh' }}
+          SITE_URL: ${{ steps.deployment.outputs.page_url }}
+          AS_OF: ${{ needs.build-review.outputs.as_of }}
+        run: |
+          set -euo pipefail
+          python scripts/notify_advisory_telegram.py \
+            --report "site/advisory_report_${AS_OF}.json" \
+            --site-url "${SITE_URL}"
