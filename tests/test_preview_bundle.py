@@ -162,18 +162,18 @@ def test_destination_is_not_visible_during_staging_readback(tmp_path, monkeypatc
 
 def test_concurrent_destination_winner_is_not_overwritten_or_cleaned(tmp_path, monkeypatch):
     output = tmp_path / "preview"
-    real_rename = preview_bundle.os.rename
+    real_rename = preview_bundle._install_no_replace
 
     def concurrent_winner(source, destination):
         Path(destination).mkdir()
-        raise FileExistsError(destination)
+        real_rename(source, destination)
 
-    monkeypatch.setattr(preview_bundle.os, "rename", concurrent_winner)
+    monkeypatch.setattr(preview_bundle, "_install_no_replace", concurrent_winner)
     with pytest.raises(PreviewBundleError, match="output_exists"):
         build_preview_bundle(report(), output)
     assert output.is_dir()
     assert not list(tmp_path.glob(".preview.staging-*"))
-    monkeypatch.setattr(preview_bundle.os, "rename", real_rename)
+    monkeypatch.setattr(preview_bundle, "_install_no_replace", real_rename)
 
 
 def test_staging_directory_is_cleaned_when_install_fails(tmp_path, monkeypatch):
@@ -187,3 +187,58 @@ def test_staging_directory_is_cleaned_when_install_fails(tmp_path, monkeypatch):
         build_preview_bundle(report(), output)
     assert not output.exists()
     assert not list(tmp_path.glob(".preview.staging-*"))
+
+
+@pytest.mark.parametrize("name", ["report.json", "report.html", "manifest.json"])
+def test_readback_rejects_symlink_entries(tmp_path, name):
+    output = tmp_path / "preview"
+    build_preview_bundle(report(), output)
+    target = tmp_path / name
+    (output / name).rename(target)
+    (output / name).symlink_to(target)
+    with pytest.raises(PreviewBundleError):
+        read_preview_bundle(output)
+
+
+def test_readback_rejects_symlink_root_and_nonregular_entry(tmp_path):
+    output = tmp_path / "preview"
+    build_preview_bundle(report(), output)
+    link = tmp_path / "link"
+    link.symlink_to(output, target_is_directory=True)
+    with pytest.raises(PreviewBundleError):
+        read_preview_bundle(link)
+    (output / "report.html").unlink()
+    (output / "report.html").mkdir()
+    with pytest.raises(PreviewBundleError):
+        read_preview_bundle(output)
+
+
+def test_readback_requires_canonical_manifest_and_mapping_source(tmp_path):
+    output = tmp_path / "preview"
+    build_preview_bundle(report(), output)
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    with pytest.raises(PreviewBundleError, match="manifest_bytes_noncanonical"):
+        read_preview_bundle(output)
+    manifest["source"] = None
+    manifest_path.write_bytes(preview_bundle._canonical_json(manifest))
+    with pytest.raises(PreviewBundleError, match="manifest_shape_invalid"):
+        read_preview_bundle(output)
+
+
+def test_returned_evidence_is_recursively_immutable(tmp_path):
+    output = tmp_path / "preview"
+    for evidence in (build_preview_bundle(report(), output), read_preview_bundle(output)):
+        with pytest.raises(TypeError):
+            evidence.manifest["source"]["cadence"] = "monthly"
+        with pytest.raises(TypeError):
+            evidence.report["source_artifacts"]["political_events"] = "changed"
+        assert isinstance(evidence.report["recommendations"], tuple)
+
+
+def test_v5_explicit_contract_field_is_rejected(tmp_path):
+    value = report()
+    value.update(schema_version="5", contract_version="model_recommendations.v5")
+    with pytest.raises(PreviewBundleError):
+        build_preview_bundle(value, tmp_path / "preview")

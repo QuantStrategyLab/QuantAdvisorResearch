@@ -1,10 +1,14 @@
 """Concrete daily report-to-preview bundle with no legacy or runtime integration."""
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import html
 import json
 import os
+import stat
+import sys
 import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -42,10 +46,50 @@ class PreviewBundleEvidence:
     def __post_init__(self) -> None:
         if not isinstance(self.report, Mapping) or not isinstance(self.manifest, Mapping):
             raise PreviewBundleError("readback_invalid")
+        object.__setattr__(self, "report", _freeze(self.report))
+        object.__setattr__(self, "manifest", _freeze(self.manifest))
 
     @property
     def bundle_contract(self) -> str:
         return BUNDLE_CONTRACT
+
+
+def _freeze(value: object) -> object:
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _freeze(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
+def _install_no_replace(source: str, destination: Path) -> None:
+    """Atomically publish without replacing even an existing empty directory."""
+    if sys.platform == "win32":
+        os.rename(source, destination)
+        return
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        operation = libc.renamex_np
+        operation.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        args = (os.fsencode(source), os.fsencode(destination), 4)  # RENAME_EXCL
+    elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
+        operation = libc.renameat2
+        operation.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        args = (-100, os.fsencode(source), -100, os.fsencode(destination), 1)  # RENAME_NOREPLACE
+    else:
+        raise OSError(errno.ENOTSUP, "exclusive directory publication unavailable")
+    operation.restype = ctypes.c_int
+    if operation(*args) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code))
+
+
+def _read_regular(directory: int, name: str) -> bytes:
+    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+    with os.fdopen(descriptor, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise _error("readback_file_set_invalid")
+        return stream.read()
 
 
 def _error(code: str) -> PreviewBundleError:
@@ -138,7 +182,7 @@ def build_preview_bundle(report: Mapping[str, Any], output_dir: str | Path) -> P
         for name, content in files.items():
             Path(staging_dir, name).write_bytes(content)
         read_preview_bundle(staging_dir)
-        os.rename(staging_dir, output)
+        _install_no_replace(staging_dir, output)
         staging_dir = None
     except FileExistsError:
         raise _error("output_exists") from None
@@ -163,11 +207,15 @@ def _parse_json_bytes(content: bytes) -> object:
 def read_preview_bundle(output_dir: str | Path) -> PreviewBundleEvidence:
     output = Path(output_dir)
     try:
-        if not output.is_dir() or {item.name for item in output.iterdir()} != _FIXED_FILES:
-            raise _error("readback_file_set_invalid")
-        report_bytes = (output / "report.json").read_bytes()
-        html_bytes = (output / "report.html").read_bytes()
-        manifest_bytes = (output / "manifest.json").read_bytes()
+        descriptor = os.open(output, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            if set(os.listdir(descriptor)) != _FIXED_FILES:
+                raise _error("readback_file_set_invalid")
+            report_bytes = _read_regular(descriptor, "report.json")
+            html_bytes = _read_regular(descriptor, "report.html")
+            manifest_bytes = _read_regular(descriptor, "manifest.json")
+        finally:
+            os.close(descriptor)
     except PreviewBundleError:
         raise
     except (OSError, TypeError, ValueError):
@@ -182,7 +230,10 @@ def read_preview_bundle(output_dir: str | Path) -> PreviewBundleEvidence:
     manifest = _parse_json_bytes(manifest_bytes)
     if not isinstance(manifest, Mapping):
         raise _error("manifest_invalid")
-    if set(manifest) != _MANIFEST_KEYS or set(manifest.get("source", {})) != _SOURCE_KEYS:
+    if _canonical_json(manifest) != manifest_bytes:
+        raise _error("manifest_bytes_noncanonical")
+    if (set(manifest) != _MANIFEST_KEYS or not isinstance(manifest.get("source"), Mapping)
+            or set(manifest["source"]) != _SOURCE_KEYS):
         raise _error("manifest_shape_invalid")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, Mapping) or set(artifacts) != {"report.json", "report.html"}:
