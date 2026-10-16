@@ -1,63 +1,78 @@
 # QuantAdvisorResearch
 
-[Chinese README](README.zh-CN.md)
+Research publishing system that turns public web and RSS evidence into traceable advisory reports.
 
-> Investing involves risk. This project does not provide investment advice and is for education, research, and engineering review only.
+English | [简体中文](README.zh-CN.md)
 
-## What this repository is
+## Status
 
-QuantAdvisorResearch is a QuantStrategyLab research publishing system. It publishes research-oriented advisory content from web and RSS evidence without placing orders.
+Experimental. Use at your own risk. This project is not financial advice and
+does not guarantee any trading result. Its outputs are research evidence, not
+trading instructions.
 
-It produces research, audit, or orchestration artifacts. It should not submit broker orders or mutate live allocations by itself.
+## What this is
 
-## QSL architecture role
+QuantAdvisorResearch builds and publishes research-oriented advisory content
+from public web and RSS evidence. It is the deterministic composition layer of
+the advisory research system: it combines upstream evidence into advisory
+reports, market-confirmation and recommendation-review artifacts, and a static
+site, keeping each output traceable to its source. It is aimed at researchers
+and reviewers who need the published reasoning, not at live trading.
 
-- **Layer**: `research`.
-- **Responsibility**: research-oriented advisory publishing system.
-- **Owns**: traceable advisory reports and web/RSS evidence summaries.
-- **Consumes**: public web/RSS inputs and research signal context.
-- **Must not**: submit orders, allocation changes, or account advice automatically.
+## What this is not
 
-## Output boundary
-
-- Treat generated reports as evidence or review material, not automatic trading instructions.
-- Keep source traceability and artifact timestamps visible.
-- Require human review before using outputs in downstream strategy or platform changes.
-- Keep credentials, private data, and external service tokens out of Git and logs.
-
-## Repository layout
-
-- `src/`: library and runtime code.
-- `tests/`: unit, contract, and regression tests.
-- `docs/`: runbooks, design notes, evidence, and integration contracts.
-- `.github/workflows/`: CI, scheduled jobs, release, or deployment workflows.
-- `scripts/`: operator scripts and local helpers.
+It does not place broker orders. It does not change allocations. It does not
+produce automatic trading instructions or auto-approvals, and its reports are
+not investment advice.
 
 ## Quick start
 
+Requires Python 3.11 or newer.
+
 ```bash
-python -m pip install -e .
+python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-## Useful docs
+Build advisory artifacts from the bundled examples:
 
-- [`docs/advisory_contract.md`](docs/advisory_contract.md)
-- [`docs/data_factor_roadmap.md`](docs/data_factor_roadmap.md)
-- [`docs/data_factor_roadmap.zh-CN.md`](docs/data_factor_roadmap.zh-CN.md)
-- [`docs/notification_format.md`](docs/notification_format.md)
-- [`docs/notification_format.zh-CN.md`](docs/notification_format.zh-CN.md)
-- [`docs/system_design.md`](docs/system_design.md)
-- [`docs/system_design.zh-CN.md`](docs/system_design.zh-CN.md)
+```bash
+qar-build-advisory-artifacts --help
+qar-build-advisory-report --help
+qar-publish-advisory-site --help
+```
 
-## Community and security
+## Configuration
 
-- See [CONTRIBUTING.md](CONTRIBUTING.md) for pull request scope, local verification, and documentation expectations.
-- Follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for maintainer and contributor conduct.
-- Report credential, automation, broker, exchange, or cloud-resource vulnerabilities through [SECURITY.md](SECURITY.md); do not open public issues for secrets or live-execution risk.
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | No | none | Bot token used to send advisory notifications. |
+| `TELEGRAM_CHAT_ID` | No | none | Chat that receives advisory notifications. |
+| `NOTIFY_LANG` | No | `zh` | Language used for notifications. |
+
+Report and notification contracts live in [`docs/advisory_contract.md`](docs/advisory_contract.md)
+and [`docs/notification_format.md`](docs/notification_format.md).
+
+## Repository layout
+
+```
+src/        library code and command implementations
+scripts/    command-line helpers
+docs/       design notes and output contracts
+examples/   sample inputs
+data/       local working output
+tests/      unit and contract tests
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Do not open a public issue for a vulnerability.
+Keep credentials, private data, and external service tokens out of Git and logs.
 
 ## License
 
-See [LICENSE](LICENSE).
-
-[Project scope and operating reference](docs/project-reference.md).
+MIT. See [LICENSE](LICENSE).
