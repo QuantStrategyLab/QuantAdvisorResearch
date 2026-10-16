@@ -25,7 +25,7 @@ python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-用内置示例构建咨询产物：
+构建与发布入口使用 `--help` 打印用法和必填参数：
 
 ```bash
 qar-build-advisory-artifacts --help

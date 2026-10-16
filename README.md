@@ -34,7 +34,8 @@ python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-Build advisory artifacts from the bundled examples:
+The build and publish entry points print usage and required arguments when run
+with `--help`:
 
 ```bash
 qar-build-advisory-artifacts --help
