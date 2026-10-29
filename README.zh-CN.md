@@ -41,7 +41,7 @@ qar-publish-advisory-site --help
 | `TELEGRAM_CHAT_ID` | 否 | 无 | 接收咨询通知的会话。 |
 | `NOTIFY_LANG` | 否 | `zh` | 通知使用的语言。 |
 
-报告与通知契约见 [`docs/advisory_contract.md`](docs/advisory_contract.md) 和 [`docs/notification_format.md`](docs/notification_format.md)。
+报告与通知契约见 [`docs/advisory-contract.md`](docs/advisory-contract.md) 和 [`docs/notification-format.md`](docs/notification-format.md)。
 
 ## 仓库结构
 

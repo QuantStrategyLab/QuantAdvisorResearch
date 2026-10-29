@@ -51,8 +51,8 @@ qar-publish-advisory-site --help
 | `TELEGRAM_CHAT_ID` | No | none | Chat that receives advisory notifications. |
 | `NOTIFY_LANG` | No | `zh` | Language used for notifications. |
 
-Report and notification contracts live in [`docs/advisory_contract.md`](docs/advisory_contract.md)
-and [`docs/notification_format.md`](docs/notification_format.md).
+Report and notification contracts live in [`docs/advisory-contract.md`](docs/advisory-contract.md)
+and [`docs/notification-format.md`](docs/notification-format.md).
 
 ## Repository layout
 

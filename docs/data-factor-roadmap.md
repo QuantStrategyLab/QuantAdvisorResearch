@@ -1,6 +1,6 @@
 # Data Source and Factor Roadmap
 
-[English](data_factor_roadmap.md) | [简体中文](data_factor_roadmap.zh-CN.md)
+[English](data-factor-roadmap.md) | [简体中文](data-factor-roadmap.zh-CN.md)
 
 ## Current Direction
 
@@ -119,7 +119,7 @@ Pages and Telegram were not updated by this artifact-only acceptance run. The
 existing frontend republisher only re-renders the already public archive and
 cannot import this weekly artifact. The October 2 theme is stale for the October 10
 report, despite its later declared expiry. Zero final picks remain valid when
-evidence is insufficient. See [the recovery evidence](system_design.md#input-publication-recovery-2026-10-06)
+evidence is insufficient. See [the recovery evidence](system-design.md#input-publication-recovery-2026-10-06)
 for hashes, actual source commits, and the existing `ai_signal_score` alias semantics.
 
 ## Low-Risk Implementation Order

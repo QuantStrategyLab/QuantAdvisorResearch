@@ -24,9 +24,9 @@
 这次只产 artifact 的验收未更新 Pages 或 Telegram。既有前端重发布只重渲染公开 archive，
 不能导入本次 weekly artifact。10/02 主题对 10/10 报告仍超过 7 天新鲜度上限，不能用较晚的声明 expiry 绕过限制。
 有效证据不足时，最终数量为 0 仍是合法结果。hash、实际源码 commit 和现有 `ai_signal_score` 别名语义见
-[系统设计恢复说明](system_design.zh-CN.md#2026-10-06-输入发布恢复)。
+[系统设计恢复说明](system-design.zh-CN.md#2026-10-06-输入发布恢复)。
 
-[English](data_factor_roadmap.md) | [简体中文](data_factor_roadmap.zh-CN.md)
+[English](data-factor-roadmap.md) | [简体中文](data-factor-roadmap.zh-CN.md)
 
 ## 当前结论
 

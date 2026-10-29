@@ -1,11 +1,11 @@
 # 智慧投顾研究系统设计
 
-[English](system_design.md) | [简体中文](system_design.zh-CN.md)
+[English](system-design.md) | [简体中文](system-design.zh-CN.md)
 
 ## 2026-10-06 输入发布恢复
 
 本次有限恢复修改周任务截止时点，并记录一次主题发布与真实消费验收，不改网页、评分门槛、账户边界或可信输入合同。
-进度见[恢复清单](data_factor_roadmap.zh-CN.md#2026-10-06-输入发布恢复阶段验收)，区分实现、消费者接受和公开站点发布。
+进度见[恢复清单](data-factor-roadmap.zh-CN.md#2026-10-06-输入发布恢复阶段验收)，区分实现、消费者接受和公开站点发布。
 
 事件核查时，周六运行却选“最近完全闭合的周六”：10/03 的运行选 09/26，参考截止时间为
 09/27 00:00 UTC，因此 10/03 新生成的主题不能合法用于这一旧截止日。已合并的
@@ -149,7 +149,7 @@ broker platform repositories
 - 所有 artifact 明确允许非个性化智慧投顾研究输出，但禁止下单、调仓、账户级仓位和个性化建议。
 - 后续可以 replay 历史智慧投顾研究结论，而不是重写过去判断。
 
-数据源和因子完善路线见 [data_factor_roadmap.zh-CN.md](data_factor_roadmap.zh-CN.md)。
+数据源和因子完善路线见 [data-factor-roadmap.zh-CN.md](data-factor-roadmap.zh-CN.md)。
 
 ## 发布频率
 

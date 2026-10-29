@@ -1,6 +1,6 @@
 # Intelligent Advisory Research System Design
 
-[English](system_design.md) | [简体中文](system_design.zh-CN.md)
+[English](system-design.md) | [简体中文](system-design.zh-CN.md)
 
 ## Architecture
 
@@ -173,7 +173,7 @@ momentum, and long-horizon gates require durable AI shadow or context strength.
 The bounded recovery changes scheduling and records one-time theme publication
 and consumer acceptance. It does not change renderers, score thresholds, account
 boundaries, or source contracts. The
-[recovery checklist](data_factor_roadmap.md#2026-10-06-input-publication-recovery-staged-evidence)
+[recovery checklist](data-factor-roadmap.md#2026-10-06-input-publication-recovery-staged-evidence)
 tracks implementation, consumer acceptance, and public-site publication separately.
 
 At incident capture, the weekly jobs ran on Saturday while `default_weekly_as_of()` selects

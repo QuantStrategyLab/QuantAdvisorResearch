@@ -1,6 +1,6 @@
 # 智慧投顾研究通知格式
 
-[English](notification_format.md)
+[English](notification-format.md)
 
 ## 设计原则
 
