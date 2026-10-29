@@ -1,6 +1,6 @@
 # Intelligent Advisory Notification Format
 
-[简体中文](notification_format.zh-CN.md)
+[简体中文](notification-format.zh-CN.md)
 
 ## Implemented Channels
 

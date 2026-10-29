@@ -1164,7 +1164,7 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
       <nav class="site-nav" aria-label="站点导航">
         <a href="index.html" aria-current="page">最新</a>
         <a href="archive.html">历史归档</a>
-        <a href="https://github.com/QuantStrategyLab/QuantAdvisorResearch/blob/main/docs/system_design.zh-CN.md">方法说明</a>
+        <a href="https://github.com/QuantStrategyLab/QuantAdvisorResearch/blob/main/docs/system-design.zh-CN.md">方法说明</a>
         <a href="feed.xml">RSS</a>
       </nav>
     </div>
