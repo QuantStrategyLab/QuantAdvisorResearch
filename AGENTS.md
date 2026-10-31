@@ -70,6 +70,8 @@ Organization documentation rules are checked by `python scripts/check_style.py`,
 
 ## Do not
 
+- Only the owner, or a reviewer explicitly authorized by the owner, may apply the `owner-approved` label; coding agents must never apply it to their own PRs.
+
 - Do not present an advisory report as a recommendation to trade or as a
   performance claim without method, period and disclaimer.
 - Do not publish real account data, personal data or private source material.
