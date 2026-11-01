@@ -1,0 +1,78 @@
+---
+import { dict } from '../i18n/zh-CN';
+import type { Summary } from '../lib/data/types';
+import {
+  cadenceLabel,
+  expiryLabel,
+  expiryLabelText,
+  formatCalendarDate,
+  formatDateTimeSG,
+  inputStatusLabel,
+} from '../lib/format';
+
+export interface Props {
+  summary: Summary;
+  contextInstant: string;
+  threeUp?: boolean;
+}
+
+const { summary, contextInstant, threeUp = false } = Astro.props;
+const label = expiryLabel(summary.expires_at, contextInstant);
+const finalCount =
+  summary.final_recommendation_count === null
+    ? dict['common.unavailable']
+    : String(summary.final_recommendation_count);
+---
+
+<dl class="meta-list" class:list={{ 'is-three-up': threeUp }}>
+  <div>
+    <dt>{dict['meta.asOf']}</dt>
+    <dd>
+      <time datetime={summary.as_of}>{formatCalendarDate(summary.as_of)}</time>
+      · {cadenceLabel(summary.cadence, dict)}
+    </dd>
+  </div>
+  <div>
+    <dt>{dict['meta.generated']}</dt>
+    <dd>
+      <time datetime={summary.generated_at}>{formatDateTimeSG(summary.generated_at)}</time>
+    </dd>
+  </div>
+  {
+    summary.reference_time ? (
+      <div>
+        <dt>{dict['meta.reference']}</dt>
+        <dd>
+          <time datetime={summary.reference_time}>{formatDateTimeSG(summary.reference_time)}</time>
+        </dd>
+      </div>
+    ) : null
+  }
+  <div>
+    <dt>{dict['meta.expiry']}</dt>
+    <dd data-expiry-state={label}>
+      {
+        summary.expires_at ? (
+          <time datetime={summary.expires_at}>{formatDateTimeSG(summary.expires_at)}</time>
+        ) : (
+          <span>{dict['meta.expiryUnavailable']}</span>
+        )
+      }
+      <span> · {expiryLabelText(label, dict)}</span>
+    </dd>
+  </div>
+  <div>
+    <dt>{dict['meta.evaluatedAt']}</dt>
+    <dd>
+      <time datetime={contextInstant}>{formatDateTimeSG(contextInstant)}</time>
+    </dd>
+  </div>
+  <div>
+    <dt>{dict['meta.inputStatus']}</dt>
+    <dd>{inputStatusLabel(summary.input_status, dict)}</dd>
+  </div>
+  <div>
+    <dt>{dict['meta.finalCountLabel']}</dt>
+    <dd class="final-count">{finalCount}</dd>
+  </div>
+</dl>

@@ -1,0 +1,53 @@
+/* Print: light high-contrast palette, no controls, full content retained. */
+
+@media print {
+  :root {
+    color-scheme: light;
+    --color-canvas: #ffffff;
+    --color-chrome: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-subtle: #ffffff;
+    --color-border: #6b6b6b;
+    --color-border-control: #000000;
+    --color-text-primary: #000000;
+    --color-text-secondary: #1f1f1f;
+    --color-text-muted: #3d3d3d;
+    --color-accent: #1f1f1f;
+  }
+
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .site-header .header-tools,
+  .theme-selector,
+  .theme-fallback,
+  .skip-link,
+  .actions {
+    display: none !important;
+  }
+
+  .site-nav a[aria-current='page'] {
+    border-bottom: none;
+  }
+
+  a {
+    color: #000000;
+    text-decoration: underline;
+  }
+
+  .surface,
+  .research-card,
+  .recent-row,
+  .archive-row,
+  .status-note,
+  .validity-badge {
+    border: 1px solid #6b6b6b;
+    break-inside: avoid;
+  }
+
+  .site-footer {
+    border-top: 1px solid #6b6b6b;
+  }
+}

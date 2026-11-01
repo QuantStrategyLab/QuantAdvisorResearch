@@ -1,0 +1,16 @@
+---
+import { dict } from '../i18n/zh-CN';
+import SiteShell from '../layouts/SiteShell.astro';
+import NotFoundBlock from '../components/NotFoundBlock.astro';
+---
+
+<SiteShell
+  currentPage="notFound"
+  title={`${dict['notFound.title']} · ${dict['brand.name']}`}
+  description={dict['notFound.body']}
+  path="404.html"
+>
+  <div class="container">
+    <NotFoundBlock />
+  </div>
+</SiteShell>

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "contract_version",
+    "kind",
+    "release_id",
+    "built_at",
+    "default_locale",
+    "locales",
+    "policy",
+    "data"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/manifest.schema.json"
+    },
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "kind": {
+      "const": "manifest"
+    },
+    "release_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "built_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "default_locale": {
+      "const": "zh-CN"
+    },
+    "locales": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "zh-CN",
+          "en"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "contains": {
+        "const": "zh-CN"
+      }
+    },
+    "policy": {
+      "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/Policy"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "report_count"
+      ],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "kind",
+              "sha256",
+              "bytes"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(index|archive|feed)\\.json$|^reports/\\d{4}-\\d{2}-\\d{2}-(daily|weekly|monthly)\\.json$"
+              },
+              "kind": {
+                "enum": [
+                  "index",
+                  "archive",
+                  "report",
+                  "feed"
+                ]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "minItems": 3,
+          "maxItems": 1003
+        },
+        "report_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      }
+    }
+  }
+}

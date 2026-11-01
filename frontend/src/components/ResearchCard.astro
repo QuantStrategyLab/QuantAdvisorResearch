@@ -1,0 +1,41 @@
+---
+import { dict } from '../i18n/zh-CN';
+import type { Card } from '../lib/data/types';
+import { localized } from '../lib/format';
+
+export interface Props {
+  card: Card;
+}
+
+const { card } = Astro.props;
+const name = card.name;
+const background = card.business_summary ? localized(card.business_summary, 'zh-CN') : null;
+const rationale = card.prospect_summary ? localized(card.prospect_summary, 'zh-CN') : null;
+const risks = card.risk_summary ? localized(card.risk_summary, 'zh-CN') : null;
+const windowText = localized(card.window, 'zh-CN');
+---
+
+<article class="research-card">
+  <p class="card-head">
+    <span class="card-rank">#{card.rank}</span>
+    <span class="symbol-chip card-symbol">{card.symbol}</span>
+  </p>
+  <h3>
+    {name ? name : <span class="name-missing">{dict['report.companyUnavailable']}</span>}
+  </h3>
+  <p class="horizon-window">
+    {dict['horizon.window']}：{windowText}
+  </p>
+  <div class="card-block">
+    <p class="block-label">{dict['report.companyBackground']}</p>
+    {background ? <p>{background}</p> : <p class="missing">{dict['report.backgroundUnavailable']}</p>}
+  </div>
+  <div class="card-block">
+    <p class="block-label">{dict['report.rationale']}</p>
+    {rationale ? <p>{rationale}</p> : <p class="missing">{dict['report.rationaleUnavailable']}</p>}
+  </div>
+  <div class="card-block">
+    <p class="block-label">{dict['report.risks']}</p>
+    {risks ? <p>{risks}</p> : <p class="missing">{dict['report.riskUnavailable']}</p>}
+  </div>
+</article>

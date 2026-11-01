@@ -1,0 +1,80 @@
+{
+  "$schema": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/report.schema.json",
+  "contract_version": "1.0.0",
+  "kind": "report",
+  "release_id": "9f8e7d6c-5b4a-4321-8765-43210fedcba9",
+  "built_at": "2026-08-10T00:00:00Z",
+  "default_locale": "zh-CN",
+  "locales": [
+    "zh-CN"
+  ],
+  "policy": {
+    "non_personalized_recommendations_allowed": true,
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "personalized_advice_allowed": false,
+    "account_specific_advice_allowed": false
+  },
+  "data": {
+    "summary": {
+      "id": "2026-08-01-daily",
+      "route": "2026-08-01-daily-model-recommendations.html",
+      "as_of": "2026-08-01",
+      "cadence": "daily",
+      "source_schema": "6",
+      "title": {
+        "zh-CN": "过期样例（合成日报）",
+        "en": null
+      },
+      "description": {
+        "zh-CN": "合成测试内容：全部周期为空且已过有效期。",
+        "en": null
+      },
+      "generated_at": "2026-08-01T06:00:00Z",
+      "reference_time": "2026-08-02T00:00:00Z",
+      "expires_at": "2026-08-08T06:00:00Z",
+      "input_status": "partial",
+      "final_recommendation_count": 0,
+      "horizons": {
+        "long": {
+          "symbols": [],
+          "empty_reason": "threshold_unmet"
+        },
+        "medium": {
+          "symbols": [],
+          "empty_reason": "input_unavailable"
+        },
+        "short": {
+          "symbols": [],
+          "empty_reason": "unknown"
+        }
+      },
+      "top_themes": [],
+      "legacy_summary_symbols": [
+        "SPY"
+      ],
+      "legacy_horizon_symbols": {
+        "long": [],
+        "medium": [
+          "SPY"
+        ],
+        "short": []
+      }
+    },
+    "lead": [
+      {
+        "zh-CN": "合成摘要：全部周期为空，三种原因各占一列。",
+        "en": null
+      }
+    ],
+    "cards": {
+      "long": [],
+      "medium": [],
+      "short": []
+    },
+    "disclaimer": {
+      "zh-CN": "合成免责声明：本内容仅供研究，不构成投资建议。",
+      "en": null
+    }
+  }
+}

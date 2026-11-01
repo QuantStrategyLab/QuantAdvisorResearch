@@ -1,0 +1,54 @@
+---
+import { dict } from '../i18n/zh-CN';
+import { canonicalUrl } from '../lib/routes';
+import SeoMetadata from '../components/SeoMetadata.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import '../styles/tokens.css';
+import '../styles/global.css';
+import '../styles/print.css';
+
+export interface Props {
+  currentPage: 'latest' | 'archive' | 'report' | 'notFound';
+  title: string;
+  description: string;
+  path: string;
+}
+
+const { currentPage, title, description, path } = Astro.props;
+const canonical = canonicalUrl(path);
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <script is:inline>
+      try {
+        var stored = localStorage.getItem('quantadvisor-theme');
+        if (stored === 'light' || stored === 'dark') {
+          document.documentElement.dataset.theme = stored;
+        }
+      } catch (error) {}
+      document.documentElement.classList.add('js');
+    </script>
+    <title>{title}</title>
+    <SeoMetadata title={title} description={description} canonical={canonical} />
+  </head>
+  <body>
+    <div class="shell">
+      <a class="skip-link" href="#main-content">{dict['a11y.skip']}</a>
+      <SiteHeader currentPage={currentPage} />
+      <main id="main-content" tabindex="-1">
+        <slot />
+      </main>
+      <SiteFooter />
+    </div>
+    <script>
+      import('../scripts/theme');
+      import('../scripts/expiry');
+    </script>
+  </body>
+</html>

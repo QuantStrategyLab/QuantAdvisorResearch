@@ -1,0 +1,143 @@
+---
+import { loadSiteBundle, reportSlugToBundlePath } from '../lib/data/bundle';
+import { dict } from '../i18n/zh-CN';
+import { expiryLabel, formatCalendarDate } from '../lib/format';
+import { assertSafeReportSlug } from '../lib/routes';
+import SiteShell from '../layouts/SiteShell.astro';
+import ReportMetaBar from '../components/ReportMetaBar.astro';
+import LeadConclusion from '../components/LeadConclusion.astro';
+import HorizonColumn from '../components/HorizonColumn.astro';
+import ValidityBadge from '../components/ValidityBadge.astro';
+import type { GetStaticPaths } from 'astro';
+
+export const getStaticPaths = (async () => {
+  const bundle = loadSiteBundle();
+  return bundle.archive.data.reports.map((summary) => {
+    const slug = summary.route.replace(/\.html$/, '');
+    assertSafeReportSlug(slug);
+    return { params: { report: slug }, props: { slug } };
+  });
+}) satisfies GetStaticPaths;
+
+const { slug } = Astro.props as { slug: string };
+const bundle = loadSiteBundle();
+const path = reportSlugToBundlePath(slug);
+const report = bundle.reports.get(path);
+if (!report) throw new Error(`Report "${slug}" is not part of the validated bundle`);
+
+const summary = report.data.summary;
+const label = expiryLabel(summary.expires_at, bundle.archive.built_at);
+const BASE = import.meta.env.BASE_URL;
+
+const HORIZONS = ['long', 'medium', 'short'] as const;
+const perHorizonSymbols = HORIZONS.map((h) => new Set(summary.horizons[h].symbols));
+const repeated = new Set<string>();
+for (let a = 0; a < HORIZONS.length; a += 1) {
+  for (let b = a + 1; b < HORIZONS.length; b += 1) {
+    for (const symbol of perHorizonSymbols[a]) {
+      if (perHorizonSymbols[b].has(symbol)) repeated.add(symbol);
+    }
+  }
+}
+---
+
+<SiteShell
+  currentPage="report"
+  title={`${summary.title['zh-CN']} · ${formatCalendarDate(summary.as_of)} · ${dict['brand.name']}`}
+  description={summary.description['zh-CN']}
+  path={summary.route}
+>
+  <div class="container">
+    <nav class="breadcrumb" aria-label={dict['nav.breadcrumb']}>
+      <ol>
+        <li>
+          <a href={`${BASE}/archive.html`}>{dict['nav.archive']}</a>
+        </li>
+        <li aria-current="page">
+          <time datetime={summary.as_of}>{formatCalendarDate(summary.as_of)}</time>
+          · {dict[`cadence.${summary.cadence}`]}
+        </li>
+      </ol>
+    </nav>
+
+    <div class="surface report-head-grid">
+      <div class="report-title-block surface-title">
+        <h1>{summary.title['zh-CN']}</h1>
+        <p class="description">{summary.description['zh-CN']}</p>
+        {
+          summary.top_themes.length > 0 ? (
+            <ul class="topics" aria-label={dict['report.topics']}>
+              {summary.top_themes.map((theme) => <li>{theme['zh-CN']}</li>)}
+            </ul>
+          ) : null
+        }
+      </div>
+      <div class="report-meta-rail">
+        <ReportMetaBar summary={summary} contextInstant={bundle.archive.built_at} threeUp={false} />
+        {
+          label === 'expired' ? (
+            <div style="display:grid;gap:var(--space-2);margin-top:var(--space-3);">
+              <div>
+                <ValidityBadge state="expired" label={dict['validity.expired']} />
+              </div>
+              <p class="status-note" data-tone="expired">{dict['validity.expiredNote']}</p>
+            </div>
+          ) : label === 'unknown' ? (
+            <div style="margin-top:var(--space-3);">
+              <ValidityBadge state="unknown" label={dict['validity.unknown']} />
+            </div>
+          ) : (
+            <div style="margin-top:var(--space-3);">
+              <ValidityBadge
+                state="current"
+                label={dict['validity.current']}
+                expiresAt={summary.expires_at}
+              />
+            </div>
+          )
+        }
+      </div>
+    </div>
+
+    <LeadConclusion lead={report.data.lead} />
+
+    <div class="report-columns">
+      {
+        HORIZONS.map((horizon) => (
+          <HorizonColumn
+            horizon={horizon}
+            cards={report.data.cards[horizon]}
+            summaryHorizon={summary.horizons[horizon]}
+            inputStatus={summary.input_status}
+          />
+        ))
+      }
+    </div>
+
+    {
+      repeated.size > 0 ? (
+        <p class="status-note">{dict['report.repeatSymbol']}</p>
+      ) : null
+    }
+
+    <section class="disclaimer-section" aria-labelledby="disclaimer-heading">
+      <h2 id="disclaimer-heading">{dict['report.disclaimerTitle']}</h2>
+      <p>{report.data.disclaimer['zh-CN']}</p>
+    </section>
+
+    <div class="actions">
+      <a class="action-link is-secondary" href={`${BASE}/archive.html`}>
+        {dict['action.backArchive']}
+      </a>
+      <a class="action-link is-secondary" href={`${BASE}/`}>
+        {dict['action.backHome']}
+      </a>
+    </div>
+  </div>
+</SiteShell>
+
+<style>
+  .report-columns {
+    padding-block: var(--space-3);
+  }
+</style>

@@ -1,0 +1,150 @@
+/*
+ * Pinned advisory token snapshot derived from the QuantStrategyLab Decision
+ * Cockpit semantic roles (KIMI-DESIGN-PLAN.md section 3). Canonical upstream
+ * revision confirmation remains a release input; do not fetch remote stylesheets.
+ */
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-canvas: #0f1012;
+  --color-chrome: #0f1012;
+  --color-surface: #17181c;
+  --color-surface-elevated: #1d1f24;
+  --color-surface-subtle: #1d1f24;
+  --color-surface-hover: #23262c;
+  --color-border: #303238;
+  --color-border-control: #717684;
+  --color-text-primary: #f4f4f5;
+  --color-text-secondary: #b4b6bf;
+  --color-text-muted: #8d919e;
+  --color-accent: #b7adff;
+  --color-accent-surface: #29243b;
+  --color-on-accent: #17181c;
+  --color-button-bg: #f4f4f5;
+  --color-button-fg: #17181c;
+  --color-button-hover: #ffffff;
+  --color-button-pressed: #dedee4;
+  --color-focus-ring: #b7adff;
+  --color-warning: #f3c677;
+  --color-warning-surface: #302718;
+  --color-danger: #f1a5ad;
+  --color-danger-surface: #321f23;
+  --color-success: #8dcfb6;
+  --color-success-surface: #182c25;
+  --color-info: #89c9ef;
+  --color-info-surface: #192b38;
+  --color-overlay-scrim: #00000099;
+  --shadow-elevated: 0 12px 32px #00000066;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-canvas: #f7f8fa;
+  --color-chrome: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-subtle: #f0f2f5;
+  --color-surface-hover: #e8ebf0;
+  --color-border: #dfe2e8;
+  --color-border-control: #858b98;
+  --color-text-primary: #18181b;
+  --color-text-secondary: #525763;
+  --color-text-muted: #646b78;
+  --color-accent: #5b4fd6;
+  --color-accent-surface: #eeebfc;
+  --color-on-accent: #ffffff;
+  --color-button-bg: #18181b;
+  --color-button-fg: #ffffff;
+  --color-button-hover: #303034;
+  --color-button-pressed: #0f1012;
+  --color-focus-ring: #5b4fd6;
+  --color-warning: #805000;
+  --color-warning-surface: #fff4dd;
+  --color-danger: #a72e42;
+  --color-danger-surface: #fcecef;
+  --color-success: #19624d;
+  --color-success-surface: #eaf6ef;
+  --color-info: #136c9f;
+  --color-info-surface: #eaf4fc;
+  --color-overlay-scrim: #00000066;
+  --shadow-elevated: 0 12px 32px #18181b1a;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']):not([data-theme='light']) {
+    color-scheme: light;
+
+    --color-canvas: #f7f8fa;
+    --color-chrome: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-elevated: #ffffff;
+    --color-surface-subtle: #f0f2f5;
+    --color-surface-hover: #e8ebf0;
+    --color-border: #dfe2e8;
+    --color-border-control: #858b98;
+    --color-text-primary: #18181b;
+    --color-text-secondary: #525763;
+    --color-text-muted: #646b78;
+    --color-accent: #5b4fd6;
+    --color-accent-surface: #eeebfc;
+    --color-on-accent: #ffffff;
+    --color-button-bg: #18181b;
+    --color-button-fg: #ffffff;
+    --color-button-hover: #303034;
+    --color-button-pressed: #0f1012;
+    --color-focus-ring: #5b4fd6;
+    --color-warning: #805000;
+    --color-warning-surface: #fff4dd;
+    --color-danger: #a72e42;
+    --color-danger-surface: #fcecef;
+    --color-success: #19624d;
+    --color-success-surface: #eaf6ef;
+    --color-info: #136c9f;
+    --color-info-surface: #eaf4fc;
+    --color-overlay-scrim: #00000066;
+    --shadow-elevated: 0 12px 32px #18181b1a;
+  }
+}
+
+:root {
+  --font-ui: Geist, Inter, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 40px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 80px;
+  --space-10: 96px;
+
+  --radius-surface: 12px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
+  --radius-pill: 999px;
+
+  --motion-fast: 120ms cubic-bezier(0.2, 0, 0, 1);
+
+  --shell-max: 1440px;
+  --reading-max: 1312px;
+
+  --section-separation: clamp(2rem, 1rem + 2.5vw, 3rem);
+  --surface-padding: clamp(1rem, 0.8rem + 0.8vw, 1.5rem);
+  --title-size: clamp(1.75rem, 1.45rem + 0.75vw, 2rem);
+  --title-line: 2.5rem;
+  --section-size: clamp(1.25rem, 0.95rem + 0.75vw, 1.5rem);
+  --section-line: 2rem;
+}
+
+@media (max-width: 767.98px) {
+  :root {
+    --title-line: 2.25rem;
+    --section-line: 1.75rem;
+  }
+}
