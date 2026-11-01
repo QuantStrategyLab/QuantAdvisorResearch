@@ -1,5 +1,8 @@
 # Intelligent Advisory Artifact Contract
 
+Site listing and report JSON for the static frontend is defined separately in
+[site-contract.md](site-contract.md).
+
 ## Report
 
 Required top-level fields:
