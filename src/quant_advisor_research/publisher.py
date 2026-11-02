@@ -1263,12 +1263,22 @@ def render_reports_index_json(reports: list[dict[str, Any]]) -> str:
     items = []
     for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
         as_of = str(report.get("as_of", ""))
+        decisions = report.get("final_decisions")
+        picks = decisions.get("recommendations", []) if isinstance(decisions, dict) else [
+            item for item in report.get("recommendations", []) if item.get("rating") == "recommend"
+        ]
+        horizon_counts = {
+            horizon: sum(pick.get("primary_horizon") == horizon for pick in picks)
+            for horizon in ("short", "medium", "long")
+        }
         items.append(
             {
                 "as_of": as_of,
                 "cadence": str(report.get("cadence", "")),
                 "html": report_filename(report),
                 "json": f"advisory_report_{as_of}.json",
+                "recommendation_count": len(picks),
+                "horizon_counts": horizon_counts,
             }
         )
     return json.dumps({"schema_version": 1, "reports": items}, ensure_ascii=False, indent=2) + "\n"
