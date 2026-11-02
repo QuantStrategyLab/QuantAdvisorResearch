@@ -160,6 +160,15 @@ Picks outside the three named horizons count toward the total only. Empty
 reports still include all three horizon keys with zero values. These fields
 support archive filtering and count charts without opening each report.
 
+V1 readers require `as_of`, `cadence`, `html`, and `json`, and ignore unknown
+entry fields, including these optional display counts. This additive contract
+keeps the v1 identity model and existing output version: display metadata does
+not establish identity or verified evidence. `parse_v1_index` and the v1 path
+of `parse_identity_index` apply the same rule. Required field types, period and
+filename validation, variant rejection, and artifact-conflict checks remain
+unchanged; the top-level index shape stays strict. Older readers that enforce
+an exact entry key set must adopt this rule before consuming the extended index.
+
 ## Policy
 
 The policy block allows non-personalized intelligent-advisory research output but keeps account

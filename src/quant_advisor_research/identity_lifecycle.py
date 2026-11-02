@@ -114,7 +114,8 @@ def _name_digest(name: str, pattern: re.Pattern[str], *, as_of: str, cadence: st
 
 
 def _validate_v1_entry(entry: object) -> V1ProvisionalBinding:
-    if type(entry) is not dict or set(entry) != {"as_of", "cadence", "json", "html"}:
+    # Display metadata is additive; only the required fields establish identity.
+    if type(entry) is not dict or not {"as_of", "cadence", "json", "html"}.issubset(entry):
         raise _error("invalid_v1_entry")
     as_of = _require_exact_type(entry["as_of"], str, "invalid_as_of")
     cadence = _require_exact_type(entry["cadence"], str, "invalid_cadence")

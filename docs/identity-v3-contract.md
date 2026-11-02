@@ -39,3 +39,9 @@ Parsed entries are `PENDING_ARTIFACT_VALIDATION`. The public ledger is not a
 trust root; real report revalidation belongs to the later allocation/migration
 stage. v1/v2 readers retain their existing wire semantics and are never
 silently upgraded to v3.
+
+V1 entry readers ignore unknown fields as specified in the
+[reports index contract](advisory-contract.md#reports-index). The four required
+identity fields retain their validation and produce only provisional bindings;
+additional fields cannot promote a v1 entry to verified evidence. This does not
+change the v2 or v3 entry contracts.
