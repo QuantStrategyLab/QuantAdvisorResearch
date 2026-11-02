@@ -6,6 +6,7 @@ import datetime as dt
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any
+from urllib.parse import urlsplit
 
 from .time_contract import (
     REPORT_EXPIRY_DAYS,
@@ -232,6 +233,41 @@ def _require_number_0_1(value: Any, name: str) -> None:
         raise AdvisoryValidationError(f"{name} must be between 0 and 1")
 
 
+def _validate_display_evidence(payload: Mapping[str, Any]) -> None:
+    if "input_checks" in payload:
+        for index, value in enumerate(_require_sequence(payload["input_checks"], "input_checks")):
+            name = f"input_checks[{index}]"
+            item = _require_mapping(value, name)
+            _require_string(item.get("name"), f"{name}.name")
+            _require_string(item.get("detail"), f"{name}.detail")
+            if item.get("status") not in ("available", "missing", "stale", "invalid", "unknown"):
+                raise AdvisoryValidationError(f"{name}.status is not allowed")
+            if "as_of" not in item:
+                raise AdvisoryValidationError(f"{name}.as_of is required (date or null)")
+            if item["as_of"] is not None:
+                _require_iso_date(item["as_of"], f"{name}.as_of")
+    if "sources" in payload:
+        for index, value in enumerate(_require_sequence(payload["sources"], "sources")):
+            name = f"sources[{index}]"
+            item = _require_mapping(value, name)
+            url = _require_string(item.get("url"), f"{name}.url")
+            try:
+                parsed = urlsplit(url)
+                valid_url = (parsed.scheme in {"http", "https"} and parsed.hostname
+                             and not parsed.username and not parsed.password)
+            except ValueError:
+                valid_url = False
+            if not valid_url:
+                raise AdvisoryValidationError(f"{name}.url must be an HTTP(S) URL without credentials")
+            _require_string(item.get("type"), f"{name}.type")
+            if item.get("status") not in ("unverified", "available", "missing", "stale", "invalid", "unknown"):
+                raise AdvisoryValidationError(f"{name}.status is not allowed")
+            if "fetched_at" not in item:
+                raise AdvisoryValidationError(f"{name}.fetched_at is required (datetime or null)")
+            if item["fetched_at"] is not None:
+                _require_contract_datetime(item["fetched_at"], f"{name}.fetched_at")
+
+
 def validate_advisory_report(payload: Mapping[str, Any]) -> None:
     account_action_fields = _find_account_action_fields(payload)
     if account_action_fields:
@@ -307,6 +343,7 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
 
     _require_mapping(payload["source_artifacts"], "source_artifacts")
     _require_mapping(payload["summary"], "summary")
+    _validate_display_evidence(payload)
 
     recommendations = _require_sequence(payload["recommendations"], "recommendations")
     for index, recommendation in enumerate(recommendations):
@@ -392,6 +429,16 @@ def validate_advisory_report(payload: Mapping[str, Any]) -> None:
 
     if "final_decisions" in payload:
         final_decisions = _require_mapping(payload["final_decisions"], "final_decisions")
+        if "horizon_summary" in final_decisions:
+            name = "final_decisions.horizon_summary"
+            summary = _require_mapping(final_decisions["horizon_summary"], name)
+            for horizon in ("short", "medium", "long"):
+                item = _require_mapping(summary.get(horizon), f"{name}.{horizon}")
+                if "max_score" not in item:
+                    raise AdvisoryValidationError(f"{name}.{horizon}.max_score is required (number or null)")
+                if item["max_score"] is not None:
+                    _require_number_0_1(item["max_score"], f"{name}.{horizon}.max_score")
+                _require_number_0_1(item.get("threshold"), f"{name}.{horizon}.threshold")
         section_actions = {
             "recommendations": "recommend",
             "watchlist": "watch",

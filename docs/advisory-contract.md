@@ -74,6 +74,101 @@ cannot prove that its producer hashed honest source bytes. V6 manifests repeat
 the report's exact `input_digest` so downstream lineage checks do not need to
 infer it from `source_artifacts` paths.
 
+### Optional publication fields
+
+These additive fields are accepted by `validate_advisory_report` on v5 and v6
+reports. New v6 builds emit them; older reports may omit them. Schema versions,
+existing fields, scoring gates and research-only policy remain unchanged.
+Consumers should hide the corresponding display when a field is absent.
+
+| Field | Shape | Meaning |
+| --- | --- | --- |
+| `final_decisions.horizon_summary` | Object keyed by `short`, `medium`, `long` | Each entry contains `max_score` and `threshold`. |
+| `input_checks` | Array of objects | Each entry contains `name`, `detail`, `status`, `as_of`. |
+| `sources` | Array of objects | Each entry contains `url`, `type`, `fetched_at`, `status`. |
+
+If `horizon_summary` is present, all three horizons and both entry fields are
+required. `max_score` is a finite number in `[0, 1]`, or `null` when no candidate
+was evaluated. It covers all evaluated candidates, including those excluded
+from the recommendation and watch lists, before public list limits are applied.
+`threshold` is a finite number in `[0, 1]`, taken from the existing recommendation
+score gate: short `0.60`, medium `0.52`, long `0.62`. Meeting this score gate
+alone does not imply a recommendation: the existing component, freshness and
+market-confirmation gates still apply.
+
+Each input check has non-empty string `name` and `detail`, a `status` from
+`available`, `missing`, `stale`, `invalid`, `unknown`, and a required `as_of`
+that is an ISO date or `null`. The producer emits checks for `political_events`,
+`political_watchlist`, `ai_signal`, `theme_momentum`, and `market_confirmation`.
+Context checks reuse the existing freshness/provenance assessment and expose
+its reason or sanitized quality warning in `detail`. Unavailable or rejected
+context is `invalid`; expired or stale context is `stale`; omitted context is
+`missing`. Existing legacy-expiry warnings remain visible in `detail`.
+CSV checks marked `available` mean parsed, not freshness-verified. Their dates
+are the latest retained event/market dates when present; the watchlist is
+undated. No timestamp is substituted for an unknown input date.
+
+Each source has an absolute HTTP(S) `url` without userinfo, non-empty string
+`type`, a required `fetched_at` that is a timezone-aware ISO datetime or `null`,
+and a `status` from `unverified`, `available`, `missing`, `stale`, `invalid`,
+`unknown`. The producer collects public links declared by retained political
+events (`type: political_event`) and watchlist entries (`type: watchlist`),
+deduplicated and sorted by `(url, type)`. Non-HTTP links and URLs with userinfo
+are omitted. These CSV inputs do not attest URL retrieval: `fetched_at` stays
+`null` and `status` stays `unverified`. The builder performs no network fetch
+and does not claim that this list exhausts all upstream evidence.
+
+Example of the new fields only (synthetic values):
+
+```json
+{
+  "final_decisions": {
+    "horizon_summary": {
+      "short": {"max_score": 0.42, "threshold": 0.60},
+      "medium": {"max_score": 0.50, "threshold": 0.52},
+      "long": {"max_score": 0.35, "threshold": 0.62}
+    }
+  },
+  "input_checks": [
+    {"name": "ai_signal", "detail": "not_provided", "status": "missing", "as_of": null}
+  ],
+  "sources": [
+    {"url": "https://example.invalid/evidence", "type": "political_event", "fetched_at": null, "status": "unverified"}
+  ]
+}
+```
+
+### Reports index
+
+The existing `reports_index.json` filename, `schema_version: 1`, report ordering
+(newest `as_of` first), and `as_of`, `cadence`, `html`, `json` fields are retained.
+Each item additionally contains:
+
+```json
+{
+  "recommendation_count": 2,
+  "horizon_counts": {"short": 0, "medium": 1, "long": 1}
+}
+```
+
+`recommendation_count` counts the public `final_decisions.recommendations`
+list. `horizon_counts` counts those picks by `primary_horizon`, once per pick;
+watchlist and overflow picks are excluded, as are secondary horizon actions.
+An explicitly empty final list yields zero counts. Legacy reports without
+`final_decisions` fall back to base recommendations with `rating: recommend`.
+Picks outside the three named horizons count toward the total only. Empty
+reports still include all three horizon keys with zero values. These fields
+support archive filtering and count charts without opening each report.
+
+V1 readers require `as_of`, `cadence`, `html`, and `json`, and ignore unknown
+entry fields, including these optional display counts. This additive contract
+keeps the v1 identity model and existing output version: display metadata does
+not establish identity or verified evidence. `parse_v1_index` and the v1 path
+of `parse_identity_index` apply the same rule. Required field types, period and
+filename validation, variant rejection, and artifact-conflict checks remain
+unchanged; the top-level index shape stays strict. Older readers that enforce
+an exact entry key set must adopt this rule before consuming the extended index.
+
 ## Policy
 
 The policy block allows non-personalized intelligent-advisory research output but keeps account

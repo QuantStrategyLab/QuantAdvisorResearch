@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from .artifacts import input_digest_for_payloads, write_report_manifest
 from .contracts import ALLOWED_CADENCES, validate_advisory_report
@@ -115,6 +116,7 @@ HORIZON_WINDOWS = {
     "not_applicable": "不适用",
 }
 SHORT_PRIMARY_MIN_SCORE_EDGE = 0.05
+HORIZON_RECOMMEND_THRESHOLDS = {"short": 0.60, "medium": 0.52, "long": 0.62}
 THEME_MOMENTUM_ARTIFACT_TYPE = "medium_horizon_theme_context"
 
 CADENCE_LABELS_ZH = {
@@ -1497,7 +1499,7 @@ def horizon_action_for(
     if horizon == "short":
         if market_score is None:
             return "skip"
-        if score >= 0.60 and market_value >= 0.55 and momentum_score >= 0.35 and (
+        if score >= HORIZON_RECOMMEND_THRESHOLDS["short"] and market_value >= 0.55 and momentum_score >= 0.35 and (
             source_score >= 0.35 or market_value >= 0.70
         ):
             return "recommend"
@@ -1505,13 +1507,13 @@ def horizon_action_for(
             return "watch"
         return "skip"
     if horizon == "medium":
-        if score >= 0.52 and momentum_score >= 0.35 and medium_context_score >= 0.35:
+        if score >= HORIZON_RECOMMEND_THRESHOLDS["medium"] and momentum_score >= 0.35 and medium_context_score >= 0.35:
             return "recommend"
         if score >= 0.38 and (momentum_score >= 0.35 or medium_context_score >= 0.35 or source_score >= 0.35):
             return "watch"
         return "skip"
     if horizon == "long":
-        if score >= 0.62 and long_context_score >= 0.55 and (medium_context_score >= 0.35 or source_score >= 0.35):
+        if score >= HORIZON_RECOMMEND_THRESHOLDS["long"] and long_context_score >= 0.55 and (medium_context_score >= 0.35 or source_score >= 0.35):
             return "recommend"
         if score >= 0.45 and long_context_score >= 0.35:
             return "watch"
@@ -1605,12 +1607,20 @@ def build_final_decisions(
     market_confirmations = market_confirmations or {}
     symbols = sorted(set(rec_by_symbol) | set(theme_context))
     picks: list[dict[str, Any]] = []
+    horizon_summary = {
+        horizon: {"max_score": None, "threshold": threshold}
+        for horizon, threshold in HORIZON_RECOMMEND_THRESHOLDS.items()
+    }
 
     for symbol in symbols:
         rec = rec_by_symbol.get(symbol)
         theme = theme_context.get(symbol, {})
         market = market_confirmations.get(symbol)
         horizon_scores = build_horizon_scores(rec, theme, market)
+        for horizon, summary in horizon_summary.items():
+            score = horizon_scores[horizon]["score"]
+            if summary["max_score"] is None or score > summary["max_score"]:
+                summary["max_score"] = score
         score_components = horizon_scores["medium"]["components"]
         source_score = as_float(score_components.get("source"))
         momentum_score = as_float(score_components.get("momentum"))
@@ -1754,6 +1764,7 @@ def build_final_decisions(
         "horizon_buckets": horizon_buckets,
         "horizon_rankings": horizon_rankings,
         "horizon_action_buckets": horizon_action_buckets,
+        "horizon_summary": horizon_summary,
         "position_policy": "No target shares, position size, portfolio weight, or account-specific allocation is provided.",
     }
 
@@ -1806,6 +1817,45 @@ def _snapshot_input(path: str | Path | None, *, fail_on_unavailable: bool) -> by
         if fail_on_unavailable:
             raise
         return _UNAVAILABLE_INPUT
+
+
+def context_input_check(
+    name: str, result: ContextFreshness, warnings: list[str],
+) -> dict[str, Any]:
+    if result.valid:
+        status = "available"
+    elif result.reason in {"expired", "stale_as_of"} or any(
+        warning in {f"{name}_expired", f"{name}_stale_as_of"} for warning in warnings
+    ):
+        status = "stale"
+    elif result.present or warnings:
+        status = "invalid"
+    else:
+        status = "missing"
+    return {
+        "name": name,
+        "detail": warnings[0] if warnings else result.reason,
+        "status": status,
+        "as_of": result.as_of.isoformat() if result.as_of else None,
+    }
+
+
+def report_sources(events: list[Event], watchlist: dict[str, WatchlistItem]) -> list[dict[str, Any]]:
+    sources = set()
+    for source_type, items in (("political_event", events), ("watchlist", watchlist.values())):
+        for item in items:
+            url = item.source_url.strip()
+            try:
+                parsed = urlsplit(url)
+                if parsed.scheme in {"http", "https"} and parsed.hostname and not parsed.username and not parsed.password:
+                    sources.add((url, source_type))
+            except ValueError:
+                continue
+    # CSV inputs do not attest URL retrieval or a fetch timestamp.
+    return [
+        {"url": url, "type": source_type, "fetched_at": None, "status": "unverified"}
+        for url, source_type in sorted(sources)
+    ]
 
 
 def build_advisory_report(
@@ -1975,6 +2025,8 @@ def build_advisory_report(
         name: "unavailable" if payload is _UNAVAILABLE_INPUT else payload
         for name, payload in input_payloads.items()
     }
+    events_as_of = max((event.event_date for event in events), default=None)
+    market_as_of = max((item.as_of for item in market_confirmations.values() if item.as_of), default=None)
     report = {
         "schema_version": "6",
         "contract_version": contract_version_for_schema("6"),
@@ -1997,6 +2049,17 @@ def build_advisory_report(
             "theme_momentum": theme_source_artifact,
             "market_confirmation": str(market_confirmation_path) if market_confirmation_path else "",
         },
+        "input_checks": [
+            {"name": "political_events", "detail": "parsed", "status": "available",
+             "as_of": events_as_of.isoformat() if events_as_of else None},
+            {"name": "political_watchlist", "detail": "parsed", "status": "available", "as_of": None},
+            context_input_check("ai_signal", ai_freshness_result, ai_quality_warnings),
+            context_input_check("theme_momentum", theme_freshness_result, theme_quality_warnings),
+            {"name": "market_confirmation", "detail": "parsed" if market_confirmation_path else "not_provided",
+             "status": "available" if market_confirmation_path else "missing",
+             "as_of": market_as_of.isoformat() if market_as_of else None},
+        ],
+        "sources": report_sources(events, watchlist),
         "summary": {
             # Keep recommendation_count as the historical base-layer count.
             "recommendation_count": len(recommendations),

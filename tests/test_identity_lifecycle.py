@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from quant_advisor_research.identity_lifecycle import (
@@ -11,6 +13,8 @@ from quant_advisor_research.identity_lifecycle import (
     parse_v2_index,
     make_verified_report_evidence,
 )
+from quant_advisor_research.identity_v3 import parse_identity_index
+from quant_advisor_research.publisher import render_reports_index_json
 
 
 DIGEST_A = "a" * 64
@@ -60,6 +64,36 @@ def test_v1_parser_returns_provisional_binding_without_v2_claims() -> None:
     assert index.bindings[0].period_key == "weekly:2026-06-15:2026-06-21"
 
 
+@pytest.mark.parametrize("parser", [parse_v1_index, parse_identity_index])
+@pytest.mark.parametrize("picks", [[], [{"primary_horizon": "medium"}]])
+def test_v1_reader_accepts_published_index_with_display_metadata(parser, picks: list[dict]) -> None:
+    report = {
+        "as_of": "2026-06-20",
+        "cadence": "weekly",
+        "final_decisions": {"recommendations": picks},
+    }
+    payload = json.loads(render_reports_index_json([report]))
+    assert payload["schema_version"] == 1
+    assert payload["reports"][0]["recommendation_count"] == len(picks)
+    assert payload["reports"][0]["horizon_counts"] == {"short": 0, "medium": len(picks), "long": 0}
+
+    expected = parse_v1_index({"schema_version": 1, "reports": [v1_entry()]})
+    assert parser(payload) == expected
+
+
+@pytest.mark.parametrize("parser", [parse_v1_index, parse_identity_index])
+def test_v1_reader_ignores_unknown_entry_fields_without_trusting_identity_claims(parser) -> None:
+    entry = {
+        **v1_entry(),
+        "future_metadata": {"display": ["synthetic"]},
+        "status": "VERIFIED_REPORT_EVIDENCE",
+        "fingerprint_digest": DIGEST_A,
+    }
+    expected = parse_v1_index({"schema_version": 1, "reports": [v1_entry()]})
+
+    assert parser({"schema_version": 1, "reports": [entry]}) == expected
+
+
 def test_v1_allows_multiple_legacy_identities_in_one_period() -> None:
     entries = [
         v1_entry(as_of="2026-06-20"),
@@ -92,12 +126,42 @@ def test_v1_exact_duplicate_identity_is_rejected() -> None:
         {**v1_entry(), "json": "../advisory_report_2026-06-20.json"},
         {**v1_entry(), "json": "/tmp/advisory_report_2026-06-20.json"},
         {**v1_entry(), "json": "advisory_report_2026-06-20.variant-a.json"},
-        {**v1_entry(), "debug": "raw"},
     ],
 )
-def test_v1_malformed_names_and_unknown_fields_are_sanitized(entry: dict) -> None:
+def test_v1_malformed_names_are_sanitized(entry: dict) -> None:
     with pytest.raises(IdentityMetadataError):
         parse_v1_index({"schema_version": 1, "reports": [entry]})
+
+
+@pytest.mark.parametrize("parser", [parse_v1_index, parse_identity_index])
+@pytest.mark.parametrize("field", ["as_of", "cadence", "json", "html"])
+@pytest.mark.parametrize("missing", [False, True])
+def test_v1_extra_metadata_does_not_relax_required_fields(parser, field: str, missing: bool) -> None:
+    entry = {**v1_entry(), "recommendation_count": 1, "horizon_counts": {"medium": 1}}
+    if missing:
+        del entry[field]
+    else:
+        entry[field] = 42
+
+    with pytest.raises(IdentityMetadataError):
+        parser({"schema_version": 1, "reports": [entry]})
+
+
+@pytest.mark.parametrize("parser", [parse_v1_index, parse_identity_index])
+@pytest.mark.parametrize(
+    "changes, code",
+    [
+        ({"json": "../advisory_report_2026-06-20.json"}, "invalid_identity_name"),
+        ({"html": "2026-06-20-daily-model-recommendations.html"}, "identity_name_mismatch"),
+        ({"as_of": "2026-02-30"}, "period_mismatch"),
+        ({"json": f"advisory_report_2026-06-20.variant-{DIGEST_A}.json"}, "v1_variant_unverified"),
+    ],
+)
+def test_v1_extra_metadata_does_not_relax_identity_validation(parser, changes: dict, code: str) -> None:
+    entry = {**v1_entry(), "recommendation_count": 1, **changes}
+
+    with pytest.raises(IdentityMetadataError, match=f"^{code}$"):
+        parser({"schema_version": 1, "reports": [entry]})
 
 
 def test_v2_parser_accepts_canonical_and_multiple_variants() -> None:
