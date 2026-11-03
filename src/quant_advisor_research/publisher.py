@@ -657,7 +657,7 @@ ARCHIVE_PAGE_CSS = """
     .month h2 .count { font: 500 13px/1 var(--sans); color: var(--ink-3); }
     .arch td { font-size: 14px; }
     .hz-mini { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
-    .hz-mini span:nth-child(odd) { color: var(--ink-3); }
+    .hz-mini > span:nth-child(odd) { color: var(--ink-3); }
 """
 
 SITE_SCRIPT_JS = """

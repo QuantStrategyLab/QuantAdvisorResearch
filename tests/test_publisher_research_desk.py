@@ -453,3 +453,14 @@ def test_legacy_facts_badge_wraps_without_changing_other_badges() -> None:
     assert "Latest · expiry not recorded" in page
     assert re.search(r"\.facts \.badge\s*\{[^}]*white-space:\s*normal\s*;", page)
     assert re.search(r"(?m)^\s*\.badge\s*\{[^}]*white-space:\s*nowrap\s*;", page)
+
+
+def test_archive_horizon_muting_only_targets_direct_label_spans() -> None:
+    report = make_report(picks=[make_pick("MMED1"), make_pick("MMED2"), make_pick("LLONG1", "long")])
+    page = render_archive_html([report])
+    assert '.hz-mini > span:nth-child(odd) { color: var(--ink-3); }' in page
+    assert '.hz-mini span:nth-child(odd)' not in page
+    snapshot = re.search(r'<div class="hz-mini">(.*?)</div>', page, re.DOTALL)
+    assert snapshot is not None
+    for symbol in ("LLONG1", "MMED1", "MMED2"):
+        assert f'<span class="sym">{symbol}</span>' in snapshot.group(1)
