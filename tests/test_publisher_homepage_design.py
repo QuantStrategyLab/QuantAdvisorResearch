@@ -34,10 +34,11 @@ def test_complete_empty_report_explains_threshold_without_promoting_watch_candid
     page = render_index_html([empty_report()])
     assert page.count('本期无推荐') == 3
     assert page.count('候选未达到推荐门槛。') == 3
-    assert '空结果也是结论：说明信号未达门槛，而不是数据缺失。' in page
+    assert '输入已核验完整；空结果本身就是结论：信号未达到门槛，而不是数据缺失。' in page
     assert 'CANDIDATE' not in page
-    assert '<a href="index.html" aria-current="page">最新</a>' in page
-    assert '>方法说明</a>' in page
+    assert '<a href="index.html" aria-current="page">' in page
+    assert 'data-l="zh" lang="zh-CN">最新</span>' in page
+    assert 'data-l="zh" lang="zh-CN">方法说明</span>' in page
     assert '>RSS</a>' in page
 
 
@@ -46,7 +47,8 @@ def test_empty_result_with_data_warning_does_not_claim_complete_inputs():
     report['summary']['data_quality_warnings'] = ['missing_market_confirmation']
     page = render_index_html([report])
     assert '不是数据缺失' not in page
-    assert '输入数据状态和未达门槛的原因请见完整报告。' in page
+    assert '本期三个周期均未产生合格推荐，且输入不完整。' in page
+    assert '此空结果不能解读为“信号未达门槛”' in page
     assert '候选未达到推荐门槛' not in page
     report['summary']['data_quality_warnings'] = []
     report['freshness'] = {'ai_signal': {'valid': False, 'reason': 'not_provided'}}
@@ -62,7 +64,7 @@ def test_unknown_freshness_never_asserts_complete_inputs_or_threshold(freshness)
     page = render_index_html([report])
     assert '不是数据缺失' not in page
     assert '候选未达到推荐门槛' not in page
-    assert page.count('具体原因见完整报告。') == 3
+    assert page.count('原因见完整报告中的输入状态。') == 3
 
 
 def test_valid_legacy_schema_with_no_freshness_keeps_reason_unknown():
@@ -98,7 +100,7 @@ def test_missing_ranking_evidence_does_not_invent_a_threshold_reason():
     page = render_index_html([report])
     assert '不是数据缺失' not in page
     assert '候选未达到推荐门槛' not in page
-    assert page.count('具体原因见完整报告。') == 3
+    assert page.count('原因见完整报告中的输入状态。') == 3
 
 
 def test_report_symbols_are_escaped_and_missing_reports_have_no_fake_date():
@@ -108,6 +110,6 @@ def test_report_symbols_are_escaped_and_missing_reports_have_no_fake_date():
     assert '<script>alert(1)</script>' not in page
     assert '&lt;script&gt;' in page
     empty = render_index_html([])
-    assert '暂无报告' in empty
+    assert '暂无已发布报告' in empty
     assert '<time ' not in empty
     assert '本期无推荐' not in empty
