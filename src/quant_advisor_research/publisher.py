@@ -694,7 +694,7 @@ SITE_SCRIPT_JS = """
   apply();
   document.querySelectorAll(".controls[hidden]").forEach(function (c) { c.hidden = false; });
 
-  /* Report page: static text always states the expiry instant; JS only adds the expired banner. */
+  /* Static text states the expiry instant; refresh status and notices on home and report pages. */
   function updateExpiry() {
   var now = Date.now();
   document.querySelectorAll("[data-expires]").forEach(function (el) {
@@ -1409,12 +1409,16 @@ def index_threshold_unmet(report: dict[str, Any], horizon: str) -> bool:
     )
 
 
-def _home_status_badge(report: dict[str, Any], *, expired: bool) -> str:
-    if not report.get("expires_at"):
+def _home_status_badge(report: dict[str, Any]) -> str:
+    expires_text = str(report.get("expires_at") or "")
+    if not expires_text:
         return _status_badge("b-unk", "最新 · 有效期未记录", "Latest · expiry not recorded")
-    if expired:
-        return _status_badge("b-warn", "已过期", "Expired")
-    return _status_badge("b-ok", "当前有效", "Current")
+    return (
+        f'<span data-expires="{html.escape(expires_text)}"></span>'
+        f'<span class="badge b-ok" data-when-current hidden>{_t("当前有效", "Current")}</span>'
+        f'<span class="badge b-warn" data-when-expired hidden>{_t("已过期", "Expired")}</span>'
+        f'<noscript><span class="badge b-unk">{_t("见有效期", "See validity")}</span></noscript>'
+    )
 
 
 def _home_input_summary(report: dict[str, Any]) -> str:
@@ -1523,10 +1527,10 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
     expired = False
     if latest:
         expired = is_report_expired(latest, now=reference_now)
-        if expired:
+        if latest.get("expires_at"):
             expires_date = _iso_date(latest.get("expires_at"))
             banner = (
-                '<div class="notice n-warn" role="note">'
+                '<div class="notice n-warn" role="note" data-when-expired hidden>'
                 f'<p><strong>{_t("当前没有有效报告。", "No current report is available.")}</strong></p>'
                 f'<p>{_t(f"以下为最近一期报告，已于 {expires_date} 过期，仅供历史查阅，不再作为当前公开结论。", f"The most recent report is shown below. It expired on {expires_date} and is kept for reference only; it is no longer a current public conclusion.")}</p></div>'
             )
@@ -1546,7 +1550,7 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
             <p class="overline">{overline}</p>
             <h2 id="latest-h" style="font-size:22px">{_t(cadence_zh, cadence_en)} {_t("研究复盘", "research review")} · <time datetime="{as_of}">{as_of}</time></h2>
           </div></div>
-          {_facts_strip(latest, status_html=_home_status_badge(latest, expired=expired))}
+          {_facts_strip(latest, status_html=_home_status_badge(latest))}
           {render_index_horizons(latest)}
           {render_index_empty_conclusion(latest)}
           {_home_input_summary(latest)}

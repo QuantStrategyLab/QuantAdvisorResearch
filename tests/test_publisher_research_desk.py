@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+from html.parser import HTMLParser
+
+import pytest
 
 from quant_advisor_research.publisher import (
     render_archive_html,
@@ -153,6 +156,46 @@ def test_home_expired_latest_keeps_expired_badge_and_banner() -> None:
     assert "已过期" in latest
     assert "最近一期 · 已过期" in latest
     assert 'datetime="2026-11-02"' in latest
+
+
+@pytest.mark.parametrize("offset_ms", [-1000, 0, 1])
+def test_home_expiry_controls_survive_static_generation(offset_ms: int) -> None:
+    report = make_report()
+    expiry = dt.datetime.fromisoformat(report["expires_at"])
+    page = render_index_html([report], now=expiry + dt.timedelta(milliseconds=offset_ms))
+
+    class ExpiryControls(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__()
+            self.controls: list[dict] = []
+
+        def handle_starttag(self, tag: str, attrs: list) -> None:
+            values = dict(attrs)
+            if any(key in values for key in ("data-expires", "data-when-current", "data-when-expired")):
+                self.controls.append(values)
+
+    parser = ExpiryControls()
+    parser.feed(page)
+    markers = [attrs for attrs in parser.controls if "data-expires" in attrs]
+    assert [attrs["data-expires"] for attrs in markers] == [report["expires_at"]]
+    current = [attrs for attrs in parser.controls if "data-when-current" in attrs]
+    expired = [attrs for attrs in parser.controls if "data-when-expired" in attrs]
+    assert len(current) == 1
+    assert len(expired) == 2  # The badge and the associated expiry notice.
+    assert all("hidden" in attrs for attrs in current + expired)
+    fallback = re.search(r"<noscript>(.*?)</noscript>", page, flags=re.DOTALL)
+    assert fallback is not None
+    assert "See validity" in fallback.group(1)
+    assert "Current" not in fallback.group(1)
+    assert "2026-11-10 00:00 UTC" in page
+
+
+def test_home_without_expiry_keeps_unknown_status_without_timer_controls() -> None:
+    page = render_index_html([make_legacy_report()], now=NOW)
+    assert 'data-expires="' not in page
+    assert 'data-when-current hidden' not in page
+    assert 'data-when-expired hidden' not in page
+    assert "Latest · expiry not recorded" in page
 
 
 def test_horizon_summary_null_max_score_renders_not_evaluated_not_zero() -> None:
