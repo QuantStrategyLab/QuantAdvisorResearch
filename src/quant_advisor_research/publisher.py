@@ -523,6 +523,7 @@ SITE_BASE_CSS = """
     /* Status badges: always text + glyph, never colour alone */
     .badge { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--sans); letter-spacing: .02em;
       padding: 5px 8px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
+    .facts .badge { white-space: normal; }
     .badge::before { content: ""; width: 7px; height: 7px; display: inline-block; }
     .b-ok { color: var(--ok); background: var(--ok-bg); } .b-ok::before { background: currentColor; border-radius: 50%; }
     .b-warn { color: var(--warn); background: var(--warn-bg); } .b-warn::before { border: 1.5px solid currentColor; transform: rotate(45deg); width: 6px; height: 6px; }

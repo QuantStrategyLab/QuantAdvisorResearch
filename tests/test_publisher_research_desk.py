@@ -446,3 +446,10 @@ def test_home_overlapping_validity_notice_only_describes_displayed_report() -> N
 
     fresh = render_index_html([weekly, monthly], now=after)
     assert report_filename(monthly) in fresh.split('id="latest"', 1)[1].split("<aside", 1)[0]
+
+
+def test_legacy_facts_badge_wraps_without_changing_other_badges() -> None:
+    page = render_index_html([make_legacy_report()], now=NOW)
+    assert "Latest · expiry not recorded" in page
+    assert re.search(r"\.facts \.badge\s*\{[^}]*white-space:\s*normal\s*;", page)
+    assert re.search(r"(?m)^\s*\.badge\s*\{[^}]*white-space:\s*nowrap\s*;", page)
