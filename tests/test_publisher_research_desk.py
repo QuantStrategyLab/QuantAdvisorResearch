@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import re
 from html.parser import HTMLParser
@@ -151,7 +152,7 @@ def test_home_expired_latest_keeps_expired_badge_and_banner() -> None:
     expired = make_report(as_of="2026-11-02", expires_at="2020-01-01T00:00:00Z")
     page = render_index_html([expired], now=NOW)
     latest = page.split('id="latest"', 1)[1]
-    assert "当前没有有效报告。" in page
+    assert "当前展示的报告已过期。" in page
     assert "已于 2020-01-01 过期" in page
     assert "已过期" in latest
     assert "最近一期 · 已过期" in latest
@@ -413,3 +414,35 @@ def test_reports_index_json_and_feed_bytes_unchanged() -> None:
         "</item></channel></rss>"
     )
     assert render_feed_xml([report], site_url="https://example.invalid/advisor", feed_title="Test Feed") == expected_feed
+
+
+def test_home_overlapping_validity_notice_only_describes_displayed_report() -> None:
+    from test_publisher import build_sample_report
+
+    from quant_advisor_research.contracts import validate_advisory_report
+    from quant_advisor_research.publisher import is_report_expired
+
+    weekly = build_sample_report()
+    weekly.update(generated_at="2026-11-03T00:00:00Z", expires_at="2026-11-10T00:00:00Z")
+    monthly = copy.deepcopy(weekly)
+    monthly.update(cadence="monthly", generated_at="2026-11-04T00:00:00Z", expires_at="2026-11-11T00:00:00Z")
+    for report in (weekly, monthly):
+        validate_advisory_report(report)
+    expiry = dt.datetime.fromisoformat(weekly["expires_at"])
+    after = expiry + dt.timedelta(milliseconds=1001)
+    assert is_report_expired(weekly, now=after)
+    assert not is_report_expired(monthly, now=after)
+
+    page = render_index_html([weekly, monthly], now=expiry - dt.timedelta(seconds=1))
+    latest = page.split('id="latest"', 1)[1].split("<aside", 1)[0]
+    assert report_filename(weekly) in latest
+    assert report_filename(monthly) in page
+    notice = re.search(r'<div class="notice n-warn"[^>]*data-when-expired[^>]*>(.*?)</div>', page, re.DOTALL)
+    assert notice is not None
+    assert "No current report is available." not in notice.group(1)
+    assert "当前没有有效报告。" not in notice.group(1)
+    assert "The displayed report has expired." in notice.group(1)
+    assert "当前展示的报告已过期。" in notice.group(1)
+
+    fresh = render_index_html([weekly, monthly], now=after)
+    assert report_filename(monthly) in fresh.split('id="latest"', 1)[1].split("<aside", 1)[0]

@@ -1531,8 +1531,8 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
             expires_date = _iso_date(latest.get("expires_at"))
             banner = (
                 '<div class="notice n-warn" role="note" data-when-expired hidden>'
-                f'<p><strong>{_t("当前没有有效报告。", "No current report is available.")}</strong></p>'
-                f'<p>{_t(f"以下为最近一期报告，已于 {expires_date} 过期，仅供历史查阅，不再作为当前公开结论。", f"The most recent report is shown below. It expired on {expires_date} and is kept for reference only; it is no longer a current public conclusion.")}</p></div>'
+                f'<p><strong>{_t("当前展示的报告已过期。", "The displayed report has expired.")}</strong></p>'
+                f'<p>{_t(f"本页展示的报告已于 {expires_date} 过期，仅供历史查阅，不再作为当前公开结论。", f"The displayed report expired on {expires_date} and is kept for reference only; it is no longer a current public conclusion.")}</p></div>'
             )
 
     if latest:
