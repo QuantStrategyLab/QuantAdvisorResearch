@@ -464,3 +464,27 @@ def test_archive_horizon_muting_only_targets_direct_label_spans() -> None:
     assert snapshot is not None
     for symbol in ("LLONG1", "MMED1", "MMED2"):
         assert f'<span class="sym">{symbol}</span>' in snapshot.group(1)
+
+
+def test_wrapped_facts_badge_preserves_status_glyph_size() -> None:
+    page = render_index_html([make_legacy_report()], now=NOW)
+    glyph = re.search(r"\.badge::before\s*\{([^}]*)\}", page)
+    assert glyph is not None
+    assert re.search(r"flex:\s*none\s*;", glyph.group(1))
+    assert re.search(r"width:\s*7px\s*;", glyph.group(1))
+    assert re.search(r"height:\s*7px\s*;", glyph.group(1))
+
+
+def test_wrapped_facts_badge_has_leading_without_growing_single_line() -> None:
+    page = render_index_html([make_legacy_report()], now=NOW)
+    facts_badge = re.search(r"\.facts \.badge\s*\{([^}]*)\}", page)
+    assert facts_badge is not None
+    assert re.search(r"line-height:\s*1\.3\s*;", facts_badge.group(1))
+    # 12px font: 15.6px leading + 6.4px padding + 2px border = original 24px.
+    assert re.search(r"padding-block:\s*3\.2px\s*;", facts_badge.group(1))
+    # Preserve the original height even with subpixel line-box rounding.
+    assert re.search(r"min-height:\s*24px\s*;", facts_badge.group(1))
+    base_badge = re.search(r"(?m)^\s*\.badge\s*\{([^}]*)\}", page)
+    assert base_badge is not None
+    assert "12px/1 " in base_badge.group(1)
+    assert "padding: 5px 8px;" in base_badge.group(1)
