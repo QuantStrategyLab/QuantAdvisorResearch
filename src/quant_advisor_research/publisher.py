@@ -1583,6 +1583,12 @@ def render_index_empty_conclusion(report: dict[str, Any]) -> str:
             f'<p><strong>{_t("本期三个周期均未产生合格推荐。", "No horizon produced a qualifying recommendation this period.")}</strong></p>'
             f'<p>{_t("输入已核验完整；空结果本身就是结论：信号未达到门槛，而不是数据缺失。", "Inputs were verified complete. The empty result is itself the conclusion: signals did not meet the gate; this is not missing data.")}</p></div>'
         )
+    if index_inputs_verified(report):
+        return (
+            '<div class="notice n-warn" role="note" style="margin:0 20px 16px">'
+            f'<p><strong>{_t("本期三个周期均未产生合格推荐。", "No horizon produced a qualifying recommendation this period.")}</strong></p>'
+            f'<p>{_t("输入已核验完整；部分周期缺少排名证据，尚不能判断信号是否达到门槛。请查看完整报告。", "Inputs were verified complete. Ranking evidence is missing for one or more horizons, so whether signals met the gate remains unknown. See the full report.")}</p></div>'
+        )
     return (
         '<div class="notice n-warn" role="note" style="margin:0 20px 16px">'
         f'<p><strong>{_t("本期三个周期均未产生合格推荐，且输入不完整。", "No horizon produced a qualifying recommendation, and inputs are incomplete.")}</strong></p>'

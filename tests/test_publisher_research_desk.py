@@ -232,6 +232,20 @@ def test_missing_ranking_evidence_is_not_presented_as_below_threshold() -> None:
     assert "候选未达到推荐门槛" not in render_index_html([report])
 
 
+def test_verified_inputs_without_rankings_keep_homepage_conclusion_unknown() -> None:
+    from quant_advisor_research.publisher import index_inputs_verified
+
+    report = _contract_valid_missing_ranking_report()
+    assert index_inputs_verified(report)
+    page = render_index_html([report])
+    assert "Inputs were verified complete" in page
+    assert "Ranking evidence is missing for one or more horizons" in page
+    assert "inputs are incomplete" not in page
+    assert "Some inputs are missing, stale or unavailable" not in page
+    assert "signals did not meet the gate" not in page
+    assert "部分周期缺少排名证据" in page
+
+
 def test_filenames_links_and_method_href_unchanged() -> None:
     report = build_sample_report()
     assert report_filename(report) == "2026-05-30-weekly-model-recommendations.html"
