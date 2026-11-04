@@ -351,7 +351,7 @@ SITE_BASE_CSS = """
       --surface-2: #f8f9fa;
       --ink: #14181f;
       --ink-2: #444c58;
-      --ink-3: #6a7280;
+      --ink-3: #68707d;
       --rule: #d8dce2;
       --rule-strong: #b7bec8;
       --accent: #1d3f66;
@@ -474,7 +474,8 @@ SITE_BASE_CSS = """
     /* Status badges: always text + glyph, never colour alone */
     .badge { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--sans); letter-spacing: .02em;
       padding: 5px 8px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
-    .badge::before { content: ""; width: 7px; height: 7px; display: inline-block; }
+    .facts .badge { white-space: normal; line-height: 1.3; padding-block: 3.2px; min-height: 24px; }
+    .badge::before { content: ""; width: 7px; height: 7px; display: inline-block; flex: none; }
     .b-ok { color: var(--ok); background: var(--ok-bg); } .b-ok::before { background: currentColor; border-radius: 50%; }
     .b-warn { color: var(--warn); background: var(--warn-bg); } .b-warn::before { border: 1.5px solid currentColor; transform: rotate(45deg); width: 6px; height: 6px; }
     .b-bad { color: var(--bad); background: var(--bad-bg); } .b-bad::before { background: currentColor; width: 8px; height: 2px; }
@@ -514,46 +515,6 @@ SITE_BASE_CSS = """
     footer li { margin-bottom: 4px; }
     .disclaimer { font-size: 13.5px; color: var(--ink-2); max-width: var(--measure); }
     .disclaimer p { margin: 0 0 8px; }
-
-    /* Responsive */
-    @media (max-width: 960px) {
-      .home-grid, .report-grid { grid-template-columns: minmax(0, 1fr); }
-      .toc { position: static; }
-      .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .facts div { border-bottom: 1px solid var(--rule); }
-    }
-    @media (max-width: 640px) {
-      body { font-size: 15px; }
-      .wrap { padding: 0 16px; }
-      h1 { font-size: 24px; }
-      .utility .wrap { flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
-      .brand-unit, .brand-sep { display: none; }
-      .primary-nav ul { overflow-x: auto; }
-      .primary-nav a { padding: 11px 10px; }
-      .panel-head, .panel-body { padding-left: 16px; padding-right: 16px; }
-      .panel-head { flex-direction: column; align-items: flex-start; gap: 4px; }
-      .facts div { padding: 10px 16px; }
-      .cols { grid-template-columns: minmax(0, 1fr); }
-      .col { border-right: 0; border-bottom: 1px solid var(--rule); }
-      .col:last-child { border-bottom: 0; }
-      .toc { display: none; }
-      /* Tables become stacked label/value rows; no horizontal scrolling */
-      table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-      table.stack, table.stack tbody, table.stack tr, table.stack td, table.stack th { display: block; width: 100%; }
-      table.stack tr { border-bottom: 1px solid var(--rule); padding: 8px 0; }
-      table.stack tbody tr:last-child { border-bottom: 0; }
-      table.stack td, table.stack th { border: 0; padding: 4px 16px; text-align: left; }
-      table.stack td[data-h]::before { content: attr(data-h); display: block; font-size: 11.5px; color: var(--ink-3); letter-spacing: .03em; }
-      html[data-locale="en"] table.stack td[data-h-en]::before { content: attr(data-h-en); }
-      td.num { text-align: left; }
-      footer .wrap { grid-template-columns: minmax(0, 1fr); }
-      .actions .btn { width: 100%; justify-content: center; }
-    }
-    @media print {
-      .utility .controls, .primary-nav, .skip-link, .toc { display: none; }
-      body { background: #fff; }
-    }
-    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 """
 
 REPORT_PAGE_CSS = """
@@ -606,7 +567,50 @@ ARCHIVE_PAGE_CSS = """
     .month h2 .count { font: 500 13px/1 var(--sans); color: var(--ink-3); }
     .arch td { font-size: 14px; }
     .hz-mini { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
-    .hz-mini span:nth-child(odd) { color: var(--ink-3); }
+    .hz-mini > span:nth-child(odd) { color: var(--ink-3); }
+"""
+
+# Emitted after the page CSS: at equal specificity these overrides would otherwise lose.
+SITE_MEDIA_CSS = """
+    /* Responsive */
+    @media (max-width: 960px) {
+      .home-grid, .report-grid { grid-template-columns: minmax(0, 1fr); }
+      .toc { position: static; }
+      .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .facts div { border-bottom: 1px solid var(--rule); }
+    }
+    @media (max-width: 640px) {
+      body { font-size: 15px; }
+      .wrap { padding: 0 16px; }
+      h1 { font-size: 24px; }
+      .utility .wrap { flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+      .brand-unit, .brand-sep { display: none; }
+      .primary-nav ul { overflow-x: auto; }
+      .primary-nav a { padding: 11px 10px; }
+      .panel-head, .panel-body { padding-left: 16px; padding-right: 16px; }
+      .panel-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+      .facts div { padding: 10px 16px; }
+      .cols { grid-template-columns: minmax(0, 1fr); }
+      .col { border-right: 0; border-bottom: 1px solid var(--rule); }
+      .col:last-child { border-bottom: 0; }
+      .toc { display: none; }
+      /* Tables become stacked label/value rows; no horizontal scrolling */
+      table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      table.stack, table.stack tbody, table.stack tr, table.stack td, table.stack th { display: block; width: 100%; }
+      table.stack tr { border-bottom: 1px solid var(--rule); padding: 8px 0; }
+      table.stack tbody tr:last-child { border-bottom: 0; }
+      table.stack td, table.stack th { border: 0; padding: 4px 16px; text-align: left; }
+      table.stack td[data-h]::before { content: attr(data-h); display: block; font-size: 11.5px; color: var(--ink-3); letter-spacing: .03em; }
+      html[data-locale="en"] table.stack td[data-h-en]::before { content: attr(data-h-en); }
+      td.num { text-align: left; }
+      footer .wrap { grid-template-columns: minmax(0, 1fr); }
+      .actions .btn { width: 100%; justify-content: center; }
+    }
+    @media print {
+      .utility .controls, .primary-nav, .skip-link, .toc { display: none; }
+      body { background: #fff; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 """
 
 
@@ -690,15 +694,20 @@ SITE_SCRIPT_JS = """
   apply();
   document.querySelectorAll(".controls[hidden]").forEach(function (c) { c.hidden = false; });
 
-  /* Report page: the static text always states the expiry instant; JS only adds the state. */
-  var now = Date.now();
-  document.querySelectorAll("[data-expires]").forEach(function (el) {
-    var exp = Date.parse(el.getAttribute("data-expires"));
-    if (isNaN(exp)) return;
-    var expired = now > exp;
-    document.querySelectorAll("[data-when-expired]").forEach(function (n) { n.hidden = !expired; });
-    document.querySelectorAll("[data-when-current]").forEach(function (n) { n.hidden = expired; });
-  });
+  /* The static text always states the expiry instant; JS only adds the state. */
+  function updateExpiry() {
+    var now = Date.now();
+    document.querySelectorAll("[data-expires]").forEach(function (el) {
+      var exp = Date.parse(el.getAttribute("data-expires"));
+      if (isNaN(exp)) return;
+      var expired = now > exp;
+      document.querySelectorAll("[data-when-expired]").forEach(function (n) { n.hidden = !expired; });
+      document.querySelectorAll("[data-when-current]").forEach(function (n) { n.hidden = expired; });
+    });
+  }
+  updateExpiry();
+  window.setInterval(updateExpiry, 1000);
+  document.addEventListener("visibilitychange", updateExpiry);
 })();
 """
 
@@ -1219,7 +1228,7 @@ def _page_chrome(*, title_zh: str, title_en: str, current: str, body: str, crumb
 <title>{html.escape(title_zh)}</title>
 <link rel="icon" type="image/svg+xml" href="{SITE_ICON_FILENAME}">
 <link rel="alternate" type="application/rss+xml" title="智慧投顾研究 RSS" href="feed.xml">
-<style>{SITE_BASE_CSS}{_PAGE_CSS.get(current, REPORT_PAGE_CSS)}</style>
+<style>{SITE_BASE_CSS}{_PAGE_CSS.get(current, REPORT_PAGE_CSS)}{SITE_MEDIA_CSS}</style>
 </head>
 <body>
 <a class="skip-link" href="#content">{_t("跳至正文", "Skip to content")}</a>
@@ -1628,21 +1637,28 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
         latest_filename = report_filename(latest)
         expired = is_report_expired(latest, now=reference_now)
         expires_text = str(latest.get("expires_at") or "").strip()
-        if expired:
-            status = _status_badge("b-warn", "已过期", "Expired")
-            overline = _t("最近一期 · 已过期", "Most recent · expired")
+        if expires_text:
+            # The published state is visible without scripting; the client clock owns the flip.
+            live, gone = ("", " hidden") if not expired else (" hidden", "")
             expires_day = expires_text[:10]
+            status = (
+                f'<span data-expires="{html.escape(expires_text, quote=True)}"></span>'
+                + _status_badge("b-ok", "当前有效", "Current", f" data-when-current{live}")
+                + _status_badge("b-warn", "已过期", "Expired", f" data-when-expired{gone}")
+            )
+            overline = (
+                f'<span data-when-current{live}>{_t("最新一期", "Latest publication")}</span>'
+                f'<span data-when-expired{gone}>{_t("最近一期 · 已过期", "Most recent · expired")}</span>'
+            )
             banner = (
-                '<div class="notice n-warn" role="note">'
+                f'<div class="notice n-warn" role="note" data-when-expired{gone}>'
                 f'<p><strong>{_t("当前没有有效报告。", "No current report is available.")}</strong></p>'
                 f'<p>{_t(f"以下为最近一期报告，已于 {expires_day} 过期，仅供历史查阅，不再作为当前公开结论。", f"The most recent report is shown below. It expired on {expires_day} and is kept for reference only; it is no longer a current public conclusion.")}</p></div>'
             )
         else:
-            status = (
-                _status_badge("b-ok", "当前有效", "Current") if expires_text
-                else _status_badge("b-unk", "最新 · 有效期未记录", "Latest · expiry not recorded")
-            )
+            status = _status_badge("b-unk", "最新 · 有效期未记录", "Latest · expiry not recorded")
             overline = _t("最新一期", "Latest publication")
+            banner = ""
         as_of = str(latest.get("as_of", ""))
         main = f"""
         <section class="panel" id="latest" aria-labelledby="latest-h">

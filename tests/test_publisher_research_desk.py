@@ -332,3 +332,71 @@ def test_multi_horizon_card_ids_and_aria_references_are_unique() -> None:
     assert 'id="p-medium-MU"' in page
     assert 'aria-labelledby="p-long-MU"' in page
     assert 'aria-labelledby="p-medium-MU"' in page
+
+
+def _expiry_hooks(page: str) -> dict[str, list[str]]:
+    visible = re.findall(r'<span class="badge (b-\w+)" (data-when-\w+)>', page)
+    hidden = re.findall(r'<span class="badge (b-\w+)" (data-when-\w+) hidden>', page)
+    return {"visible": [f"{css} {hook}" for css, hook in visible], "hidden": [f"{css} {hook}" for css, hook in hidden]}
+
+
+def test_home_status_is_bound_to_the_expiry_instant_not_the_publication_run() -> None:
+    """Regression: the home badge was a publication-time constant.
+
+    A visitor who opens the home page after ``expires_at`` must not be shown
+    "Current" while the report page of the same report says "Expired".
+    """
+    report = build_sample_report()
+    report["expires_at"] = "2026-11-07T06:00:00Z"
+    page = render_index_html([report], now=dt.datetime(2026, 11, 3, tzinfo=dt.UTC))
+
+    assert '<span data-expires="2026-11-07T06:00:00Z"></span>' in page
+    assert _expiry_hooks(page) == {
+        "visible": ["b-ok data-when-current"],
+        "hidden": ["b-warn data-when-expired"],
+    }
+    assert '<span data-when-current>' in page
+    assert '<span data-when-expired hidden>' in page
+    # The expired notice ships hidden and only the client clock can reveal it.
+    assert '<div class="notice n-warn" role="note" data-when-expired hidden>' in page
+    assert "以下为最近一期报告，已于 2026-11-07 过期" in page
+
+
+def test_home_expired_at_publication_shows_expired_and_keeps_current_hidden() -> None:
+    report = build_sample_report()
+    report["expires_at"] = "2020-01-01T00:00:00Z"
+    page = render_index_html([report], now=dt.datetime(2026, 6, 1, tzinfo=dt.UTC))
+
+    assert _expiry_hooks(page) == {
+        "visible": ["b-warn data-when-expired"],
+        "hidden": ["b-ok data-when-current"],
+    }
+    assert '<div class="notice n-warn" role="note" data-when-expired>' in page
+    assert "当前没有有效报告。" in page
+
+
+def test_legacy_home_status_stays_unknown_and_emits_no_expiry_hooks() -> None:
+    report = build_sample_report()
+    report.update(schema_version="5", contract_version="model_recommendations.v5")
+    for key in ("reference_time", "expires_at", "freshness", "input_digest"):
+        report.pop(key, None)
+    page = render_index_html([report], now=dt.datetime(2026, 11, 3, tzinfo=dt.UTC))
+
+    assert "<span data-expires=" not in page
+    assert "data-when-current" not in page.split("<script>")[0]
+    assert "最新 · 有效期未记录" in page
+    assert "当前有效" not in page
+
+
+def test_expiry_state_is_refreshed_while_the_page_stays_open() -> None:
+    page = render_report_html(build_sample_report())
+    script = re.search(r"<script>(.*)</script>", page, re.DOTALL)
+    assert script is not None
+    body = script.group(1)
+
+    assert "function updateExpiry()" in body
+    assert "updateExpiry();" in body
+    assert re.search(r"window\.setInterval\(updateExpiry,\s*1000\)", body)
+    assert 'document.addEventListener("visibilitychange", updateExpiry)' in body
+    # The instant itself is still strictly exclusive: equal is not expired.
+    assert "var expired = now > exp;" in body
