@@ -36,22 +36,21 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     html = render_report_html(build_sample_report())
 
     assert "智慧投顾研究周度复盘 - 2026-05-30" in html
-    assert "text-align: center" in html
-    assert "report-shell" in html
-    assert "report-hero" in html
-    assert "topbar" in html
-    assert "--font-sans" in html
-    assert "--font-display" in html
+    assert "skip-link" in html
+    assert "research-strip" in html
+    assert "report-grid" in html
+    assert "--sans" in html
+    assert "--serif" in html
     assert "PingFang SC" in html
     assert "Songti SC" in html
-    assert "返回首页" in html
+    assert "首页" in html
     assert "RSS 订阅" in html
-    assert 'date-label">报告日期' in html
+    assert "报告日期" in html
     assert 'rel="icon" type="image/svg+xml" href="favicon.svg"' in html
     assert "site-mark" in html
-    assert "2-12周" in html
+    assert "2–12 周" in html
     assert "来源模式：fixture" not in html
-    assert "股票背景" in html
+    assert "公司背景" in html
     assert "推荐理由" in html
     assert "主要风险" in html
     assert "按长线、中线、短线分栏展示系统结论" not in html
@@ -59,7 +58,7 @@ def test_render_report_html_is_direct_public_recommendation_page() -> None:
     assert "长线：暂无稳定结论" in html
     assert "中线：MU、NVDA" in html
     assert "短线：暂无稳定结论" in html
-    assert "本期较突出的方向主要在科技板块" in html
+    assert "整体看，当前结论更偏中线，短线暂不强调，后续重点观察趋势能否延续和基本面兑现。" in html
     assert "综合分" not in html
     assert "多源依据" not in html
     assert "<span class=\"pill\">模式：" not in html
@@ -115,19 +114,16 @@ def test_publish_reports_writes_site_files(tmp_path: Path) -> None:
     assert "#172033" in favicon
     assert "阅读完整报告" in index_html
     assert "历史归档" in index_html
-    assert "投资有风险。本站内容为模型研究输出，不构成投资建议。" in index_html
+    assert "投资有风险。本站内容为模型研究输出，面向公众、非个性化，不构成投资建议" in index_html
     assert "周度更新 · 静态页面" not in index_html
     assert "近期报告" in index_html
     assert "archive.html" in index_html
     assert "历史归档" in archive_html
-    assert "2026 年 05 月" in archive_html
-    assert "--font-sans" in index_html
-    assert "--font-display" in index_html
-    assert "latest-panel" in index_html
-    assert "snapshot-grid" in index_html
-    assert "<p class=\"snapshot-label\">长线</p>" in index_html
-    assert "<p class=\"snapshot-label\">中线</p>" in index_html
-    assert "<p class=\"snapshot-label\">短线</p>" in index_html
+    assert "2026 年 5 月" in archive_html
+    assert "--sans" in index_html
+    assert "--serif" in index_html
+    assert 'id="latest"' in index_html
+    assert index_html.count('class="hz-name"') == 3
     assert "阅读完整报告" in index_html
 
 
@@ -175,8 +171,9 @@ def test_index_limits_recent_history_and_archive_keeps_all_reports() -> None:
     assert 'datetime="2026-05-16"' not in index_html
     assert "查看全部" in index_html
     assert "archive.html" in index_html
-    assert archive_html.count('class="archive-card"') == 22
-    assert "2026-05-01 周度复盘" in archive_html
+    assert archive_html.count('class="arch-row"') == 22
+    assert 'datetime="2026-05-01"' in archive_html
+    assert "周度" in archive_html
     assert feed.count("<item>") == 20
     assert "2026-05-03 周度智慧投顾研究" in feed
     assert "2026-05-02 周度智慧投顾研究" not in feed
@@ -255,14 +252,14 @@ def test_render_report_html_groups_final_cards_by_horizon_and_rank() -> None:
 
     html = render_report_html(report)
 
-    assert "horizon-columns" in html
-    assert "horizon-long" in html
-    assert "horizon-medium" in html
-    assert "horizon-short" in html
-    assert html.index("<h2>长线</h2>") < html.index("<h2>中线</h2>") < html.index("<h2>短线</h2>")
-    assert html.index("推荐 #1</span>MID1") < html.index("推荐 #2</span>MID2")
-    assert "推荐 #1</span>LONG1" in html
-    assert "推荐 #1</span>SHORT1" in html
+    assert 'class="cols"' in html
+    assert 'id="h-long"' in html
+    assert 'id="h-medium"' in html
+    assert 'id="h-short"' in html
+    assert html.index('id="h-long"') < html.index('id="h-medium"') < html.index('id="h-short"')
+    assert html.index('id="p-medium-mid1"') < html.index('id="p-medium-mid2"')
+    assert 'id="p-long-long1"' in html
+    assert 'id="p-short-short1"' in html
     assert "最终推荐" not in html
 
 
@@ -320,11 +317,11 @@ def test_short_and_medium_columns_use_primary_horizon_only() -> None:
     html = render_report_html(report)
 
     assert "本期结论：长线：MU、DELL；中线：MU；短线：DELL。" in html
-    assert "<h2>短线</h2>" in html
-    short_start = html.index("<h2>短线</h2>")
+    assert 'id="h-short"' in html
+    short_start = html.index('id="h-short"')
     short_block = html[short_start:]
-    assert "推荐 #1</span>DELL" in short_block
-    assert "推荐 #1</span>MU" not in short_block
+    assert 'id="p-short-dell"' in short_block
+    assert 'id="p-short-mu"' not in short_block
 
 def test_render_report_html_renders_long_context_as_full_card_when_primary_bucket_is_medium() -> None:
     report = build_sample_report()
@@ -360,8 +357,9 @@ def test_render_report_html_renders_long_context_as_full_card_when_primary_bucke
     html = render_report_html(report)
 
     assert "长线观察" not in html
-    assert "推荐 #1</span>MU" in html
-    assert "长线 / 1-3年" in html
+    assert 'id="p-long-mu"' in html
+    assert "长线" in html
+    assert "1–3 年" in html
     assert "MU background" in html
     assert "MU reason" in html
     assert "本期结论：长线：MU；中线：MU；短线：暂无稳定结论。" in html
@@ -430,7 +428,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "多源依据" not in html
     assert "AI信号仓库" not in html
     assert "ResearchSignalContextPipelines" not in html
-    assert "股票背景" in html
+    assert "公司背景" in html
     assert "推荐理由" in html
     assert "主要风险" in html
     assert "按长线、中线、短线分栏展示系统结论" not in html
@@ -438,7 +436,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "长线：暂无稳定结论" in html
     assert "中线：MU、NVDA" in html
     assert "短线：暂无稳定结论" in html
-    assert "本期较突出的方向主要在科技板块" in html
+    assert "整体看，当前结论更偏中线，短线暂不强调，后续重点观察趋势能否延续和基本面兑现。" in html
     assert "存储周期" in html
     assert "需复核估值、财报、回撤和流动性" not in html
     assert "做什么" not in html
@@ -447,7 +445,7 @@ def test_render_report_html_includes_theme_momentum_context() -> None:
     assert "仓位/数量" not in html
     assert "主题候选（解释材料，不是最终推荐）" not in html
     assert "最终推荐" not in html
-    assert "主题动量" not in html
+    assert '<h2>主题动量</h2>' not in html
     assert "事件证据" not in html
     assert "hbm_memory" not in html
     assert "MU" in html
@@ -541,7 +539,7 @@ def test_render_index_html_prefers_non_expired_report_as_latest() -> None:
     expired["expires_at"] = "2020-01-01T00:00:00Z"
 
     html = render_index_html([expired, fresh], now=dt.datetime(2026, 6, 1, tzinfo=dt.UTC))
-    latest_section = html.split('class="latest-panel"', 1)[1].split('<aside', 1)[0]
+    latest_section = html.split('id="latest"', 1)[1].split('<aside', 1)[0]
 
     assert "2026-05-20" in latest_section
     assert "2026-05-30" not in latest_section
@@ -554,7 +552,7 @@ def test_render_index_html_marks_expired_when_only_expired_reports_remain() -> N
     expired["expires_at"] = "2020-01-01T00:00:00Z"
 
     html = render_index_html([expired], now=dt.datetime(2026, 6, 1, tzinfo=dt.UTC))
-    latest_section = html.split('class="latest-panel"', 1)[1]
+    latest_section = html.split('id="latest"', 1)[1]
 
     assert "过期" in latest_section
 
