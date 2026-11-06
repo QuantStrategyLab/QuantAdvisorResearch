@@ -1,0 +1,396 @@
+{
+  "as_of": "2026-05-23",
+  "audience_scope": "non_personalized_model_research",
+  "cadence": "weekly",
+  "contract_version": "model_recommendations.v5",
+  "generated_at": "2026-05-24T00:00:00Z",
+  "mode": "model_recommendations",
+  "policy": {
+    "account_specific_advice_allowed": false,
+    "downstream_use": "Intelligent advisory research only; do not route to broker execution or account-level allocation.",
+    "execution_allowed": false,
+    "non_personalized_recommendations_allowed": true,
+    "personalized_advice_allowed": false,
+    "portfolio_allocation_allowed": false
+  },
+  "recommendations": [
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [
+        {
+          "accepted": true,
+          "entity_match_type": "issuer",
+          "event_id": "demo-evt1-disclosure-buy",
+          "match_evidence": "Synthetic fixture explicitly names EVT1.",
+          "relationship_type": "issuer"
+        },
+        {
+          "accepted": true,
+          "entity_match_type": "issuer",
+          "event_id": "demo-evt1-public-mention",
+          "match_evidence": "Synthetic fixture explicitly names EVT1.",
+          "relationship_type": "issuer"
+        }
+      ],
+      "evidence_refs": [
+        "https://example.invalid/watchlist/evt1",
+        "https://example.invalid/official-filing/evt1-2026-01-10",
+        "https://example.invalid/official-remarks/evt1-2026-01-20"
+      ],
+      "evidence_score": 15,
+      "evidence_summary": "Synthetic disclosure plus mention recommendation used only to validate model output. 观察到事件证据：disclosure_buy, public_mention。",
+      "horizon_note": "事件驱动主周期为2-12周；1-10个交易日只适合观察催化反应，波动和反转风险更高。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Catalyst One",
+      "primary_horizon": "medium",
+      "primary_horizon_label": "中线",
+      "primary_horizon_window": "2-12周",
+      "rating": "recommend",
+      "rating_label": "重点推荐",
+      "reasons": [
+        "Synthetic disclosure plus mention recommendation used only to validate model output.",
+        "观察到事件证据：disclosure_buy, public_mention。"
+      ],
+      "recommendation_tier": "tier_1",
+      "recommendation_tier_label": "一级推荐",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.85,
+      "source_confidence": "medium",
+      "source_confidence_label": "中",
+      "source_score": 0.804,
+      "strategy_style": "event_driven",
+      "suitable_horizon_windows": {
+        "medium": "2-12周",
+        "short": "1-10个交易日"
+      },
+      "suitable_horizons": [
+        "short",
+        "medium"
+      ],
+      "symbol": "EVT1"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [
+        {
+          "accepted": true,
+          "entity_match_type": "issuer",
+          "event_id": "demo-evt2-policy-capital",
+          "match_evidence": "Synthetic fixture explicitly names EVT2.",
+          "relationship_type": "issuer"
+        }
+      ],
+      "evidence_refs": [
+        "https://example.invalid/watchlist/evt2",
+        "https://example.invalid/policy-capital/evt2-2026-02-05"
+      ],
+      "evidence_score": 11,
+      "evidence_summary": "Synthetic policy capital recommendation used only to validate model output. 观察到事件证据：policy_capital。",
+      "horizon_note": "事件驱动主周期为2-12周；1-10个交易日只适合观察催化反应，波动和反转风险更高。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Policy Two",
+      "primary_horizon": "medium",
+      "primary_horizon_label": "中线",
+      "primary_horizon_window": "2-12周",
+      "rating": "watch",
+      "rating_label": "观察",
+      "reasons": [
+        "Synthetic policy capital recommendation used only to validate model output.",
+        "观察到事件证据：policy_capital。"
+      ],
+      "recommendation_tier": "watchlist",
+      "recommendation_tier_label": "观察名单",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.79,
+      "source_confidence": "high",
+      "source_confidence_label": "高",
+      "source_score": 0.747,
+      "strategy_style": "event_driven",
+      "suitable_horizon_windows": {
+        "medium": "2-12周",
+        "short": "1-10个交易日"
+      },
+      "suitable_horizons": [
+        "short",
+        "medium"
+      ],
+      "symbol": "EVT2"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [
+        {
+          "accepted": true,
+          "entity_match_type": "issuer",
+          "event_id": "demo-evt3-disclosure-buy",
+          "match_evidence": "Synthetic fixture explicitly names EVT3.",
+          "relationship_type": "issuer"
+        }
+      ],
+      "evidence_refs": [
+        "https://example.invalid/watchlist/evt3",
+        "https://example.invalid/unverified-lead/evt3-2026-03-01"
+      ],
+      "evidence_score": 6,
+      "evidence_summary": "Synthetic low-confidence lead used only to validate source-review behavior. 观察到事件证据：disclosure_buy。",
+      "horizon_note": "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Review Three",
+      "primary_horizon": "not_applicable",
+      "primary_horizon_label": "不适用",
+      "primary_horizon_window": "不适用",
+      "rating": "verify_source",
+      "rating_label": "先核验来源",
+      "reasons": [
+        "Synthetic low-confidence lead used only to validate source-review behavior.",
+        "观察到事件证据：disclosure_buy。"
+      ],
+      "recommendation_tier": "source_check",
+      "recommendation_tier_label": "来源核验",
+      "review_checklist": [
+        "对照官方公告、披露文件、讲话或公司材料复核事件日期和来源链接。",
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "事件证据包含低置信来源行，需要用官方来源复核。"
+      ],
+      "risk_score": 2,
+      "score": 0.5,
+      "source_confidence": "low",
+      "source_confidence_label": "低",
+      "source_score": 0.304,
+      "strategy_style": "event_driven",
+      "suitable_horizon_windows": {
+        "not_applicable": "不适用"
+      },
+      "suitable_horizons": [
+        "not_applicable"
+      ],
+      "symbol": "EVT3"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [],
+      "evidence_refs": [
+        "https://example.invalid/watchlist/evt4"
+      ],
+      "evidence_score": 2,
+      "evidence_summary": "Synthetic monitor-only record used only to validate monitor behavior.",
+      "horizon_note": "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Monitor Four",
+      "primary_horizon": "not_applicable",
+      "primary_horizon_label": "不适用",
+      "primary_horizon_window": "不适用",
+      "rating": "monitor",
+      "rating_label": "背景跟踪",
+      "reasons": [
+        "Synthetic monitor-only record used only to validate monitor behavior."
+      ],
+      "recommendation_tier": "monitor",
+      "recommendation_tier_label": "背景跟踪",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.42,
+      "source_confidence": "no_event",
+      "source_confidence_label": "无事件",
+      "source_score": 0.0,
+      "strategy_style": "mixed_research",
+      "suitable_horizon_windows": {
+        "not_applicable": "不适用"
+      },
+      "suitable_horizons": [
+        "not_applicable"
+      ],
+      "symbol": "EVT4"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [],
+      "evidence_refs": [
+        "https://example.invalid/macro-context/idx1"
+      ],
+      "evidence_score": 1,
+      "evidence_summary": "Synthetic broad-market benchmark for AI macro context.",
+      "horizon_note": "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Broad Index",
+      "primary_horizon": "not_applicable",
+      "primary_horizon_label": "不适用",
+      "primary_horizon_window": "不适用",
+      "rating": "monitor",
+      "rating_label": "背景跟踪",
+      "reasons": [
+        "Synthetic broad-market benchmark for AI macro context."
+      ],
+      "recommendation_tier": "monitor",
+      "recommendation_tier_label": "背景跟踪",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.38,
+      "source_confidence": "no_event",
+      "source_confidence_label": "无事件",
+      "source_score": 0.0,
+      "strategy_style": "long_horizon_growth",
+      "suitable_horizon_windows": {
+        "not_applicable": "不适用"
+      },
+      "suitable_horizons": [
+        "not_applicable"
+      ],
+      "symbol": "IDX1"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [],
+      "evidence_refs": [
+        "https://example.invalid/macro-context/idx2"
+      ],
+      "evidence_score": 1,
+      "evidence_summary": "Synthetic growth benchmark for AI macro context.",
+      "horizon_note": "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Growth Index",
+      "primary_horizon": "not_applicable",
+      "primary_horizon_label": "不适用",
+      "primary_horizon_window": "不适用",
+      "rating": "monitor",
+      "rating_label": "背景跟踪",
+      "reasons": [
+        "Synthetic growth benchmark for AI macro context."
+      ],
+      "recommendation_tier": "monitor",
+      "recommendation_tier_label": "背景跟踪",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.38,
+      "source_confidence": "no_event",
+      "source_confidence_label": "无事件",
+      "source_score": 0.0,
+      "strategy_style": "long_horizon_growth",
+      "suitable_horizon_windows": {
+        "not_applicable": "不适用"
+      },
+      "suitable_horizons": [
+        "not_applicable"
+      ],
+      "symbol": "IDX2"
+    }
+  ],
+  "schema_version": "5",
+  "source_artifacts": {
+    "ai_signal": "",
+    "market_confirmation": "",
+    "political_events": "examples/political_events.example.csv",
+    "political_watchlist": "examples/political_watchlist.example.csv",
+    "theme_momentum": ""
+  },
+  "summary": {
+    "ai_confidence": 0.0,
+    "ai_regime": "not_available",
+    "base_recommendation_count": 6,
+    "candidate_universe_count": 6,
+    "data_quality_warnings": [],
+    "final_overflow_recommendation_count": 0,
+    "final_recommendation_count": 0,
+    "final_watchlist_count": 0,
+    "long_context_available": false,
+    "long_context_missing_reason": "ai_signal_not_available",
+    "long_context_symbol_count": 0,
+    "long_context_symbols": [],
+    "market_confirmation_count": 0,
+    "recommendation_count": 6,
+    "review_note": "Intelligent advisory research output. No order, target quantity, account suitability, or portfolio allocation is encoded.",
+    "source_event_count": 4,
+    "source_mode": "fixture",
+    "theme_first_candidate_count": 0,
+    "theme_momentum_artifact_type": "",
+    "theme_momentum_available": false,
+    "theme_momentum_horizon": "",
+    "theme_momentum_horizon_window": "",
+    "top_recommended_symbols": [],
+    "top_theme_candidate_symbols": [],
+    "top_theme_ids": []
+  },
+  "theme_first_candidates": [],
+  "theme_momentum": {
+    "available": false,
+    "data_quality": {},
+    "top_themes": []
+  }
+}

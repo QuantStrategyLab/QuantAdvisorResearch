@@ -11,7 +11,9 @@ data/output/*
 !data/output/.gitkeep
 
 
-site/
+# Generated static site at the repository root. Anchored so tracked
+# `schemas/site/` and test fixture directories are not ignored.
+/site/
 
 # Keep AI rule files and shared engineering conventions tracked even when a
 # personal global ignore excludes Markdown.
