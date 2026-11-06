@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/feed.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "contract_version",
+    "kind",
+    "release_id",
+    "built_at",
+    "default_locale",
+    "locales",
+    "policy",
+    "data"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/feed.schema.json"
+    },
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "kind": {
+      "const": "feed"
+    },
+    "release_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "built_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "default_locale": {
+      "const": "zh-CN"
+    },
+    "locales": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "zh-CN",
+          "en"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "contains": {
+        "const": "zh-CN"
+      }
+    },
+    "policy": {
+      "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/Policy"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "description",
+        "home_url",
+        "feed_route",
+        "items"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+        },
+        "description": {
+          "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+        },
+        "home_url": {
+          "const": "https://quantstrategylab.github.io/QuantAdvisorResearch/"
+        },
+        "feed_route": {
+          "const": "feed.xml"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "report_id",
+              "title",
+              "route",
+              "guid",
+              "published_at",
+              "description"
+            ],
+            "properties": {
+              "report_id": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}-(daily|weekly|monthly)$"
+              },
+              "title": {
+                "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+              },
+              "route": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}-(daily|weekly|monthly)-model-recommendations\\.html$"
+              },
+              "guid": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://quantstrategylab\\.github\\.io/QuantAdvisorResearch/\\d{4}-\\d{2}-\\d{2}-(daily|weekly|monthly)-model-recommendations\\.html$"
+              },
+              "published_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "description": {
+                "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+              }
+            }
+          },
+          "maxItems": 20
+        }
+      }
+    }
+  }
+}

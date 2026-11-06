@@ -1,0 +1,26 @@
+---
+import { dict } from '../i18n/zh-CN';
+---
+
+<fieldset class="theme-selector">
+  <legend>{dict['theme.label']}</legend>
+  <div class="theme-options">
+    <label class="theme-option">
+      <input type="radio" name="theme-preference" value="system" />
+      <span class="marker" aria-hidden="true"></span>
+      <span>{dict['theme.system']}</span>
+    </label>
+    <label class="theme-option">
+      <input type="radio" name="theme-preference" value="light" />
+      <span class="marker" aria-hidden="true"></span>
+      <span>{dict['theme.light']}</span>
+    </label>
+    <label class="theme-option">
+      <input type="radio" name="theme-preference" value="dark" />
+      <span class="marker" aria-hidden="true"></span>
+      <span>{dict['theme.dark']}</span>
+    </label>
+  </div>
+  <p class="theme-storage-failure" role="status">{dict['theme.storageFailure']}</p>
+</fieldset>
+<p class="theme-fallback">{dict['theme.noJs']}</p>

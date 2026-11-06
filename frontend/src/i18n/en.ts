@@ -1,0 +1,117 @@
+// Reserved interface copy only. Publishing English routes requires reviewed
+// non-null narrative fields in the data bundle; this dictionary never
+// authorizes automatic translation. See KIMI-DESIGN-PLAN.md section 8.8.
+import type { UiDictionary, UiKey } from './zh-CN';
+
+export const en: UiDictionary = {
+  'brand.name': 'QuantStrategyLab',
+  'brand.descriptor': 'Research publications',
+  'brand.tagline': 'Transparent research, visible risks.',
+  'a11y.skip': 'Skip to content',
+  'nav.main': 'Main navigation',
+  'nav.latest': 'Latest research',
+  'nav.archive': 'Research archive',
+  'nav.method': 'Research method',
+  'nav.methodExternal': 'Research method (external document)',
+  'nav.rss': 'RSS feed',
+  'nav.home': 'Home',
+  'nav.breadcrumb': 'Breadcrumb',
+  'nav.footer': 'Footer navigation',
+  'latest.title': 'QuantAdvisor Research',
+  'latest.purpose':
+    'Research conclusions, rationale, and risks across long-, medium-, and short-term windows.',
+  'latest.section': 'Latest published report',
+  'archive.title': 'Research archive',
+  'archive.purpose':
+    'Review each report by its as-of date, preserving its original themes, symbols, and horizon conclusions.',
+  'recent.title': 'Recent research',
+  'recent.purpose':
+    'Original conclusions and counts are retained; historical content does not represent a current view.',
+  'risk.notice':
+    'For research only, not investment advice. Model results are uncertain and past performance does not guarantee future results; read the full report and risks and make an independent judgment.',
+  'risk.archive':
+    'Historical content provides research context, not a current view. See the original report for risks; validity is unknown when expiry was not recorded.',
+  'risk.footer':
+    'This site is for research only, not investment advice. Model results are uncertain and past performance does not guarantee future results.',
+  'action.readReport': 'Read full report',
+  'action.viewArchive': 'View full archive',
+  'action.backLatest': 'Back to latest research',
+  'action.backArchive': 'Back to research archive',
+  'action.backHome': 'Back to homepage',
+  'cadence.daily': 'Daily',
+  'cadence.weekly': 'Weekly',
+  'cadence.monthly': 'Monthly',
+  'meta.asOf': 'Report as-of date',
+  'meta.generated': 'Generated',
+  'meta.reference': 'Reference time',
+  'meta.expiry': 'Valid until',
+  'meta.expiryUnavailable': 'Expiry unavailable',
+  'meta.evaluatedAt': 'Status evaluated at',
+  'meta.inputStatus': 'Input status',
+  'meta.finalCountLabel': 'Final recommendations',
+  'meta.finalCount': 'Final recommendations: {count}',
+  'meta.inputVerified': 'Inputs verified',
+  'meta.inputPartial': 'Inputs partially available',
+  'meta.inputUnknown': 'Input status unknown',
+  'validity.current': 'Within validity period',
+  'validity.expired': 'Expired',
+  'validity.unknown': 'Validity unknown',
+  'validity.none': 'No report available',
+  'validity.expiredNote':
+    'This report has expired and is retained for historical research only; it does not represent a current view.',
+  'common.unavailable': 'Unavailable',
+  'horizon.long': 'Long-term research',
+  'horizon.medium': 'Medium-term research',
+  'horizon.short': 'Short-term research',
+  'horizon.window': 'Research window',
+  'horizon.windowUnavailable': 'Window unavailable',
+  'horizon.windowPerCard': 'See each research entry for its window',
+  'empty.threshold':
+    'The selection threshold was not met; no entries qualified for this report.',
+  'empty.inputUnavailable':
+    'Some inputs are unavailable, so this report’s results could not be produced.',
+  'empty.unknown':
+    'The reason for this empty result is unknown; no verifiable explanation was provided.',
+  'empty.verifiedPrefix': 'Inputs verified. ',
+  'empty.reasonLabel.threshold': 'Threshold not met',
+  'empty.reasonLabel.inputUnavailable': 'Inputs unavailable',
+  'empty.reasonLabel.unknown': 'Reason unknown',
+  'empty.reasonLabel.expired': 'Report expired',
+  'empty.noReport': 'No research has been published.',
+  'empty.noRecent': 'No additional historical reports.',
+  'empty.noArchive': 'No historical reports.',
+  'archive.historicalSymbols': 'Historically mentioned',
+  'report.topics': 'Themes',
+  'archive.longPreview': 'Long-term historical preview',
+  'archive.mediumPreview': 'Medium-term historical preview',
+  'archive.shortPreview': 'Short-term historical preview',
+  'archive.legacyNote':
+    'Historical previews preserve the original summary context; they are not current recommendations or the full report’s final recommendation list.',
+  'report.summary': 'Report summary',
+  'report.takeaway': 'Key takeaway',
+  'report.companyBackground': 'Company background',
+  'report.rationale': 'Research rationale',
+  'report.risks': 'Key risks',
+  'report.companyUnavailable': 'Company name unavailable',
+  'report.backgroundUnavailable': 'Company background unavailable',
+  'report.rationaleUnavailable': 'Research rationale unavailable',
+  'report.riskUnavailable': 'Risk explanation unavailable',
+  'report.disclaimerTitle': 'Research use and risk notice',
+  'report.repeatSymbol':
+    'The same symbol may appear in multiple horizons; repetition does not represent an additional allocation.',
+  'theme.label': 'Theme',
+  'theme.system': 'System',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
+  'theme.noJs': 'Theme follows system',
+  'theme.storageFailure': 'Theme preference could not be saved',
+  'language.label': 'Language',
+  'language.unavailable': 'English unavailable',
+  'language.reportUnavailable': 'English unavailable for this report',
+  'notFound.title': 'Page not found',
+  'notFound.english': 'Page not found',
+  'notFound.body':
+    'No page is available at this address. Check the link, or continue from the homepage or research archive.',
+};
+
+export type { UiKey };

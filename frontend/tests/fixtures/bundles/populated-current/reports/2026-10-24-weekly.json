@@ -1,0 +1,217 @@
+{
+  "$schema": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/report.schema.json",
+  "contract_version": "1.0.0",
+  "kind": "report",
+  "release_id": "6f1d2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+  "built_at": "2026-10-25T01:00:00Z",
+  "default_locale": "zh-CN",
+  "locales": [
+    "zh-CN"
+  ],
+  "policy": {
+    "non_personalized_recommendations_allowed": true,
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "personalized_advice_allowed": false,
+    "account_specific_advice_allowed": false
+  },
+  "data": {
+    "summary": {
+      "id": "2026-10-24-weekly",
+      "route": "2026-10-24-weekly-model-recommendations.html",
+      "as_of": "2026-10-24",
+      "cadence": "weekly",
+      "source_schema": "6",
+      "title": {
+        "zh-CN": "需求韧性与产业周期 <script>alert(1)</script>",
+        "en": null
+      },
+      "description": {
+        "zh-CN": "合成测试内容：本期研究覆盖需求、供给与估值三条线索。<img src=x onerror=alert(1)>",
+        "en": null
+      },
+      "generated_at": "2026-10-24T12:00:00Z",
+      "reference_time": "2026-10-25T00:00:00Z",
+      "expires_at": "2026-10-31T12:00:00Z",
+      "input_status": "verified",
+      "final_recommendation_count": 4,
+      "horizons": {
+        "long": {
+          "symbols": [
+            "NVDA",
+            "<img src=x onerror=alert(1)>"
+          ],
+          "empty_reason": null
+        },
+        "medium": {
+          "symbols": [
+            "NVDA",
+            "XOM"
+          ],
+          "empty_reason": null
+        },
+        "short": {
+          "symbols": [
+            "QQQ"
+          ],
+          "empty_reason": null
+        }
+      },
+      "top_themes": [
+        {
+          "zh-CN": "算力资本开支",
+          "en": null
+        },
+        {
+          "zh-CN": "能源现金流",
+          "en": null
+        }
+      ],
+      "legacy_summary_symbols": [
+        "NVDA",
+        "QQQ",
+        "XOM"
+      ],
+      "legacy_horizon_symbols": {
+        "long": [
+          "NVDA"
+        ],
+        "medium": [
+          "XOM"
+        ],
+        "short": []
+      }
+    },
+    "lead": [
+      {
+        "zh-CN": "合成摘要第一段：长期窗口关注需求韧性，风险集中于资本开支节奏。",
+        "en": null
+      },
+      {
+        "zh-CN": "合成摘要第二段：综合各周期，本期的整体阅读要点是风险优先。",
+        "en": null
+      }
+    ],
+    "cards": {
+      "long": [
+        {
+          "rank": 1,
+          "symbol": "NVDA",
+          "name": "合成公司甲",
+          "horizon_action": "recommend",
+          "selection_basis": "primary_horizon",
+          "window": {
+            "zh-CN": "6–12 个月",
+            "en": null
+          },
+          "business_summary": {
+            "zh-CN": "合成公司背景：数据中心硬件供应商。",
+            "en": null
+          },
+          "prospect_summary": {
+            "zh-CN": "合成研究理由：需求指引与订单结构。",
+            "en": null
+          },
+          "risk_summary": {
+            "zh-CN": "合成风险：估值对利率敏感。",
+            "en": null
+          }
+        },
+        {
+          "rank": 2,
+          "symbol": "<img src=x onerror=alert(1)>",
+          "name": null,
+          "horizon_action": "watch",
+          "selection_basis": "long_fallback",
+          "window": {
+            "zh-CN": "6–12 个月",
+            "en": null
+          },
+          "business_summary": null,
+          "prospect_summary": {
+            "zh-CN": "合成研究理由：仅有依据字段。",
+            "en": null
+          },
+          "risk_summary": null
+        }
+      ],
+      "medium": [
+        {
+          "rank": 1,
+          "symbol": "NVDA",
+          "name": "合成公司甲",
+          "horizon_action": "recommend",
+          "selection_basis": "primary_horizon",
+          "window": {
+            "zh-CN": "1–3 个月",
+            "en": null
+          },
+          "business_summary": {
+            "zh-CN": "合成公司背景：同长期列公司，标的在多个周期重复出现。",
+            "en": null
+          },
+          "prospect_summary": {
+            "zh-CN": "合成研究理由：中期景气数据。",
+            "en": null
+          },
+          "risk_summary": {
+            "zh-CN": "合成风险：库存周期反转。",
+            "en": null
+          }
+        },
+        {
+          "rank": 2,
+          "symbol": "XOM",
+          "name": "合成公司乙",
+          "horizon_action": "recommend",
+          "selection_basis": "primary_horizon",
+          "window": {
+            "zh-CN": "1–3 个月",
+            "en": null
+          },
+          "business_summary": {
+            "zh-CN": "合成公司背景：综合能源公司。",
+            "en": null
+          },
+          "prospect_summary": {
+            "zh-CN": "合成研究理由：现金流与分红能力。",
+            "en": null
+          },
+          "risk_summary": {
+            "zh-CN": "合成风险：商品价格波动。",
+            "en": null
+          }
+        }
+      ],
+      "short": [
+        {
+          "rank": 1,
+          "symbol": "QQQ",
+          "name": "合成指数工具",
+          "horizon_action": "recommend",
+          "selection_basis": "primary_horizon",
+          "window": {
+            "zh-CN": "1–4 周",
+            "en": null
+          },
+          "business_summary": {
+            "zh-CN": "合成公司背景：宽基指数ETF。",
+            "en": null
+          },
+          "prospect_summary": {
+            "zh-CN": "合成研究理由：短周期拥挤度指标。",
+            "en": null
+          },
+          "risk_summary": {
+            "zh-CN": "合成风险：流动性冲击。",
+            "en": null
+          }
+        }
+      ]
+    },
+    "disclaimer": {
+      "zh-CN": "合成免责声明：本内容仅供研究，不构成投资建议。",
+      "en": null
+    }
+  }
+}

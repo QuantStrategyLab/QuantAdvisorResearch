@@ -1,0 +1,33 @@
+---
+import { dict } from '../i18n/zh-CN';
+import { METHOD_URL } from '../lib/routes';
+
+const BASE = import.meta.env.BASE_URL;
+const footerLinks = [
+  { label: dict['nav.home'], href: `${BASE}/` },
+  { label: dict['nav.archive'], href: `${BASE}/archive.html` },
+  { label: dict['nav.methodExternal'], href: METHOD_URL },
+  { label: dict['nav.rss'], href: `${BASE}/feed.xml` },
+];
+---
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <p class="tagline">{dict['brand.name']} · {dict['brand.tagline']}</p>
+      <p class="risk-copy">{dict['risk.footer']}</p>
+      <p class="language-unavailable" lang="en">{dict['language.unavailable']}</p>
+    </div>
+    <nav aria-label={dict['nav.footer']}>
+      <ul class="footer-links">
+        {
+          footerLinks.map((link) => (
+            <li>
+              <a href={link.href}>{link.label}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </div>
+</footer>

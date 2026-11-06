@@ -1,0 +1,16 @@
+---
+import { dict } from '../i18n/zh-CN';
+
+const BASE = import.meta.env.BASE_URL;
+---
+
+<div class="notfound-block">
+  <p class="notfound-numeral" aria-hidden="true">404</p>
+  <h1>{dict['notFound.title']}</h1>
+  <p class="notfound-english" lang="en">{dict['notFound.english']}</p>
+  <p>{dict['notFound.body']}</p>
+  <div class="actions">
+    <a class="action-link is-primary" href={`${BASE}/`}>{dict['action.backHome']}</a>
+    <a class="action-link is-secondary" href={`${BASE}/archive.html`}>{dict['nav.archive']}</a>
+  </div>
+</div>

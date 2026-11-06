@@ -1,0 +1,99 @@
+---
+import { loadSiteBundle } from '../lib/data/bundle';
+import { dict } from '../i18n/zh-CN';
+import { formatCalendarDate } from '../lib/format';
+import SiteShell from '../layouts/SiteShell.astro';
+import RiskNotice from '../components/RiskNotice.astro';
+import ReportMetaBar from '../components/ReportMetaBar.astro';
+import ValidityBadge from '../components/ValidityBadge.astro';
+import HorizonSummary from '../components/HorizonSummary.astro';
+import RecentReportsList from '../components/RecentReportsList.astro';
+
+const bundle = loadSiteBundle();
+const { index } = bundle;
+const latest = index.data.latest;
+const validity = index.data.latest_validity;
+const BASE = import.meta.env.BASE_URL;
+---
+
+<SiteShell
+  currentPage="latest"
+  title={`${dict['latest.title']} · ${dict['brand.name']}`}
+  description={dict['latest.purpose']}
+  path=""
+>
+  <div class="container">
+    <div class="page-intro">
+      <h1>{dict['latest.title']}</h1>
+      <p class="purpose">{dict['latest.purpose']}</p>
+    </div>
+
+    <RiskNotice />
+
+    <section class="surface" id="latest" aria-labelledby="latest-heading">
+      <h2 id="latest-heading">{dict['latest.section']}</h2>
+      {
+        latest ? (
+          <>
+            <div class="report-head-grid">
+              <div class="report-title-block">
+                <p class="row-meta">
+                  <time datetime={latest.as_of}>{formatCalendarDate(latest.as_of)}</time>
+                  · {dict[`cadence.${latest.cadence}`]}
+                </p>
+                <h3>{latest.title['zh-CN']}</h3>
+                <p class="description">{latest.description['zh-CN']}</p>
+                {latest.top_themes.length > 0 ? (
+                  <ul class="topics" aria-label={dict['report.topics']}>
+                    {latest.top_themes.map((theme) => (
+                      <li>{theme['zh-CN']}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+              <div class="report-meta-rail">
+                <ValidityBadge
+                  state={validity === 'current' ? 'current' : validity === 'expired' ? 'expired' : 'unknown'}
+                  label={dict[`validity.${validity}`]}
+                  expiresAt={validity === 'current' ? latest.expires_at : null}
+                />
+                <div style="margin-top: var(--space-2);">
+                  <ReportMetaBar summary={latest} contextInstant={index.data.evaluated_at} />
+                </div>
+              </div>
+            </div>
+
+            <div class="horizon-ledger">
+              {(['long', 'medium', 'short'] as const).map((horizon) => (
+                <HorizonSummary
+                  horizon={horizon}
+                  data={latest.horizons[horizon]}
+                  inputStatus={latest.input_status}
+                />
+              ))}
+            </div>
+
+            <div class="actions is-end">
+              <a class="action-link is-primary" href={`${BASE}/${latest.route}`}>
+                {dict['action.readReport']}
+              </a>
+            </div>
+          </>
+        ) : (
+          <div class="latest-empty">
+            <ValidityBadge state="none" label={dict['validity.none']} />
+            <p class="legacy-note">{dict['empty.noReport']}</p>
+          </div>
+        )
+      }
+    </section>
+
+    <RecentReportsList recent={index.data.recent} evaluatedAt={index.data.evaluated_at} />
+
+    <div class="actions">
+      <a class="action-link is-secondary" href={`${BASE}/archive.html`}>
+        {dict['action.viewArchive']}
+      </a>
+    </div>
+  </div>
+</SiteShell>

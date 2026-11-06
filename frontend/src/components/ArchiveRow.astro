@@ -1,0 +1,72 @@
+---
+import { dict } from '../i18n/zh-CN';
+import type { Summary } from '../lib/data/types';
+import { cadenceLabel, expiryLabel, expiryLabelText, formatCalendarDate } from '../lib/format';
+import SymbolList from './SymbolList.astro';
+import ValidityBadge from './ValidityBadge.astro';
+
+export interface Props {
+  summary: Summary;
+  builtAt: string;
+}
+
+const { summary, builtAt } = Astro.props;
+const BASE = import.meta.env.BASE_URL;
+const label = expiryLabel(summary.expires_at, builtAt);
+const badgeState = label === 'expired' ? 'expired' : label === 'unknown' ? 'unknown' : 'current';
+
+const previews = [
+  { horizon: 'long', label: dict['archive.longPreview'], symbols: summary.legacy_horizon_symbols.long },
+  { horizon: 'medium', label: dict['archive.mediumPreview'], symbols: summary.legacy_horizon_symbols.medium },
+  { horizon: 'short', label: dict['archive.shortPreview'], symbols: summary.legacy_horizon_symbols.short },
+] as const;
+---
+
+<article class="archive-row">
+  <div class="row-meta">
+    <p>
+      <time datetime={summary.as_of}>{formatCalendarDate(summary.as_of)}</time>
+      · {cadenceLabel(summary.cadence, dict)}
+    </p>
+    <ValidityBadge state={badgeState} label={expiryLabelText(label, dict)} expiresAt={summary.expires_at} />
+  </div>
+  <div class="row-body">
+    <h3>
+      <a href={`${BASE}/${summary.route}`}>{summary.title['zh-CN']}</a>
+    </h3>
+    <p class="description">{summary.description['zh-CN']}</p>
+    {
+      summary.top_themes.length > 0 ? (
+        <ul class="topics" aria-label={dict['report.topics']}>
+          {summary.top_themes.map((theme) => <li>{theme['zh-CN']}</li>)}
+        </ul>
+      ) : null
+    }
+    <div class="horizon-block">
+      <h4 class="preview-grid-label">{dict['archive.historicalSymbols']}</h4>
+      {
+        summary.legacy_summary_symbols.length > 0 ? (
+          <SymbolList
+            symbols={summary.legacy_summary_symbols}
+            label={`${dict['archive.historicalSymbols']}：${summary.title['zh-CN']}`}
+          />
+        ) : (
+          <p class="legacy-note">{dict['common.unavailable']}</p>
+        )
+      }
+    </div>
+    <div class="preview-grid">
+      {previews.map((preview) => (
+        <div>
+          <h4>{preview.label}</h4>
+          {preview.symbols.length > 0 ? (
+            <SymbolList symbols={preview.symbols} label={`${preview.label}：${summary.title['zh-CN']}`} />
+          ) : (
+            <p class="legacy-note">{dict['common.unavailable']}</p>
+          )}
+        </div>
+      ))}
+    </div>
+    <p class="legacy-note">{dict['archive.legacyNote']}</p>
+  </div>
+</article>

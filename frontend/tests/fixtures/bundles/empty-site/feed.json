@@ -1,0 +1,31 @@
+{
+  "$schema": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/feed.schema.json",
+  "contract_version": "1.0.0",
+  "kind": "feed",
+  "release_id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+  "built_at": "2026-11-01T00:00:00Z",
+  "default_locale": "zh-CN",
+  "locales": [
+    "zh-CN"
+  ],
+  "policy": {
+    "non_personalized_recommendations_allowed": true,
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "personalized_advice_allowed": false,
+    "account_specific_advice_allowed": false
+  },
+  "data": {
+    "title": {
+      "zh-CN": "QuantAdvisorResearch 合成订阅",
+      "en": null
+    },
+    "description": {
+      "zh-CN": "合成测试频道：仅供研究，不构成投资建议。",
+      "en": null
+    },
+    "home_url": "https://quantstrategylab.github.io/QuantAdvisorResearch/",
+    "feed_route": "feed.xml",
+    "items": []
+  }
+}

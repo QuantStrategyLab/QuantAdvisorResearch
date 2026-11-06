@@ -1,0 +1,76 @@
+{
+  "$schema": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/report.schema.json",
+  "contract_version": "1.0.0",
+  "kind": "report",
+  "release_id": "6f1d2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+  "built_at": "2026-10-25T01:00:00Z",
+  "default_locale": "zh-CN",
+  "locales": [
+    "zh-CN"
+  ],
+  "policy": {
+    "non_personalized_recommendations_allowed": true,
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "personalized_advice_allowed": false,
+    "account_specific_advice_allowed": false
+  },
+  "data": {
+    "summary": {
+      "id": "2026-10-17-weekly",
+      "route": "2026-10-17-weekly-model-recommendations.html",
+      "as_of": "2026-10-17",
+      "cadence": "weekly",
+      "source_schema": "6",
+      "title": {
+        "zh-CN": "利率路径与估值锚（合成）",
+        "en": null
+      },
+      "description": {
+        "zh-CN": "合成测试内容：上一期周报，已过有效期。",
+        "en": null
+      },
+      "generated_at": "2026-10-17T12:00:00Z",
+      "reference_time": "2026-10-18T00:00:00Z",
+      "expires_at": "2026-10-24T12:00:00Z",
+      "input_status": "verified",
+      "final_recommendation_count": 0,
+      "horizons": {
+        "long": {
+          "symbols": [],
+          "empty_reason": "threshold_unmet"
+        },
+        "medium": {
+          "symbols": [],
+          "empty_reason": "threshold_unmet"
+        },
+        "short": {
+          "symbols": [],
+          "empty_reason": "threshold_unmet"
+        }
+      },
+      "top_themes": [],
+      "legacy_summary_symbols": [],
+      "legacy_horizon_symbols": {
+        "long": [],
+        "medium": [],
+        "short": []
+      }
+    },
+    "lead": [
+      {
+        "zh-CN": "合成摘要：上期三条周期均未达入选阈值。",
+        "en": null
+      }
+    ],
+    "cards": {
+      "long": [],
+      "medium": [],
+      "short": []
+    },
+    "disclaimer": {
+      "zh-CN": "合成免责声明：本内容仅供研究，不构成投资建议。",
+      "en": null
+    }
+  }
+}

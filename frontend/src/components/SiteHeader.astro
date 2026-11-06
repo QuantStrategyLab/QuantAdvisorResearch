@@ -1,0 +1,53 @@
+---
+import { dict } from '../i18n/zh-CN';
+import { METHOD_URL } from '../lib/routes';
+import ThemeSelector from './ThemeSelector.astro';
+import LanguageControl from './LanguageControl.astro';
+
+export interface Props {
+  currentPage: 'latest' | 'archive' | 'report' | 'notFound';
+  counterpartUrl?: string | null;
+}
+
+const { currentPage, counterpartUrl = null } = Astro.props;
+const BASE = import.meta.env.BASE_URL;
+const navItems: Array<{ key: string; label: string; href: string; match: string; external?: boolean }> = [
+  { key: 'latest', label: dict['nav.latest'], href: `${BASE}/`, match: 'latest' },
+  { key: 'archive', label: dict['nav.archive'], href: `${BASE}/archive.html`, match: 'archive' },
+  {
+    key: 'method',
+    label: dict['nav.method'],
+    href: METHOD_URL,
+    match: 'method',
+    external: true,
+  },
+  { key: 'rss', label: dict['nav.rss'], href: `${BASE}/feed.xml`, match: 'rss' },
+];
+---
+
+<header class="site-header">
+  <div class="container">
+    <p class="site-identity">
+      <a href={`${BASE}/`} aria-label={dict['brand.name']}>{dict['brand.name']}</a>
+      <span class="descriptor">{dict['brand.descriptor']}</span>
+    </p>
+    <nav class="site-nav" aria-label={dict['nav.main']}>
+      {
+        navItems.map((item) => (
+          <a
+            href={item.href}
+            aria-current={item.match === currentPage || (currentPage === 'report' && item.match === 'archive') ? 'page' : undefined}
+            {...item.external ? { 'aria-label': dict['nav.methodExternal'], rel: 'noreferrer' } : {}}
+          >
+            {item.label}
+            {item.external ? <span class="ext-icon" aria-hidden="true"> ↗</span> : null}
+          </a>
+        ))
+      }
+    </nav>
+    <div class="header-tools">
+      <ThemeSelector />
+      <LanguageControl counterpartUrl={counterpartUrl} />
+    </div>
+  </div>
+</header>

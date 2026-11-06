@@ -1,0 +1,28 @@
+---
+import { dict } from '../i18n/zh-CN';
+import type { LocalizedText } from '../lib/data/types';
+
+export interface Props {
+  lead: LocalizedText[];
+}
+
+const { lead } = Astro.props;
+const paragraphs = lead.map((item) => item['zh-CN']);
+const onlyOne = paragraphs.length === 1;
+---
+
+<section class="surface lead-conclusion" aria-labelledby="lead-heading">
+  <h2 id="lead-heading">{dict['report.summary']}</h2>
+  {
+    paragraphs.map((text, index) =>
+      index === paragraphs.length - 1 ? (
+        <div class="takeaway">
+          {!onlyOne ? <span class="takeaway-label">{dict['report.takeaway']}</span> : null}
+          <p>{text}</p>
+        </div>
+      ) : (
+        <p>{text}</p>
+      ),
+    )
+  }
+</section>

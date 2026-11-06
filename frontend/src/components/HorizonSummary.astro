@@ -1,0 +1,30 @@
+---
+import { dict } from '../i18n/zh-CN';
+import type { HorizonSummaryData, InputStatus } from '../lib/data/types';
+import SymbolList from './SymbolList.astro';
+import EmptyStateExplanation from './EmptyStateExplanation.astro';
+
+export interface Props {
+  horizon: 'long' | 'medium' | 'short';
+  data: HorizonSummaryData;
+  inputStatus: InputStatus;
+}
+
+const { horizon, data, inputStatus } = Astro.props;
+const heading = dict[`horizon.${horizon}`];
+const headingId = `horizon-${horizon}`;
+---
+
+<section class="horizon-panel" aria-labelledby={headingId}>
+  <h3 id={headingId}>{heading}</h3>
+  <p class="horizon-window">
+    {dict['horizon.window']}：{dict['horizon.windowUnavailable']}
+  </p>
+  {
+    data.symbols.length > 0 ? (
+      <SymbolList symbols={data.symbols} label={heading} />
+    ) : (
+      <EmptyStateExplanation reason={data.empty_reason ?? 'unknown'} inputStatus={inputStatus} />
+    )
+  }
+</section>

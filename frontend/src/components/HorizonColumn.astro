@@ -1,0 +1,45 @@
+---
+import { dict } from '../i18n/zh-CN';
+import type { Card, HorizonSummaryData } from '../lib/data/types';
+import { localized } from '../lib/format';
+import ResearchCard from './ResearchCard.astro';
+import EmptyStateExplanation from './EmptyStateExplanation.astro';
+
+export interface Props {
+  horizon: 'long' | 'medium' | 'short';
+  cards: Card[];
+  summaryHorizon: HorizonSummaryData;
+  inputStatus: 'verified' | 'partial' | 'unknown';
+}
+
+const { horizon, cards, summaryHorizon, inputStatus } = Astro.props;
+const heading = dict[`horizon.${horizon}`];
+const headingId = `column-${horizon}`;
+
+const windows = cards.map((card) => localized(card.window, 'zh-CN'));
+const uniqueWindows = [...new Set(windows)];
+let windowLine = dict['horizon.windowUnavailable'];
+if (cards.length > 0) {
+  windowLine =
+    uniqueWindows.length === 1
+      ? `${dict['horizon.window']}：${uniqueWindows[0]}`
+      : dict['horizon.windowPerCard'];
+}
+---
+
+<section class="horizon-panel horizon-panel--full" aria-labelledby={headingId}>
+  <h2 id={headingId}>{heading}</h2>
+  <p class="horizon-window">{windowLine}</p>
+  {
+    cards.length === 0 ? (
+      <EmptyStateExplanation
+        reason={summaryHorizon.empty_reason ?? 'unknown'}
+        inputStatus={inputStatus}
+      />
+    ) : (
+      <div class="card-stack">
+        {cards.map((card) => <ResearchCard card={card} />)}
+      </div>
+    )
+  }
+</section>

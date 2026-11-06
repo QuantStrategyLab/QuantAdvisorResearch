@@ -1,0 +1,380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json",
+  "$defs": {
+    "LocalizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "zh-CN",
+        "en"
+      ],
+      "properties": {
+        "zh-CN": {
+          "type": "string",
+          "minLength": 1
+        },
+        "en": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Policy": {
+      "const": {
+        "non_personalized_recommendations_allowed": true,
+        "execution_allowed": false,
+        "portfolio_allocation_allowed": false,
+        "personalized_advice_allowed": false,
+        "account_specific_advice_allowed": false
+      }
+    },
+    "Summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "route",
+        "as_of",
+        "cadence",
+        "source_schema",
+        "title",
+        "description",
+        "generated_at",
+        "reference_time",
+        "expires_at",
+        "input_status",
+        "final_recommendation_count",
+        "horizons",
+        "top_themes",
+        "legacy_summary_symbols",
+        "legacy_horizon_symbols"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}-(daily|weekly|monthly)$"
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}-(daily|weekly|monthly)-model-recommendations\\.html$"
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "cadence": {
+          "enum": [
+            "daily",
+            "weekly",
+            "monthly"
+          ]
+        },
+        "source_schema": {
+          "enum": [
+            "5",
+            "6"
+          ]
+        },
+        "title": {
+          "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+        },
+        "description": {
+          "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "reference_time": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "input_status": {
+          "enum": [
+            "verified",
+            "partial",
+            "unknown"
+          ]
+        },
+        "final_recommendation_count": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "horizons": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "long",
+            "medium",
+            "short"
+          ],
+          "properties": {
+            "long": {
+              "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/HorizonSummary"
+            },
+            "medium": {
+              "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/HorizonSummary"
+            },
+            "short": {
+              "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/HorizonSummary"
+            }
+          }
+        },
+        "top_themes": {
+          "type": "array",
+          "items": {
+            "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+          }
+        },
+        "legacy_summary_symbols": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "uniqueItems": true
+        },
+        "legacy_horizon_symbols": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "long",
+            "medium",
+            "short"
+          ],
+          "properties": {
+            "long": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "uniqueItems": true
+            },
+            "medium": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "uniqueItems": true
+            },
+            "short": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source_schema": {
+                "const": "6"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reference_time": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "HorizonSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbols",
+        "empty_reason"
+      ],
+      "properties": {
+        "symbols": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "uniqueItems": true
+        },
+        "empty_reason": {
+          "enum": [
+            null,
+            "threshold_unmet",
+            "input_unavailable",
+            "unknown"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "symbols": {
+                "maxItems": 0
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "empty_reason": {
+                "enum": [
+                  "threshold_unmet",
+                  "input_unavailable",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "empty_reason": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "Card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rank",
+        "symbol",
+        "name",
+        "horizon_action",
+        "selection_basis",
+        "window",
+        "business_summary",
+        "prospect_summary",
+        "risk_summary"
+      ],
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "horizon_action": {
+          "enum": [
+            "recommend",
+            "watch",
+            "unknown"
+          ]
+        },
+        "selection_basis": {
+          "enum": [
+            "primary_horizon",
+            "long_fallback"
+          ]
+        },
+        "window": {
+          "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+        },
+        "business_summary": {
+          "anyOf": [
+            {
+              "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "prospect_summary": {
+          "anyOf": [
+            {
+              "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "risk_summary": {
+          "anyOf": [
+            {
+              "$ref": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/common.schema.json#/$defs/LocalizedText"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

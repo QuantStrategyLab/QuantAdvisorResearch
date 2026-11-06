@@ -1,0 +1,19 @@
+---
+import { dict } from '../i18n/zh-CN';
+
+export interface Props {
+  tone?: 'standard' | 'archive';
+}
+
+const { tone = 'standard' } = Astro.props;
+const copy = tone === 'archive' ? dict['risk.archive'] : dict['risk.notice'];
+---
+
+<section class="risk-notice">
+  <svg class="notice-icon" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="1.5"></circle>
+    <path d="M10 6v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+    <circle cx="10" cy="14" r="1" fill="currentColor"></circle>
+  </svg>
+  <p>{copy}</p>
+</section>
