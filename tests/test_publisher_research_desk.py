@@ -154,6 +154,8 @@ def test_absent_optional_additions_hide_sections_for_v5() -> None:
     report.pop("input_checks", None)
     report.pop("sources", None)
     report["final_decisions"].pop("horizon_summary", None)
+    # With neither optional checks nor recorded blockers, keep the section hidden.
+    report["summary"]["data_quality_warnings"] = []
     page = render_report_html(report)
     assert 'id="inputs"' not in page
     assert 'id="sources"' not in page
@@ -414,3 +416,37 @@ def test_expiry_state_is_refreshed_while_the_page_stays_open() -> None:
     assert 'document.addEventListener("visibilitychange", updateExpiry)' in body
     # The instant itself is still strictly exclusive: equal is not expired.
     assert "var expired = now > exp;" in body
+
+
+def test_archived_report_exposes_recorded_input_blockers_without_promoting_candidates() -> None:
+    report = _zero_pick_report()
+    report.pop("input_checks", None)
+    report["summary"]["data_quality_warnings"] = [
+        "ai_signal_provenance_untrusted", "theme_momentum_stale_as_of",
+    ]
+    report["freshness"] = {
+        "ai_signal": {"present": False, "valid": False, "reason": "not_provided"},
+        "theme_momentum": {"present": True, "valid": False, "reason": "stale_as_of"},
+    }
+    before = deepcopy(report)
+    for page in (render_index_html([report]), render_report_html(report)):
+        assert "AI signal provenance was not trusted" in page
+        assert "Theme momentum predates the report freshness window" in page
+        assert "These recorded blockers do not establish complete input checks" in page
+        assert "CANDIDATE" not in page
+    full = render_report_html(report)
+    assert 'id="inputs"' in full
+    assert 'href="#inputs"' in full
+    assert report == before
+
+
+def test_archived_input_diagnostics_never_echo_unknown_warning_or_infer_health() -> None:
+    report = _zero_pick_report()
+    report.pop("input_checks", None)
+    report["summary"]["data_quality_warnings"] = ["private-debug-example", "theme_momentum_stale_as_of"]
+    report["freshness"] = {"ai_signal": {"valid": True, "reason": "fresh"}}
+    for page in (render_index_html([report]), render_report_html(report)):
+        assert "Theme momentum predates the report freshness window" in page
+        assert "private-debug-example" not in page
+        assert "These recorded blockers do not establish complete input checks" in page
+        assert "inputs are complete" not in page.lower()

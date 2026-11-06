@@ -122,6 +122,21 @@ report, despite its later declared expiry. Zero final picks remain valid when
 evidence is insufficient. See [the recovery evidence](system-design.md#input-publication-recovery-2026-10-06)
 for hashes, actual source commits, and the existing `ai_signal_score` alias semantics.
 
+## Reading empty published reports
+
+The frontend republisher recovers `reports_index.json` and the referenced report
+JSON from the public archive. It validates and re-renders those reports; it does
+not refresh upstream inputs or import newer workflow artifacts. A successful
+republish therefore does not establish current input availability.
+
+For archived reports without `input_checks`, the homepage and full report show
+known recorded blockers for untrusted AI provenance and stale theme momentum.
+Only fixed explanations of these warning codes are displayed. Unknown warning
+text is not echoed, unrecorded checks remain unknown, and missing or stale inputs
+are never converted into recommendations. The original report JSON is preserved.
+Recovering trusted, fresh inputs belongs to the existing source owners; do not
+change dates, relax validation, or promote audit candidates to fill an empty page.
+
 ## Low-Risk Implementation Order
 
 1. Keep public output focused on final recommendations. Preserve

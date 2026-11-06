@@ -787,6 +787,36 @@ def _horizon_summary_cell(
     return score_html
 
 
+def _recorded_input_blockers(report: dict[str, Any]) -> str:
+    """Expose known archive warnings without inventing missing input checks."""
+    warnings = report.get("summary", {}).get("data_quality_warnings")
+    if not isinstance(warnings, list):
+        return ""
+    messages = {
+        "ai_signal_provenance_untrusted": (
+            "AI 研究信号未通过来源校验，不能用于本期结论。",
+            "AI signal provenance was not trusted; it cannot support this report's conclusions.",
+        ),
+        "theme_momentum_stale_as_of": (
+            "主题动量数据早于本期报告允许的新鲜度窗口，不能用于本期结论。",
+            "Theme momentum predates the report freshness window; it cannot support this report's conclusions.",
+        ),
+    }
+    # Only fixed, known messages are public. Unknown diagnostics can contain
+    # private source details and must never be echoed from an archived payload.
+    items = "".join(f"<li>{_t(*message)}</li>" for code, message in messages.items() if code in warnings)
+    if not items:
+        return ""
+    return (
+        f'<ul>{items}</ul><p class="small muted">'
+        + _t(
+            "以上为报告已记录的输入问题，不代表完整输入检查；未记录的状态仍为未知。",
+            "These recorded blockers do not establish complete input checks; unrecorded states remain unknown.",
+        )
+        + "</p>"
+    )
+
+
 def _check_summary(report: dict[str, Any]) -> str:
     checks = report.get("input_checks")
     if not isinstance(checks, list):
@@ -797,6 +827,7 @@ def _check_summary(report: dict[str, Any]) -> str:
                 "Input status not recorded (legacy report format); this does not mean inputs were complete.",
             )
             + "</p>"
+            + _recorded_input_blockers(report)
         )
     counts: dict[str, int] = {}
     for item in checks:
@@ -1279,7 +1310,14 @@ def _page_chrome(*, title_zh: str, title_en: str, current: str, body: str, crumb
 def _input_checks_section(report: dict[str, Any]) -> str:
     checks = report.get("input_checks")
     if not isinstance(checks, list):
-        return ""
+        blockers = _recorded_input_blockers(report)
+        if not blockers:
+            return ""
+        return (
+            '<section class="panel section" id="inputs" aria-labelledby="inputs-h">'
+            f'<div class="panel-head"><h2 id="inputs-h">{_t("输入状态", "Input status")}</h2></div>'
+            f'<div class="panel-body">{blockers}</div></section>'
+        )
     rows = []
     for item in checks:
         if not isinstance(item, dict):
@@ -1415,7 +1453,7 @@ def render_report_html(report: dict[str, Any]) -> str:
         ("summary", _t("摘要", "Summary")),
         ("conclusions", _t("按周期的最终结论", "Final conclusions by horizon")),
     ]
-    if isinstance(report.get("input_checks"), list):
+    if isinstance(report.get("input_checks"), list) or _recorded_input_blockers(report):
         toc_items.append(("inputs", _t("输入状态", "Input status")))
     if isinstance(report.get("sources"), list):
         toc_items.append(("sources", _t("来源链接", "Source links")))
