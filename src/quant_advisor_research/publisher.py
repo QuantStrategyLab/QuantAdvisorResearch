@@ -988,6 +988,8 @@ def format_horizon_conclusion(report: dict[str, Any]) -> str:
 def format_momentum_factor_summary(report: dict[str, Any]) -> str:
     theme_momentum = report.get("theme_momentum", {})
     if not isinstance(theme_momentum, dict) or not theme_momentum.get("available"):
+        if not index_inputs_verified(report):
+            return "本期主题动量不可用，未形成主题排序。"
         return "本期暂无足够稳定的主题排序。"
 
     themes = [theme for theme in theme_momentum.get("top_themes", []) if isinstance(theme, dict)]
@@ -1014,7 +1016,15 @@ def format_report_takeaway(report: dict[str, Any]) -> str:
         return "整体看，当前信号更偏长线观察，短线和中线暂未形成稳定排序。"
     if has_short:
         return "整体看，当前只出现短线机会，持续性仍需要后续数据确认。"
+    if not index_inputs_verified(report):
+        return "整体看，本期输入不完整，此空结果不能解读为信号未达门槛；请查看下方输入状态。"
+    if not _all_thresholds_checked(report):
+        return "整体看，部分周期缺少排名证据，尚不能判断信号是否达到门槛。"
     return "整体看，当前暂未形成稳定系统结论，继续等待更清晰的主题和价格确认。"
+
+
+def _all_thresholds_checked(report: dict[str, Any]) -> bool:
+    return all(index_threshold_unmet(report, horizon) for horizon, _, _ in HORIZON_COLUMNS)
 
 
 def _join_en_items(items: list[str], *, limit: int = 5, empty: str = "None") -> str:
@@ -1046,6 +1056,8 @@ def format_horizon_conclusion_en(report: dict[str, Any]) -> str:
 def format_momentum_factor_summary_en(report: dict[str, Any]) -> str:
     theme_momentum = report.get("theme_momentum", {})
     if not isinstance(theme_momentum, dict) or not theme_momentum.get("available"):
+        if not index_inputs_verified(report):
+            return "Theme momentum could not be used for ranking this period."
         return "No stable theme ranking is available this period."
     themes = [theme for theme in theme_momentum.get("top_themes", []) if isinstance(theme, dict)]
     names = [str(theme.get("theme_name") or theme.get("theme_id") or "") for theme in themes[:4]]
@@ -1074,6 +1086,10 @@ def format_report_takeaway_en(report: dict[str, Any]) -> str:
         return "Overall, signals lean long term; short and medium horizons have no stable ranking."
     if has_short:
         return "Overall, only a short-horizon opportunity appears; persistence still needs confirmation from later data."
+    if not index_inputs_verified(report):
+        return "Overall, inputs are incomplete this period, so this empty result cannot be read as signals below the gate; see input status below."
+    if not _all_thresholds_checked(report):
+        return "Overall, ranking evidence is missing for one or more horizons, so whether signals met the gate remains unknown."
     return "Overall, the system has not formed a stable conclusion this period; wait for clearer theme and price confirmation."
 
 
@@ -1467,6 +1483,7 @@ def render_report_html(report: dict[str, Any]) -> str:
           <div class="panel-head" style="border-bottom:0"><h2 id="summary-h">{_t("摘要", "Summary")}</h2>
             <span class="aside mono">{html.escape(contract_version)}</span></div>
           <div class="panel-body" style="padding-top:0"><p class="lead">{render_report_lead(report)}</p></div>
+          {render_index_empty_conclusion(report)}
           {_facts_strip(report, status_html=status)}
         </section>
     """
@@ -1614,8 +1631,7 @@ def render_index_horizons(report: dict[str, Any]) -> str:
 def render_index_empty_conclusion(report: dict[str, Any]) -> str:
     if any(displayed_horizon_symbols(report, horizon) for horizon, _, _ in HORIZON_COLUMNS):
         return ""
-    thresholds_checked = all(index_threshold_unmet(report, horizon) for horizon, _, _ in HORIZON_COLUMNS)
-    if thresholds_checked:
+    if _all_thresholds_checked(report):
         return (
             '<div class="notice n-info" role="note" style="margin:0 20px 16px">'
             f'<p><strong>{_t("本期三个周期均未产生合格推荐。", "No horizon produced a qualifying recommendation this period.")}</strong></p>'
