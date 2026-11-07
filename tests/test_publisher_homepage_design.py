@@ -26,6 +26,17 @@ def empty_report():
                'expires_at': '2026-06-06T00:00:00Z'}
         for name in ('ai_signal', 'theme_momentum')
     }
+    # A complete report also records every producer input check as available;
+    # the sample's own checks (untrusted AI signal, no market confirmation) would
+    # contradict the fresh freshness block above.
+    report['source_artifacts']['market_confirmation'] = '<PROJECT_ID>/market_confirmation.json'
+    report['input_checks'] = [
+        {'name': 'political_events', 'detail': 'parsed', 'status': 'available', 'as_of': '2026-03-01'},
+        {'name': 'political_watchlist', 'detail': 'parsed', 'status': 'available', 'as_of': None},
+        {'name': 'ai_signal', 'detail': 'fresh', 'status': 'available', 'as_of': '2026-05-30'},
+        {'name': 'theme_momentum', 'detail': 'fresh', 'status': 'available', 'as_of': '2026-05-30'},
+        {'name': 'market_confirmation', 'detail': 'parsed', 'status': 'available', 'as_of': '2026-05-30'},
+    ]
     validate_advisory_report(report)
     return report
 

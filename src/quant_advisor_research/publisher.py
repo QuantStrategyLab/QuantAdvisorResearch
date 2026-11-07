@@ -1555,8 +1555,23 @@ def render_horizon_snapshot(report: dict[str, Any], *, linked: bool = False) -> 
     return f'<div class="hz-mini">{"".join(cells)}</div>'
 
 
+_REQUIRED_INPUT_CHECKS = frozenset(
+    ("political_events", "political_watchlist", "ai_signal", "theme_momentum", "market_confirmation")
+)
+
+
+def _input_checks_all_available(report: dict[str, Any]) -> bool:
+    """Only a recorded, complete and fully available input-check table proves completeness."""
+    checks = report.get("input_checks")
+    if not isinstance(checks, list) or not checks:
+        return False
+    if not all(isinstance(item, dict) and item.get("status") == "available" for item in checks):
+        return False
+    return _REQUIRED_INPUT_CHECKS <= {item.get("name") for item in checks}
+
+
 def index_inputs_verified(report: dict[str, Any]) -> bool:
-    """Missing legacy/unknown freshness never proves a complete set of inputs."""
+    """Missing legacy/unknown freshness or input checks never prove a complete set of inputs."""
     freshness = report.get("freshness")
     return isinstance(freshness, dict) and not report.get("summary", {}).get("data_quality_warnings") and all(
         isinstance(freshness.get(name), dict)
@@ -1564,7 +1579,7 @@ def index_inputs_verified(report: dict[str, Any]) -> bool:
         and freshness[name].get("valid") is True
         and freshness[name].get("reason") == "fresh"
         for name in ("ai_signal", "theme_momentum")
-    )
+    ) and _input_checks_all_available(report)
 
 
 def index_threshold_unmet(report: dict[str, Any], horizon: str) -> bool:
