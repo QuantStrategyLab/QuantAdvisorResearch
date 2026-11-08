@@ -211,8 +211,20 @@ def _contract_valid_missing_ranking_report() -> dict:
         }
         for name in ("ai_signal", "theme_momentum")
     }
+    report["input_checks"] = _all_input_checks_available()
     validate_advisory_report(report)
     return report
+
+
+def _all_input_checks_available() -> list[dict]:
+    """Producer-shaped input checks when every input was supplied and fresh."""
+    return [
+        {"name": "political_events", "detail": "parsed", "status": "available", "as_of": "2026-05-30"},
+        {"name": "political_watchlist", "detail": "parsed", "status": "available", "as_of": None},
+        {"name": "ai_signal", "detail": "fresh", "status": "available", "as_of": "2026-05-30"},
+        {"name": "theme_momentum", "detail": "fresh", "status": "available", "as_of": "2026-05-30"},
+        {"name": "market_confirmation", "detail": "parsed", "status": "available", "as_of": "2026-05-30"},
+    ]
 
 
 def test_missing_ranking_evidence_is_not_presented_as_below_threshold() -> None:
@@ -450,3 +462,306 @@ def test_archived_input_diagnostics_never_echo_unknown_warning_or_infer_health()
         assert "private-debug-example" not in page
         assert "These recorded blockers do not establish complete input checks" in page
         assert "inputs are complete" not in page.lower()
+
+
+# --- F1: zero-pick summary must not imply complete inputs merely missed a gate ---
+
+_HEALTHY_WAIT_ZH = "继续等待更清晰的主题和价格确认"
+_HEALTHY_WAIT_EN = "wait for clearer theme and price confirmation"
+_INCOMPLETE_NOTICE_ZH = "此空结果不能解读为“信号未达门槛”"
+_INCOMPLETE_NOTICE_EN = "cannot be read as “signals below the gate”"
+
+
+def _f1_incomplete_report() -> dict:
+    return _zero_pick_report(verified=False)
+
+
+def _f1_untrusted_report() -> dict:
+    report = _zero_pick_report()
+    report["summary"]["data_quality_warnings"] = ["ai_signal_provenance_untrusted"]
+    report["freshness"]["ai_signal"] = {"present": True, "valid": False, "reason": "provenance_untrusted"}
+    return report
+
+
+def _f1_stale_report() -> dict:
+    report = _zero_pick_report()
+    report.pop("input_checks", None)
+    report["summary"]["data_quality_warnings"] = ["theme_momentum_stale_as_of"]
+    report["freshness"]["theme_momentum"] = {"present": True, "valid": False, "reason": "stale_as_of"}
+    report["theme_momentum"] = {"available": False, "top_themes": []}
+    return report
+
+
+def _f1_unknown_report() -> dict:
+    report = _zero_pick_report()
+    report.pop("input_checks", None)
+    report.pop("freshness", None)
+    report["summary"]["data_quality_warnings"] = []
+    return report
+
+
+def _f1_healthy_report() -> dict:
+    """Fresh, verified inputs whose evaluated candidates all stayed below the gate."""
+    report = _contract_valid_missing_ranking_report()
+    report["final_decisions"]["horizon_rankings"] = {
+        horizon: [{"symbol": "CANDIDATE", "action": "watch", "score": 0.1}]
+        for horizon in ("long", "medium", "short")
+    }
+    return report
+
+
+def _lead(page: str) -> str:
+    return page.split('<p class="lead">', 1)[1].split("</p>", 1)[0]
+
+
+def _empty_notice(page: str) -> str:
+    match = re.search(r'<div class="notice n-(?:warn|info)" role="note" style="margin:0 20px 16px">.*?</div>', page)
+    assert match is not None, "empty-conclusion notice missing"
+    return match.group(0)
+
+
+_F1_UNVERIFIED_CASES = {
+    "incomplete": _f1_incomplete_report,
+    "untrusted": _f1_untrusted_report,
+    "stale": _f1_stale_report,
+    "unknown": _f1_unknown_report,
+}
+
+
+def test_f1_unverified_zero_pick_lead_does_not_imply_signals_missed_gate() -> None:
+    from quant_advisor_research.publisher import index_inputs_verified
+
+    for name, build in _F1_UNVERIFIED_CASES.items():
+        report = build()
+        assert not index_inputs_verified(report), name
+        lead = _lead(render_report_html(report))
+        assert _HEALTHY_WAIT_ZH not in lead, name
+        assert _HEALTHY_WAIT_EN not in lead, name
+        assert "输入不完整" in lead and "不能解读为信号未达门槛" in lead, name
+        assert "inputs are incomplete" in lead and "cannot be read as signals below the gate" in lead, name
+
+
+def test_f1_unverified_zero_pick_report_shows_same_warning_as_index() -> None:
+    for name, build in _F1_UNVERIFIED_CASES.items():
+        report = build()
+        before = deepcopy(report)
+        report_page = render_report_html(report)
+        index_page = render_index_html([report])
+        notice = _empty_notice(report_page)
+        assert 'class="notice n-warn"' in notice, name
+        assert _INCOMPLETE_NOTICE_ZH in notice and _INCOMPLETE_NOTICE_EN in notice, name
+        assert notice == _empty_notice(index_page), name
+        # The warning belongs to the summary, ahead of the horizon columns.
+        summary = report_page.split('id="summary"', 1)[1].split('id="conclusions"', 1)[0]
+        assert notice in summary, name
+        assert "空结果本身就是结论" not in report_page, name
+        assert "候选未达到推荐门槛" not in report_page, name
+        assert report_page.split('id="conclusions"', 1)[1].count("本期无推荐") == 3, name
+        assert "仅供研究" in report_page and "RESEARCH ONLY" in report_page, name
+        assert report == before, name
+
+
+def test_f1_stale_momentum_is_not_described_as_unstable_ranking() -> None:
+    lead = _lead(render_report_html(_f1_stale_report()))
+    assert "本期暂无足够稳定的主题排序" not in lead
+    assert "No stable theme ranking is available this period" not in lead
+    assert "主题动量不可用" in lead
+    assert "Theme momentum could not be used" in lead
+
+
+def test_f1_healthy_zero_pick_control_keeps_below_gate_conclusion() -> None:
+    from quant_advisor_research.publisher import index_inputs_verified
+
+    report = _f1_healthy_report()
+    assert index_inputs_verified(report)
+    report_page = render_report_html(report)
+    lead = _lead(report_page)
+    assert _HEALTHY_WAIT_ZH in lead and _HEALTHY_WAIT_EN in lead
+    assert "输入不完整" not in lead and "inputs are incomplete" not in lead
+    notice = _empty_notice(report_page)
+    assert 'class="notice n-info"' in notice
+    assert "空结果本身就是结论" in notice
+    assert _INCOMPLETE_NOTICE_ZH not in report_page
+    assert notice == _empty_notice(render_index_html([report]))
+    assert report_page.split('id="conclusions"', 1)[1].count("候选未达到推荐门槛") == 3
+
+
+def test_f1_verified_inputs_missing_rankings_stay_unknown_on_report() -> None:
+    report = _contract_valid_missing_ranking_report()
+    report_page = render_report_html(report)
+    lead = _lead(report_page)
+    assert _HEALTHY_WAIT_ZH not in lead and _HEALTHY_WAIT_EN not in lead
+    assert "尚不能判断信号是否达到门槛" in lead
+    assert "whether signals met the gate remains unknown" in lead
+    assert "输入不完整" not in lead
+    notice = _empty_notice(report_page)
+    assert "部分周期缺少排名证据" in notice
+    assert notice == _empty_notice(render_index_html([report]))
+
+
+def test_f1_report_with_picks_has_no_empty_conclusion_notice() -> None:
+    report = build_sample_report()
+    report["summary"]["data_quality_warnings"] = ["missing_market_confirmation"]
+    page = render_report_html(report)
+    assert 'style="margin:0 20px 16px"' not in page
+    assert _INCOMPLETE_NOTICE_ZH not in page
+
+
+def test_f1_expired_unverified_report_keeps_expiry_banner_and_warning() -> None:
+    report = _f1_untrusted_report()
+    report["expires_at"] = "2020-01-01T00:00:00Z"
+    page = render_report_html(report)
+    assert '<div class="notice n-warn" role="note" data-when-expired hidden>' in page
+    assert "此报告已过期。" in page
+    assert _INCOMPLETE_NOTICE_ZH in _empty_notice(page)
+
+
+# --- F1-R1: shared completeness predicate must honour the page's own input checks ---
+
+_VERIFIED_NOTICE_ZH = "空结果本身就是结论"
+_VERIFIED_NOTICE_EN = "this is not missing data"
+_VERIFIED_INPUTS_ZH = "输入已核验完整"
+_VERIFIED_INPUTS_EN = "Inputs were verified complete"
+
+
+def _r1_market_confirmation_missing_report() -> dict:
+    """Reviewer R1: contract-valid zero-pick report, fresh AI/theme, market confirmation not provided.
+
+    Mirrors ``build_advisory_report`` without a market-confirmation path: the
+    check row is ``missing``/``not_provided`` and no data-quality warning is added.
+    """
+    report = _f1_healthy_report()
+    for check in report["input_checks"]:
+        if check["name"] == "market_confirmation":
+            check.update(status="missing", detail="not_provided", as_of=None)
+    validate_advisory_report(report)
+    return report
+
+
+def _assert_unverified_everywhere(report: dict, label: str) -> None:
+    from quant_advisor_research.publisher import index_inputs_verified
+
+    assert not index_inputs_verified(report), label
+    report_page = render_report_html(report)
+    index_page = render_index_html([report])
+    lead = _lead(report_page)
+    assert _HEALTHY_WAIT_ZH not in lead and _HEALTHY_WAIT_EN not in lead, label
+    assert "输入不完整" in lead and "不能解读为信号未达门槛" in lead, label
+    assert "inputs are incomplete" in lead and "cannot be read as signals below the gate" in lead, label
+    notice = _empty_notice(report_page)
+    assert 'class="notice n-warn"' in notice, label
+    assert _INCOMPLETE_NOTICE_ZH in notice and _INCOMPLETE_NOTICE_EN in notice, label
+    assert notice == _empty_notice(index_page), label
+    for page in (report_page, index_page):
+        assert _VERIFIED_NOTICE_ZH not in page and _VERIFIED_NOTICE_EN not in page, label
+        assert _VERIFIED_INPUTS_ZH not in page and _VERIFIED_INPUTS_EN not in page, label
+        assert "候选未达到推荐门槛" not in page, label
+        assert "Candidates did not meet the" not in page, label
+    conclusions = report_page.split('id="conclusions"', 1)[1]
+    assert conclusions.count("本期无推荐") == 3, label
+    assert index_page.count("本期无推荐") == 3, label
+
+
+def test_r1_missing_market_confirmation_is_not_verified_complete() -> None:
+    report = _r1_market_confirmation_missing_report()
+    report_page = render_report_html(report)
+    inputs = report_page.split('id="inputs"', 1)[1].split("</section>", 1)[0]
+    assert "缺失" in inputs and "Missing" in inputs
+    _assert_unverified_everywhere(report, "market_confirmation_missing")
+
+
+def _with_check(name: str, **changes) -> dict:
+    report = _f1_healthy_report()
+    for check in report["input_checks"]:
+        if check["name"] == name:
+            check.update(changes)
+    return report
+
+
+def _r1_adverse_cases() -> dict[str, dict]:
+    cases: dict[str, dict] = {}
+    names = [check["name"] for check in _all_input_checks_available()]
+    for name in names:
+        for status in ("missing", "invalid", "stale", "unknown"):
+            cases[f"{name}:{status}"] = _with_check(name, status=status)
+        partial = _f1_healthy_report()
+        partial["input_checks"] = [c for c in partial["input_checks"] if c["name"] != name]
+        cases[f"{name}:absent_row"] = partial
+    unrecognised = _f1_healthy_report()
+    unrecognised["input_checks"][0]["status"] = "unverified"
+    cases["unrecognised_status"] = unrecognised
+    no_status = _f1_healthy_report()
+    del no_status["input_checks"][2]["status"]
+    cases["status_not_recorded"] = no_status
+    duplicate = _f1_healthy_report()
+    duplicate["input_checks"].append(
+        {"name": "market_confirmation", "detail": "not_provided", "status": "missing", "as_of": None}
+    )
+    cases["conflicting_duplicate_row"] = duplicate
+    extra = _f1_healthy_report()
+    extra["input_checks"].append({"name": "extra_input", "detail": "x", "status": "invalid", "as_of": None})
+    cases["extra_row_invalid"] = extra
+    empty = _f1_healthy_report()
+    empty["input_checks"] = []
+    cases["empty_list"] = empty
+    absent = _f1_healthy_report()
+    del absent["input_checks"]
+    cases["input_checks_absent"] = absent
+    not_list = _f1_healthy_report()
+    not_list["input_checks"] = {"market_confirmation": "available"}
+    cases["input_checks_not_list"] = not_list
+    non_dict = _f1_healthy_report()
+    non_dict["input_checks"][4] = "available"
+    cases["non_dict_row"] = non_dict
+    return cases
+
+
+def test_r1_missing_invalid_stale_unknown_or_partial_checks_never_verified_complete() -> None:
+    for label, report in _r1_adverse_cases().items():
+        before = deepcopy(report)
+        _assert_unverified_everywhere(report, label)
+        assert report == before, label
+
+
+def test_r1_available_checks_do_not_override_untrusted_or_stale_freshness() -> None:
+    untrusted = _f1_healthy_report()
+    untrusted["freshness"]["ai_signal"] = {"present": True, "valid": False, "reason": "provenance_untrusted"}
+    stale = _f1_healthy_report()
+    stale["freshness"]["theme_momentum"] = {"present": True, "valid": False, "reason": "stale_as_of"}
+    warned = _f1_healthy_report()
+    warned["summary"]["data_quality_warnings"] = ["ai_signal_provenance_untrusted"]
+    no_freshness = _f1_healthy_report()
+    del no_freshness["freshness"]
+    for label, report in {
+        "untrusted": untrusted, "stale": stale, "warning": warned, "no_freshness": no_freshness,
+    }.items():
+        assert all(c["status"] == "available" for c in report["input_checks"]), label
+        _assert_unverified_everywhere(report, label)
+
+
+def test_r1_fully_healthy_zero_pick_keeps_below_gate_conclusion_everywhere() -> None:
+    from quant_advisor_research.publisher import index_inputs_verified
+
+    report = _f1_healthy_report()
+    assert all(c["status"] == "available" for c in report["input_checks"])
+    assert index_inputs_verified(report)
+    report_page = render_report_html(report)
+    index_page = render_index_html([report])
+    lead = _lead(report_page)
+    assert _HEALTHY_WAIT_ZH in lead and _HEALTHY_WAIT_EN in lead
+    notice = _empty_notice(report_page)
+    assert 'class="notice n-info"' in notice
+    assert _VERIFIED_NOTICE_ZH in notice and _VERIFIED_NOTICE_EN in notice
+    assert notice == _empty_notice(index_page)
+    assert report_page.split('id="conclusions"', 1)[1].count("候选未达到推荐门槛") == 3
+    assert index_page.count("候选未达到推荐门槛。") == 3
+    for page in (report_page, index_page):
+        assert _INCOMPLETE_NOTICE_ZH not in page and _INCOMPLETE_NOTICE_EN not in page
+
+
+def test_r1_genuine_picks_are_unaffected_by_missing_checks() -> None:
+    report = build_sample_report()
+    assert any(c["status"] != "available" for c in report["input_checks"])
+    page = render_report_html(report)
+    assert 'style="margin:0 20px 16px"' not in page
+    assert _INCOMPLETE_NOTICE_ZH not in page
