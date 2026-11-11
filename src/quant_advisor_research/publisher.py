@@ -1766,11 +1766,23 @@ def render_index_html(reports: list[dict[str, Any]], *, now: dt.datetime | None 
     return _page_chrome(title_zh="智慧投顾研究系统", title_en="Advisory Research", current="latest", body=body)
 
 
+def _published_picks(report: dict[str, Any]) -> list[dict[str, Any]]:
+    """Final public picks; the single source for every pick count and symbol list."""
+    decisions = report.get("final_decisions")
+    picks = decisions.get("recommendations", []) if isinstance(decisions, dict) else [
+        item for item in report.get("recommendations", []) if item.get("rating") == "recommend"
+    ]
+    return [pick for pick in picks if isinstance(pick, dict)]
+
+
 def render_archive_card(report: dict[str, Any]) -> str:
     as_of = str(report.get("as_of", ""))
     filename = report_filename(report)
-    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
-    top_symbols = [str(symbol) for symbol in summary.get("top_recommended_symbols", [])]
+    # Not summary.top_recommended_symbols: a stale summary must not advertise picks
+    # that the report page itself does not publish.
+    top_symbols = [
+        str(pick.get("symbol")) for pick in _published_picks(report)[:5] if pick.get("symbol")
+    ]
     symbols_html = "".join(_sym(symbol) for symbol in top_symbols) or _t(
         "本期无推荐", "No recommendation"
     )
@@ -1854,10 +1866,7 @@ def render_reports_index_json(reports: list[dict[str, Any]]) -> str:
     items = []
     for report in sorted(reports, key=lambda item: item["as_of"], reverse=True):
         as_of = str(report.get("as_of", ""))
-        decisions = report.get("final_decisions")
-        picks = decisions.get("recommendations", []) if isinstance(decisions, dict) else [
-            item for item in report.get("recommendations", []) if item.get("rating") == "recommend"
-        ]
+        picks = _published_picks(report)
         horizon_counts = {
             horizon: sum(pick.get("primary_horizon") == horizon for pick in picks)
             for horizon in ("short", "medium", "long")
