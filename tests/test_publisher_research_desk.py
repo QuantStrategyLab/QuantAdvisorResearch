@@ -765,3 +765,27 @@ def test_r1_genuine_picks_are_unaffected_by_missing_checks() -> None:
     page = render_report_html(report)
     assert 'style="margin:0 20px 16px"' not in page
     assert _INCOMPLETE_NOTICE_ZH not in page
+
+
+def test_archive_symbols_follow_published_picks_not_stale_summary() -> None:
+    # A contract-valid zero-pick report whose summary still lists earlier symbols
+    # must not be advertised in the archive as having recommended them.
+    report = _zero_pick_report(verified=False)
+    assert report["summary"]["top_recommended_symbols"]
+    validate_advisory_report(report)
+    archive = render_archive_html([report])
+    card = archive.split('class="archive-card"', 1)[1]
+    symbols_cell = card.split('data-h="推荐标的"', 1)[1].split("</td>", 1)[0]
+    assert 'class="sym"' not in symbols_cell
+    assert "本期无推荐" in symbols_cell
+    assert "No recommendation" in symbols_cell
+
+    published = build_sample_report()
+    expected = [pick["symbol"] for pick in published["final_decisions"]["recommendations"][:5]]
+    assert expected
+    published["summary"]["top_recommended_symbols"] = ["STALEONLY"]
+    card = render_archive_html([published]).split('class="archive-card"', 1)[1]
+    symbols_cell = card.split('data-h="推荐标的"', 1)[1].split("</td>", 1)[0]
+    assert "STALEONLY" not in symbols_cell
+    for symbol in expected:
+        assert f'<span class="sym">{symbol}</span>' in symbols_cell
