@@ -1,0 +1,985 @@
+{
+  "as_of": "2026-05-30",
+  "audience_scope": "non_personalized_model_research",
+  "cadence": "weekly",
+  "contract_version": "model_recommendations.v6",
+  "expires_at": "2026-06-07T00:00:00Z",
+  "final_decisions": {
+    "horizon_action_buckets": {
+      "long": {
+        "recommend": [],
+        "watch": []
+      },
+      "medium": {
+        "recommend": [
+          "MU",
+          "NVDA"
+        ],
+        "watch": [
+          "DELL"
+        ]
+      },
+      "short": {
+        "recommend": [],
+        "watch": []
+      }
+    },
+    "horizon_buckets": {
+      "long": [],
+      "medium": [
+        "MU",
+        "NVDA"
+      ],
+      "short": []
+    },
+    "horizon_rankings": {
+      "long": [
+        {
+          "action": "skip",
+          "score": 0.159,
+          "symbol": "MU"
+        },
+        {
+          "action": "skip",
+          "score": 0.159,
+          "symbol": "NVDA"
+        },
+        {
+          "action": "skip",
+          "score": 0.088,
+          "symbol": "DELL"
+        }
+      ],
+      "medium": [
+        {
+          "action": "recommend",
+          "score": 0.592,
+          "symbol": "MU"
+        },
+        {
+          "action": "recommend",
+          "score": 0.56,
+          "symbol": "NVDA"
+        },
+        {
+          "action": "watch",
+          "score": 0.384,
+          "symbol": "DELL"
+        }
+      ],
+      "short": [
+        {
+          "action": "skip",
+          "score": 0.0,
+          "symbol": "DELL"
+        },
+        {
+          "action": "skip",
+          "score": 0.0,
+          "symbol": "MU"
+        },
+        {
+          "action": "skip",
+          "score": 0.0,
+          "symbol": "NVDA"
+        }
+      ]
+    },
+    "method": "Final recommendation blend for model scoring.",
+    "overflow_recommendations": [],
+    "position_policy": "No target shares, position size, portfolio weight, or account-specific allocation is provided.",
+    "recommendations": [
+      {
+        "action": "recommend",
+        "action_label": "最终推荐",
+        "ai_signal_score": 0.793,
+        "business_summary": "Micron 主要做 DRAM、NAND 和 HBM 等存储芯片。",
+        "combined_score": 0.592,
+        "horizon_actions": {
+          "long": "skip",
+          "medium": "recommend",
+          "short": "skip"
+        },
+        "horizon_scores": {
+          "long": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.793,
+              "momentum": 0.587,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_context"
+            ],
+            "score": 0.159
+          },
+          "medium": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.793,
+              "momentum": 0.587,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_momentum_snapshot"
+            ],
+            "score": 0.592
+          },
+          "short": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.793,
+              "momentum": 0.587,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_momentum_snapshot"
+            ],
+            "score": 0.0
+          }
+        },
+        "long_context_score": 0.0,
+        "medium_context_score": 0.793,
+        "momentum_score": 0.587,
+        "name": "MU",
+        "primary_horizon": "medium",
+        "primary_horizon_label": "中线",
+        "primary_horizon_window": "2-12周",
+        "prospect_summary": "前景主要来自 AI 服务器对 HBM 和高端 DRAM 的需求，以及存储周期修复。",
+        "risk_summary": "主要风险是存储周期反转、HBM 供需和价格不及预期、客户集中度较高，以及强动量后的估值和回撤压力。",
+        "selection_trace": [
+          "candidate_source=theme_momentum_snapshot",
+          "short_score=0.00",
+          "medium_score=0.59",
+          "long_score=0.16",
+          "final_action=recommend",
+          "symbol=MU"
+        ],
+        "source_score": 0.0,
+        "supporting_context": {
+          "long": [],
+          "medium": [
+            "theme_momentum_snapshot"
+          ],
+          "short": []
+        },
+        "symbol": "MU",
+        "why_selected": [
+          "动量：个股动量分数=0.88，近3个月=+28.0%。",
+          "中线主题上下文：HBM / 存储。"
+        ]
+      },
+      {
+        "action": "recommend",
+        "action_label": "最终推荐",
+        "ai_signal_score": 0.793,
+        "business_summary": "NVDA（NVDA）为当前观察股票池标的。",
+        "combined_score": 0.56,
+        "horizon_actions": {
+          "long": "watch",
+          "medium": "recommend",
+          "short": "skip"
+        },
+        "horizon_scores": {
+          "long": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.793,
+              "momentum": 0.507,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_context"
+            ],
+            "score": 0.159
+          },
+          "medium": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.793,
+              "momentum": 0.507,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_momentum_snapshot"
+            ],
+            "score": 0.56
+          },
+          "short": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.793,
+              "momentum": 0.507,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_momentum_snapshot"
+            ],
+            "score": 0.0
+          }
+        },
+        "long_context_score": 0.0,
+        "medium_context_score": 0.793,
+        "momentum_score": 0.507,
+        "name": "NVDA",
+        "primary_horizon": "medium",
+        "primary_horizon_label": "中线",
+        "primary_horizon_window": "2-12周",
+        "prospect_summary": "推荐理由需要结合行业需求、公司财报、估值和价格趋势继续复核。",
+        "risk_summary": "主要风险是行业需求不及预期、估值对增长假设较敏感、业绩兑现延后，以及股价波动带来的回撤。",
+        "selection_trace": [
+          "candidate_source=theme_momentum_snapshot",
+          "short_score=0.00",
+          "medium_score=0.56",
+          "long_score=0.16",
+          "final_action=recommend",
+          "symbol=NVDA"
+        ],
+        "source_score": 0.0,
+        "supporting_context": {
+          "long": [],
+          "medium": [
+            "theme_momentum_snapshot"
+          ],
+          "short": []
+        },
+        "symbol": "NVDA",
+        "why_selected": [
+          "动量：个股动量分数=0.76，近3个月=+20.0%。",
+          "中线主题上下文：HBM / 存储。"
+        ]
+      }
+    ],
+    "watchlist": [
+      {
+        "action": "watch",
+        "action_label": "观察名单",
+        "ai_signal_score": 0.439,
+        "business_summary": "Dell 主要做企业服务器、存储、PC 和 AI 服务器基础设施。",
+        "combined_score": 0.384,
+        "horizon_actions": {
+          "long": "skip",
+          "medium": "watch",
+          "short": "skip"
+        },
+        "horizon_scores": {
+          "long": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.439,
+              "momentum": 0.467,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_context"
+            ],
+            "score": 0.088
+          },
+          "medium": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.439,
+              "momentum": 0.467,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_momentum_snapshot"
+            ],
+            "score": 0.384
+          },
+          "short": {
+            "components": {
+              "long_context": 0.0,
+              "market_confirmation": null,
+              "medium_context": 0.439,
+              "momentum": 0.467,
+              "source": 0.0
+            },
+            "drivers": [
+              "theme_momentum_snapshot"
+            ],
+            "score": 0.0
+          }
+        },
+        "long_context_score": 0.0,
+        "medium_context_score": 0.439,
+        "momentum_score": 0.467,
+        "name": "DELL",
+        "primary_horizon": "medium",
+        "primary_horizon_label": "中线",
+        "primary_horizon_window": "2-12周",
+        "prospect_summary": "前景主要来自 AI 服务器、企业基础设施更新和数据中心资本开支。",
+        "risk_summary": "主要风险是 AI 服务器利润率偏低、订单转收入节奏不稳定、企业硬件需求周期波动，以及股价已反映较高增长预期。",
+        "selection_trace": [
+          "candidate_source=theme_momentum_snapshot",
+          "short_score=0.00",
+          "medium_score=0.38",
+          "long_score=0.09",
+          "final_action=watch",
+          "symbol=DELL"
+        ],
+        "source_score": 0.0,
+        "supporting_context": {
+          "long": [],
+          "medium": [
+            "theme_momentum_snapshot"
+          ],
+          "short": []
+        },
+        "symbol": "DELL",
+        "why_selected": [
+          "动量：个股动量分数=0.70，近3个月=+20.0%。",
+          "中线主题上下文：AI 服务器 / 数据中心硬件。"
+        ]
+      }
+    ]
+  },
+  "freshness": {
+    "ai_signal": {
+      "as_of": "2026-05-29",
+      "expires_at": "2026-06-05T00:00:00Z",
+      "generated_at": "2026-05-30T00:00:00Z",
+      "present": true,
+      "reason": "fresh",
+      "valid": true
+    },
+    "theme_momentum": {
+      "as_of": "2026-05-29",
+      "expires_at": "2026-06-05T00:00:00Z",
+      "generated_at": "2026-05-30T00:00:00Z",
+      "present": true,
+      "reason": "fresh",
+      "valid": true
+    }
+  },
+  "generated_at": "2026-05-31T00:00:00Z",
+  "input_digest": "64c06a8c3ab372b3bc804118bafbc7ceaea86af75ddc896a180a601ba5aaed66",
+  "mode": "model_recommendations",
+  "policy": {
+    "account_specific_advice_allowed": false,
+    "downstream_use": "Intelligent advisory research only; do not route to broker execution or account-level allocation.",
+    "execution_allowed": false,
+    "non_personalized_recommendations_allowed": true,
+    "personalized_advice_allowed": false,
+    "portfolio_allocation_allowed": false
+  },
+  "recommendations": [
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [
+        {
+          "accepted": true,
+          "entity_match_type": "issuer",
+          "event_id": "demo-evt1-disclosure-buy",
+          "match_evidence": "Synthetic fixture explicitly names EVT1.",
+          "relationship_type": "issuer"
+        },
+        {
+          "accepted": true,
+          "entity_match_type": "issuer",
+          "event_id": "demo-evt1-public-mention",
+          "match_evidence": "Synthetic fixture explicitly names EVT1.",
+          "relationship_type": "issuer"
+        }
+      ],
+      "evidence_refs": [
+        "https://example.invalid/watchlist/evt1",
+        "https://example.invalid/official-filing/evt1-2026-01-10",
+        "https://example.invalid/official-remarks/evt1-2026-01-20"
+      ],
+      "evidence_score": 15,
+      "evidence_summary": "Synthetic disclosure plus mention recommendation used only to validate model output. 观察到事件证据：disclosure_buy, public_mention。",
+      "horizon_note": "事件驱动主周期为2-12周；1-10个交易日只适合观察催化反应，波动和反转风险更高。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Catalyst One",
+      "primary_horizon": "medium",
+      "primary_horizon_label": "中线",
+      "primary_horizon_window": "2-12周",
+      "rating": "recommend",
+      "rating_label": "重点推荐",
+      "reasons": [
+        "Synthetic disclosure plus mention recommendation used only to validate model output.",
+        "观察到事件证据：disclosure_buy, public_mention。"
+      ],
+      "recommendation_tier": "tier_1",
+      "recommendation_tier_label": "一级推荐",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.85,
+      "source_confidence": "medium",
+      "source_confidence_label": "中",
+      "source_score": 0.804,
+      "strategy_style": "event_driven",
+      "suitable_horizon_windows": {
+        "medium": "2-12周",
+        "short": "1-10个交易日"
+      },
+      "suitable_horizons": [
+        "short",
+        "medium"
+      ],
+      "symbol": "EVT1"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [
+        {
+          "accepted": true,
+          "entity_match_type": "issuer",
+          "event_id": "demo-evt2-policy-capital",
+          "match_evidence": "Synthetic fixture explicitly names EVT2.",
+          "relationship_type": "issuer"
+        }
+      ],
+      "evidence_refs": [
+        "https://example.invalid/watchlist/evt2",
+        "https://example.invalid/policy-capital/evt2-2026-02-05"
+      ],
+      "evidence_score": 11,
+      "evidence_summary": "Synthetic policy capital recommendation used only to validate model output. 观察到事件证据：policy_capital。",
+      "horizon_note": "事件驱动主周期为2-12周；1-10个交易日只适合观察催化反应，波动和反转风险更高。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Policy Two",
+      "primary_horizon": "medium",
+      "primary_horizon_label": "中线",
+      "primary_horizon_window": "2-12周",
+      "rating": "watch",
+      "rating_label": "观察",
+      "reasons": [
+        "Synthetic policy capital recommendation used only to validate model output.",
+        "观察到事件证据：policy_capital。"
+      ],
+      "recommendation_tier": "watchlist",
+      "recommendation_tier_label": "观察名单",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.79,
+      "source_confidence": "high",
+      "source_confidence_label": "高",
+      "source_score": 0.747,
+      "strategy_style": "event_driven",
+      "suitable_horizon_windows": {
+        "medium": "2-12周",
+        "short": "1-10个交易日"
+      },
+      "suitable_horizons": [
+        "short",
+        "medium"
+      ],
+      "symbol": "EVT2"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [
+        {
+          "accepted": true,
+          "entity_match_type": "issuer",
+          "event_id": "demo-evt3-disclosure-buy",
+          "match_evidence": "Synthetic fixture explicitly names EVT3.",
+          "relationship_type": "issuer"
+        }
+      ],
+      "evidence_refs": [
+        "https://example.invalid/watchlist/evt3",
+        "https://example.invalid/unverified-lead/evt3-2026-03-01"
+      ],
+      "evidence_score": 6,
+      "evidence_summary": "Synthetic low-confidence lead used only to validate source-review behavior. 观察到事件证据：disclosure_buy。",
+      "horizon_note": "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Review Three",
+      "primary_horizon": "not_applicable",
+      "primary_horizon_label": "不适用",
+      "primary_horizon_window": "不适用",
+      "rating": "verify_source",
+      "rating_label": "先核验来源",
+      "reasons": [
+        "Synthetic low-confidence lead used only to validate source-review behavior.",
+        "观察到事件证据：disclosure_buy。"
+      ],
+      "recommendation_tier": "source_check",
+      "recommendation_tier_label": "来源核验",
+      "review_checklist": [
+        "对照官方公告、披露文件、讲话或公司材料复核事件日期和来源链接。",
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "事件证据包含低置信来源行，需要用官方来源复核。"
+      ],
+      "risk_score": 2,
+      "score": 0.5,
+      "source_confidence": "low",
+      "source_confidence_label": "低",
+      "source_score": 0.304,
+      "strategy_style": "event_driven",
+      "suitable_horizon_windows": {
+        "not_applicable": "不适用"
+      },
+      "suitable_horizons": [
+        "not_applicable"
+      ],
+      "symbol": "EVT3"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [],
+      "evidence_refs": [
+        "https://example.invalid/watchlist/evt4"
+      ],
+      "evidence_score": 2,
+      "evidence_summary": "Synthetic monitor-only record used only to validate monitor behavior.",
+      "horizon_note": "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Monitor Four",
+      "primary_horizon": "not_applicable",
+      "primary_horizon_label": "不适用",
+      "primary_horizon_window": "不适用",
+      "rating": "monitor",
+      "rating_label": "背景跟踪",
+      "reasons": [
+        "Synthetic monitor-only record used only to validate monitor behavior."
+      ],
+      "recommendation_tier": "monitor",
+      "recommendation_tier_label": "背景跟踪",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.42,
+      "source_confidence": "no_event",
+      "source_confidence_label": "无事件",
+      "source_score": 0.0,
+      "strategy_style": "mixed_research",
+      "suitable_horizon_windows": {
+        "not_applicable": "不适用"
+      },
+      "suitable_horizons": [
+        "not_applicable"
+      ],
+      "symbol": "EVT4"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [],
+      "evidence_refs": [
+        "https://example.invalid/macro-context/idx1"
+      ],
+      "evidence_score": 1,
+      "evidence_summary": "Synthetic broad-market benchmark for AI macro context.",
+      "horizon_note": "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Broad Index",
+      "primary_horizon": "not_applicable",
+      "primary_horizon_label": "不适用",
+      "primary_horizon_window": "不适用",
+      "rating": "monitor",
+      "rating_label": "背景跟踪",
+      "reasons": [
+        "Synthetic broad-market benchmark for AI macro context."
+      ],
+      "recommendation_tier": "monitor",
+      "recommendation_tier_label": "背景跟踪",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.38,
+      "source_confidence": "no_event",
+      "source_confidence_label": "无事件",
+      "source_score": 0.0,
+      "strategy_style": "long_horizon_growth",
+      "suitable_horizon_windows": {
+        "not_applicable": "不适用"
+      },
+      "suitable_horizons": [
+        "not_applicable"
+      ],
+      "symbol": "IDX1"
+    },
+    {
+      "ai_context": {
+        "bias": "",
+        "confidence": 0.0,
+        "horizon": "",
+        "horizon_window": "",
+        "source": "",
+        "theme_ids": []
+      },
+      "entity_evidence": [],
+      "evidence_refs": [
+        "https://example.invalid/macro-context/idx2"
+      ],
+      "evidence_score": 1,
+      "evidence_summary": "Synthetic growth benchmark for AI macro context.",
+      "horizon_note": "该项不是当前推荐，仅用于来源核验、风险暂缓或背景跟踪。",
+      "long_horizon_ai_score": 0.0,
+      "name": "Example Growth Index",
+      "primary_horizon": "not_applicable",
+      "primary_horizon_label": "不适用",
+      "primary_horizon_window": "不适用",
+      "rating": "monitor",
+      "rating_label": "背景跟踪",
+      "reasons": [
+        "Synthetic growth benchmark for AI macro context."
+      ],
+      "recommendation_tier": "monitor",
+      "recommendation_tier_label": "背景跟踪",
+      "review_checklist": [
+        "检查最新价格走势、财报日、估值和行业新闻。",
+        "单独讨论策略前，记录来源质量和模型边界。"
+      ],
+      "risk_notes": [
+        "如果缺少最新价格、估值、来源和流动性检查，推荐结论可能失效。"
+      ],
+      "risk_score": 0,
+      "score": 0.38,
+      "source_confidence": "no_event",
+      "source_confidence_label": "无事件",
+      "source_score": 0.0,
+      "strategy_style": "long_horizon_growth",
+      "suitable_horizon_windows": {
+        "not_applicable": "不适用"
+      },
+      "suitable_horizons": [
+        "not_applicable"
+      ],
+      "symbol": "IDX2"
+    }
+  ],
+  "reference_time": "2026-05-31T00:00:00Z",
+  "schema_version": "6",
+  "source_artifacts": {
+    "ai_signal": "synthetic/ai_signal.json",
+    "market_confirmation": "",
+    "political_events": "examples/political_events.example.csv",
+    "political_watchlist": "examples/political_watchlist.example.csv",
+    "theme_momentum": "synthetic/theme_momentum.json"
+  },
+  "summary": {
+    "ai_confidence": 0.0,
+    "ai_regime": "not_available",
+    "base_recommendation_count": 6,
+    "candidate_universe_count": 6,
+    "data_quality_warnings": [],
+    "final_overflow_recommendation_count": 0,
+    "final_recommendation_count": 2,
+    "final_watchlist_count": 1,
+    "long_context_available": false,
+    "long_context_missing_reason": "ai_signal_not_available",
+    "long_context_symbol_count": 0,
+    "long_context_symbols": [],
+    "market_confirmation_count": 0,
+    "recommendation_count": 6,
+    "review_note": "Intelligent advisory research output. No order, target quantity, account suitability, or portfolio allocation is encoded.",
+    "source_event_count": 4,
+    "source_mode": "fixture",
+    "theme_first_candidate_count": 4,
+    "theme_momentum_artifact_type": "medium_horizon_theme_context",
+    "theme_momentum_available": true,
+    "theme_momentum_horizon": "medium",
+    "theme_momentum_horizon_window": "2-12周",
+    "top_recommended_symbols": [
+      "MU",
+      "NVDA"
+    ],
+    "top_theme_candidate_symbols": [
+      "MU",
+      "NVDA",
+      "DELL",
+      "VRT"
+    ],
+    "top_theme_ids": [
+      "hbm_memory",
+      "ai_server_infrastructure"
+    ]
+  },
+  "theme_first_candidates": [
+    {
+      "advisor_status": "主题候选",
+      "best_theme_rank": 1,
+      "candidate_type": "theme_first",
+      "industry_background": "科技 / HBM / 存储",
+      "name": "MU",
+      "primary_theme_breadth_3m": 1.0,
+      "primary_theme_id": "hbm_memory",
+      "primary_theme_name": "HBM and memory cycle",
+      "primary_theme_score": 0.82,
+      "primary_theme_sector": "technology",
+      "rank": 1,
+      "reasons": [
+        "主题和个股动量靠前，适合放入本期主题优先候选池。",
+        "主主题 #1 HBM / 存储 主题分数=0.82，3个月广度=1.0。",
+        "个股动量分数=0.88。"
+      ],
+      "recommendation_summary": "属于科技 / HBM / 存储，主主题排名 #1；个股动量 0.88，近3个月 +28.0%。",
+      "return_12_1m": 0.52,
+      "return_3m": 0.28,
+      "return_6_1m": 0.34,
+      "risk_notes": [
+        "该候选来自主题和价格动量排序，不代表个性化建议或下单信号。",
+        "需复核估值、财报、回撤和流动性；当前暂无明确事件催化。"
+      ],
+      "risk_summary": "需复核估值、财报、回撤和流动性；当前暂无明确事件催化。",
+      "source_confirmation": "暂无明确事件催化",
+      "symbol": "MU",
+      "symbol_momentum_score": 0.88,
+      "theme_ids": [
+        "hbm_memory"
+      ],
+      "themes": [
+        {
+          "breadth_3m": 1.0,
+          "momentum_score": 0.82,
+          "rank": 1,
+          "sector": "technology",
+          "theme_id": "hbm_memory",
+          "theme_name": "HBM and memory cycle"
+        }
+      ]
+    },
+    {
+      "advisor_status": "主题候选",
+      "best_theme_rank": 1,
+      "candidate_type": "theme_first",
+      "industry_background": "科技 / HBM / 存储",
+      "name": "NVDA",
+      "primary_theme_breadth_3m": 1.0,
+      "primary_theme_id": "hbm_memory",
+      "primary_theme_name": "HBM and memory cycle",
+      "primary_theme_score": 0.82,
+      "primary_theme_sector": "technology",
+      "rank": 2,
+      "reasons": [
+        "主题和个股动量靠前，适合放入本期主题优先候选池。",
+        "主主题 #1 HBM / 存储 主题分数=0.82，3个月广度=1.0。",
+        "个股动量分数=0.76。"
+      ],
+      "recommendation_summary": "属于科技 / HBM / 存储，主主题排名 #1；个股动量 0.76，近3个月 +20.0%。",
+      "return_12_1m": 0.38,
+      "return_3m": 0.2,
+      "return_6_1m": 0.28,
+      "risk_notes": [
+        "该候选来自主题和价格动量排序，不代表个性化建议或下单信号。",
+        "需复核估值、财报、回撤和流动性；当前暂无明确事件催化。"
+      ],
+      "risk_summary": "需复核估值、财报、回撤和流动性；当前暂无明确事件催化。",
+      "source_confirmation": "暂无明确事件催化",
+      "symbol": "NVDA",
+      "symbol_momentum_score": 0.76,
+      "theme_ids": [
+        "hbm_memory"
+      ],
+      "themes": [
+        {
+          "breadth_3m": 1.0,
+          "momentum_score": 0.82,
+          "rank": 1,
+          "sector": "technology",
+          "theme_id": "hbm_memory",
+          "theme_name": "HBM and memory cycle"
+        }
+      ]
+    },
+    {
+      "advisor_status": "主题候选",
+      "best_theme_rank": 2,
+      "candidate_type": "theme_first",
+      "industry_background": "科技 / AI 服务器 / 数据中心硬件",
+      "name": "DELL",
+      "primary_theme_breadth_3m": 1.0,
+      "primary_theme_id": "ai_server_infrastructure",
+      "primary_theme_name": "AI server and data-center hardware",
+      "primary_theme_score": 0.65,
+      "primary_theme_sector": "technology",
+      "rank": 3,
+      "reasons": [
+        "主题和个股动量靠前，适合放入本期主题优先候选池。",
+        "主主题 #2 AI 服务器 / 数据中心硬件 主题分数=0.65，3个月广度=1.0。",
+        "个股动量分数=0.7。"
+      ],
+      "recommendation_summary": "属于科技 / AI 服务器 / 数据中心硬件，主主题排名 #2；个股动量 0.70，近3个月 +20.0%。",
+      "return_12_1m": 0.39,
+      "return_3m": 0.2,
+      "return_6_1m": 0.25,
+      "risk_notes": [
+        "该候选来自主题和价格动量排序，不代表个性化建议或下单信号。",
+        "需复核估值、财报、回撤和流动性；当前暂无明确事件催化。"
+      ],
+      "risk_summary": "需复核估值、财报、回撤和流动性；当前暂无明确事件催化。",
+      "source_confirmation": "暂无明确事件催化",
+      "symbol": "DELL",
+      "symbol_momentum_score": 0.7,
+      "theme_ids": [
+        "ai_server_infrastructure"
+      ],
+      "themes": [
+        {
+          "breadth_3m": 1.0,
+          "momentum_score": 0.65,
+          "rank": 2,
+          "sector": "technology",
+          "theme_id": "ai_server_infrastructure",
+          "theme_name": "AI server and data-center hardware"
+        }
+      ]
+    },
+    {
+      "advisor_status": "主题候选",
+      "best_theme_rank": 2,
+      "candidate_type": "theme_first",
+      "industry_background": "科技 / AI 服务器 / 数据中心硬件",
+      "name": "VRT",
+      "primary_theme_breadth_3m": 1.0,
+      "primary_theme_id": "ai_server_infrastructure",
+      "primary_theme_name": "AI server and data-center hardware",
+      "primary_theme_score": 0.65,
+      "primary_theme_sector": "technology",
+      "rank": 4,
+      "reasons": [
+        "主题和个股动量靠前，适合放入本期主题优先候选池。",
+        "主主题 #2 AI 服务器 / 数据中心硬件 主题分数=0.65，3个月广度=1.0。",
+        "个股动量分数=0.6。"
+      ],
+      "recommendation_summary": "属于科技 / AI 服务器 / 数据中心硬件，主主题排名 #2；个股动量 0.60，近3个月 +16.0%。",
+      "return_12_1m": 0.33,
+      "return_3m": 0.16,
+      "return_6_1m": 0.23,
+      "risk_notes": [
+        "该候选来自主题和价格动量排序，不代表个性化建议或下单信号。",
+        "需复核估值、财报、回撤和流动性；当前暂无明确事件催化。"
+      ],
+      "risk_summary": "需复核估值、财报、回撤和流动性；当前暂无明确事件催化。",
+      "source_confirmation": "暂无明确事件催化",
+      "symbol": "VRT",
+      "symbol_momentum_score": 0.6,
+      "theme_ids": [
+        "ai_server_infrastructure"
+      ],
+      "themes": [
+        {
+          "breadth_3m": 1.0,
+          "momentum_score": 0.65,
+          "rank": 2,
+          "sector": "technology",
+          "theme_id": "ai_server_infrastructure",
+          "theme_name": "AI server and data-center hardware"
+        }
+      ]
+    }
+  ],
+  "theme_momentum": {
+    "artifact_type": "medium_horizon_theme_context",
+    "as_of": "2026-05-30",
+    "available": true,
+    "data_quality": {
+      "coverage": {
+        "configured_symbol_count": 4,
+        "insufficient_history_symbol_count": 0,
+        "price_coverage_ratio": 1.0,
+        "priced_symbol_count": 4
+      },
+      "insufficient_history_symbols": [],
+      "missing_price_symbols": [],
+      "unranked_themes": []
+    },
+    "horizon": "medium",
+    "horizon_window": "2-12 weeks",
+    "horizon_window_label": "2-12周",
+    "policy": {
+      "direct_short_term_recommendation_allowed": false,
+      "execution_allowed": false,
+      "theme_rank_is_research_context_only": true
+    },
+    "taxonomy_version": "2026-05-31-core-themes-v1",
+    "top_themes": [
+      {
+        "breadth_3m": 1.0,
+        "momentum_score": 0.82,
+        "rank": 1,
+        "sector": "technology",
+        "theme_id": "hbm_memory",
+        "theme_name": "HBM and memory cycle",
+        "top_symbols": [
+          "MU",
+          "NVDA"
+        ]
+      },
+      {
+        "breadth_3m": 1.0,
+        "momentum_score": 0.65,
+        "rank": 2,
+        "sector": "technology",
+        "theme_id": "ai_server_infrastructure",
+        "theme_name": "AI server and data-center hardware",
+        "top_symbols": [
+          "DELL",
+          "VRT"
+        ]
+      }
+    ]
+  }
+}
