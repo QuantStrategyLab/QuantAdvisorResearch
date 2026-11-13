@@ -1,0 +1,28 @@
+---
+import { dict } from '../i18n/zh-CN';
+import { emptyReasonText } from '../lib/format';
+
+export interface Props {
+  reason: 'threshold_unmet' | 'input_unavailable' | 'unknown' | 'expired';
+  inputStatus: 'verified' | 'partial' | 'unknown';
+}
+
+const { reason, inputStatus } = Astro.props;
+
+const labels = {
+  threshold_unmet: dict['empty.reasonLabel.threshold'],
+  input_unavailable: dict['empty.reasonLabel.inputUnavailable'],
+  unknown: dict['empty.reasonLabel.unknown'],
+  expired: dict['empty.reasonLabel.expired'],
+} as const;
+
+const body =
+  reason === 'expired'
+    ? dict['validity.expiredNote']
+    : emptyReasonText({ input_status: inputStatus }, reason, dict);
+---
+
+<div class="empty-explain">
+  <p class="reason-label">{labels[reason]}</p>
+  <p>{body}</p>
+</div>

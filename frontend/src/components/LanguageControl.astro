@@ -1,0 +1,19 @@
+---
+import { dict } from '../i18n/zh-CN';
+
+export interface Props {
+  counterpartUrl?: string | null;
+}
+
+const { counterpartUrl = null } = Astro.props;
+---
+
+{
+  counterpartUrl ? (
+    <span class="language-group">
+      <a href={counterpartUrl} hrefLang="en" lang="en" rel="alternate">
+        English
+      </a>
+    </span>
+  ) : null
+}

@@ -1,0 +1,12 @@
+---
+export interface Props {
+  symbols: string[];
+  label: string;
+}
+
+const { symbols, label } = Astro.props;
+---
+
+<ul class="symbol-list" aria-label={label}>
+  {symbols.map((symbol) => <li><span class="symbol-chip">{symbol}</span></li>)}
+</ul>

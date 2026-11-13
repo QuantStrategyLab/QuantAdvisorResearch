@@ -1,0 +1,23 @@
+---
+import { dict } from '../i18n/zh-CN';
+
+export interface Props {
+  state: 'current' | 'expired' | 'unknown' | 'none';
+  label: string;
+  expiresAt?: string | null;
+}
+
+const { state, label, expiresAt = null } = Astro.props;
+---
+
+<span
+  class="validity-badge"
+  data-state={state}
+  data-validity={state}
+  {...state === 'current' && expiresAt
+    ? { 'data-expires-at': expiresAt, 'data-label-expired': dict['validity.expired'] }
+    : {}}
+>
+  <span class="marker" aria-hidden="true"></span>
+  <span class="validity-text">{label}</span>
+</span>

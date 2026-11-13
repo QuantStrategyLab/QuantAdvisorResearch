@@ -1,0 +1,21 @@
+{
+  "name": "quantadvisor-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Astro static renderer for the QuantAdvisorResearch site JSON contract 1.0.0",
+  "engines": {
+    "node": ">=20.17.0"
+  },
+  "scripts": {
+    "build": "astro build",
+    "preview": "astro preview",
+    "fixtures": "node scripts/make-fixtures.mjs",
+    "test": "node --test tests/format.test.ts tests/bundle.test.ts"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "astro": "5.18.2"
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/report.schema.json",
+  "contract_version": "1.0.0",
+  "kind": "report",
+  "release_id": "6f1d2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+  "built_at": "2026-10-25T01:00:00Z",
+  "default_locale": "zh-CN",
+  "locales": [
+    "zh-CN"
+  ],
+  "policy": {
+    "non_personalized_recommendations_allowed": true,
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "personalized_advice_allowed": false,
+    "account_specific_advice_allowed": false
+  },
+  "data": {
+    "summary": {
+      "id": "2026-09-26-weekly",
+      "route": "2026-09-26-weekly-model-recommendations.html",
+      "as_of": "2026-09-26",
+      "cadence": "weekly",
+      "source_schema": "5",
+      "title": {
+        "zh-CN": "旧版契约样例（v5，合成）",
+        "en": null
+      },
+      "description": {
+        "zh-CN": "合成测试内容：v5 来源无参考时间与有效期，时效状态应为未知。",
+        "en": null
+      },
+      "generated_at": "2026-09-26T09:00:00Z",
+      "reference_time": null,
+      "expires_at": null,
+      "input_status": "unknown",
+      "final_recommendation_count": null,
+      "horizons": {
+        "long": {
+          "symbols": [
+            "MRVL"
+          ],
+          "empty_reason": null
+        },
+        "medium": {
+          "symbols": [],
+          "empty_reason": "unknown"
+        },
+        "short": {
+          "symbols": [],
+          "empty_reason": "input_unavailable"
+        }
+      },
+      "top_themes": [],
+      "legacy_summary_symbols": [
+        "MRVL"
+      ],
+      "legacy_horizon_symbols": {
+        "long": [
+          "MRVL"
+        ],
+        "medium": [],
+        "short": []
+      }
+    },
+    "lead": [
+      {
+        "zh-CN": "合成摘要：旧版契约样例，仅保留公开列。",
+        "en": null
+      }
+    ],
+    "cards": {
+      "long": [
+        {
+          "rank": 1,
+          "symbol": "MRVL",
+          "name": "合成公司丙",
+          "horizon_action": "recommend",
+          "selection_basis": "primary_horizon",
+          "window": {
+            "zh-CN": "6–12 个月",
+            "en": null
+          },
+          "business_summary": {
+            "zh-CN": "合成公司背景：网络芯片设计。",
+            "en": null
+          },
+          "prospect_summary": {
+            "zh-CN": "合成研究理由：客户资本开支。",
+            "en": null
+          },
+          "risk_summary": {
+            "zh-CN": "合成风险：客户集中。",
+            "en": null
+          }
+        }
+      ],
+      "medium": [],
+      "short": []
+    },
+    "disclaimer": {
+      "zh-CN": "合成免责声明：旧版样例，仅供研究。",
+      "en": null
+    }
+  }
+}

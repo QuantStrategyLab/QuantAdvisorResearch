@@ -1,0 +1,73 @@
+---
+import { loadSiteBundle } from '../lib/data/bundle';
+import { dict } from '../i18n/zh-CN';
+import type { Summary } from '../lib/data/types';
+import SiteShell from '../layouts/SiteShell.astro';
+import RiskNotice from '../components/RiskNotice.astro';
+import ArchiveMonthGroup from '../components/ArchiveMonthGroup.astro';
+
+const bundle = loadSiteBundle();
+const { archive } = bundle;
+const BASE = import.meta.env.BASE_URL;
+
+const groups: Array<{ monthKey: string; reports: Summary[] }> = [];
+for (const report of archive.data.reports) {
+  const monthKey = report.as_of.slice(0, 7);
+  const last = groups[groups.length - 1];
+  if (last && last.monthKey === monthKey) last.reports.push(report);
+  else groups.push({ monthKey, reports: [report] });
+}
+---
+
+<SiteShell
+  currentPage="archive"
+  title={`${dict['archive.title']} · ${dict['brand.name']}`}
+  description={dict['archive.purpose']}
+  path="archive.html"
+>
+  <div class="container">
+    <div class="page-intro">
+      <h1>{dict['archive.title']}</h1>
+      <p class="purpose">{dict['archive.purpose']}</p>
+    </div>
+
+    <RiskNotice tone="archive" />
+
+    {
+      groups.length === 0 ? (
+        <>
+          <p class="legacy-note">{dict['empty.noArchive']}</p>
+          <div class="actions">
+            <a class="action-link is-secondary" href={`${BASE}/`}>
+              {dict['action.backHome']}
+            </a>
+          </div>
+        </>
+      ) : (
+        <>
+          <div class="archive-groups">
+            {groups.map((group) => (
+              <ArchiveMonthGroup
+                monthKey={group.monthKey}
+                reports={group.reports}
+                builtAt={archive.built_at}
+              />
+            ))}
+          </div>
+          <div class="actions">
+            <a class="action-link is-secondary" href={`${BASE}/#latest`}>
+              {dict['action.backLatest']}
+            </a>
+          </div>
+        </>
+      )
+    }
+  </div>
+</SiteShell>
+
+<style>
+  .archive-groups {
+    display: grid;
+    gap: var(--space-7);
+  }
+</style>

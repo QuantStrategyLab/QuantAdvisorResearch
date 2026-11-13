@@ -1,0 +1,46 @@
+{
+  "$schema": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/feed.schema.json",
+  "contract_version": "1.0.0",
+  "kind": "feed",
+  "release_id": "9f8e7d6c-5b4a-4321-8765-43210fedcba9",
+  "built_at": "2026-08-10T00:00:00Z",
+  "default_locale": "zh-CN",
+  "locales": [
+    "zh-CN"
+  ],
+  "policy": {
+    "non_personalized_recommendations_allowed": true,
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "personalized_advice_allowed": false,
+    "account_specific_advice_allowed": false
+  },
+  "data": {
+    "title": {
+      "zh-CN": "QuantAdvisorResearch 合成订阅",
+      "en": null
+    },
+    "description": {
+      "zh-CN": "合成测试频道：仅供研究，不构成投资建议。",
+      "en": null
+    },
+    "home_url": "https://quantstrategylab.github.io/QuantAdvisorResearch/",
+    "feed_route": "feed.xml",
+    "items": [
+      {
+        "report_id": "2026-08-01-daily",
+        "title": {
+          "zh-CN": "过期样例（合成日报）",
+          "en": null
+        },
+        "route": "2026-08-01-daily-model-recommendations.html",
+        "guid": "https://quantstrategylab.github.io/QuantAdvisorResearch/2026-08-01-daily-model-recommendations.html",
+        "published_at": "2026-08-01T06:00:00Z",
+        "description": {
+          "zh-CN": "合成测试内容：全部周期为空且已过有效期。",
+          "en": null
+        }
+      }
+    ]
+  }
+}

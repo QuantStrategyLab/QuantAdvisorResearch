@@ -1,0 +1,21 @@
+---
+import type { Summary } from '../lib/data/types';
+import { monthHeading } from '../lib/format';
+import ArchiveRow from './ArchiveRow.astro';
+
+export interface Props {
+  monthKey: string;
+  reports: Summary[];
+  builtAt: string;
+}
+
+const { monthKey, reports, builtAt } = Astro.props;
+const headingId = `month-${monthKey}`;
+---
+
+<section class="archive-month" aria-labelledby={headingId}>
+  <h2 id={headingId}>{monthHeading(reports[0].as_of)}</h2>
+  <ul class="report-list">
+    {reports.map((report) => <li><ArchiveRow summary={report} builtAt={builtAt} /></li>)}
+  </ul>
+</section>

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/feed.schema.json",
+  "contract_version": "1.0.0",
+  "kind": "feed",
+  "release_id": "6f1d2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+  "built_at": "2026-10-25T01:00:00Z",
+  "default_locale": "zh-CN",
+  "locales": [
+    "zh-CN"
+  ],
+  "policy": {
+    "non_personalized_recommendations_allowed": true,
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "personalized_advice_allowed": false,
+    "account_specific_advice_allowed": false
+  },
+  "data": {
+    "title": {
+      "zh-CN": "QuantAdvisorResearch 合成订阅",
+      "en": null
+    },
+    "description": {
+      "zh-CN": "合成测试频道：仅供研究，不构成投资建议。",
+      "en": null
+    },
+    "home_url": "https://quantstrategylab.github.io/QuantAdvisorResearch/",
+    "feed_route": "feed.xml",
+    "items": [
+      {
+        "report_id": "2026-10-24-weekly",
+        "title": {
+          "zh-CN": "需求韧性与产业周期 <script>alert(1)</script>",
+          "en": null
+        },
+        "route": "2026-10-24-weekly-model-recommendations.html",
+        "guid": "https://quantstrategylab.github.io/QuantAdvisorResearch/2026-10-24-weekly-model-recommendations.html",
+        "published_at": "2026-10-24T12:00:00Z",
+        "description": {
+          "zh-CN": "合成测试内容：本期研究覆盖需求、供给与估值三条线索。<img src=x onerror=alert(1)>",
+          "en": null
+        }
+      },
+      {
+        "report_id": "2026-10-17-weekly",
+        "title": {
+          "zh-CN": "利率路径与估值锚（合成）",
+          "en": null
+        },
+        "route": "2026-10-17-weekly-model-recommendations.html",
+        "guid": "https://quantstrategylab.github.io/QuantAdvisorResearch/2026-10-17-weekly-model-recommendations.html",
+        "published_at": "2026-10-17T12:00:00Z",
+        "description": {
+          "zh-CN": "合成测试内容：上一期周报，已过有效期。",
+          "en": null
+        }
+      },
+      {
+        "report_id": "2026-09-26-weekly",
+        "title": {
+          "zh-CN": "旧版契约样例（v5，合成）",
+          "en": null
+        },
+        "route": "2026-09-26-weekly-model-recommendations.html",
+        "guid": "https://quantstrategylab.github.io/QuantAdvisorResearch/2026-09-26-weekly-model-recommendations.html",
+        "published_at": "2026-09-26T09:00:00Z",
+        "description": {
+          "zh-CN": "合成测试内容：v5 来源无参考时间与有效期，时效状态应为未知。",
+          "en": null
+        }
+      }
+    ]
+  }
+}

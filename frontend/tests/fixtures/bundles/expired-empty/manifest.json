@@ -1,0 +1,47 @@
+{
+  "$schema": "https://quantstrategylab.github.io/QuantAdvisorResearch/schemas/site/1.0.0/manifest.schema.json",
+  "contract_version": "1.0.0",
+  "kind": "manifest",
+  "release_id": "9f8e7d6c-5b4a-4321-8765-43210fedcba9",
+  "built_at": "2026-08-10T00:00:00Z",
+  "default_locale": "zh-CN",
+  "locales": [
+    "zh-CN"
+  ],
+  "policy": {
+    "non_personalized_recommendations_allowed": true,
+    "execution_allowed": false,
+    "portfolio_allocation_allowed": false,
+    "personalized_advice_allowed": false,
+    "account_specific_advice_allowed": false
+  },
+  "data": {
+    "files": [
+      {
+        "path": "index.json",
+        "kind": "index",
+        "sha256": "55f5794294c5e69351ad11a5a38c7e157bf4d733219268fb3c49cf5b4cb9f1d1",
+        "bytes": 1831
+      },
+      {
+        "path": "archive.json",
+        "kind": "archive",
+        "sha256": "5118a8a95bdda1493421d07b32ceb69540997b990c406cc56fea80f96b6e28bf",
+        "bytes": 1842
+      },
+      {
+        "path": "feed.json",
+        "kind": "feed",
+        "sha256": "41714bcb468a42b20ae02fcf0e79683febc8850496908d7780e647378520382d",
+        "bytes": 1440
+      },
+      {
+        "path": "reports/2026-08-01-daily.json",
+        "kind": "report",
+        "sha256": "394729f4ddbe97dca7a4d43017f596e6597dc7173e9a69d585ab9044e100bfa5",
+        "bytes": 2088
+      }
+    ],
+    "report_count": 1
+  }
+}

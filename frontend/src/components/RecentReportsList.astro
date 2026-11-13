@@ -1,0 +1,57 @@
+---
+import { dict } from '../i18n/zh-CN';
+import type { Summary } from '../lib/data/types';
+import { cadenceLabel, expiryLabel, expiryLabelText, formatCalendarDate } from '../lib/format';
+import ValidityBadge from './ValidityBadge.astro';
+
+export interface Props {
+  recent: Summary[];
+  evaluatedAt: string;
+}
+
+const { recent, evaluatedAt } = Astro.props;
+const BASE = import.meta.env.BASE_URL;
+---
+
+<section class="recent-list" aria-labelledby="recent-heading">
+  <div class="surface-title">
+    <h2 id="recent-heading">{dict['recent.title']}</h2>
+    <p class="purpose">{dict['recent.purpose']}</p>
+  </div>
+  {
+    recent.length === 0 ? (
+      <p class="legacy-note">{dict['empty.noRecent']}</p>
+    ) : (
+      <ul class="report-list">
+        {recent.map((report) => {
+          const label = expiryLabel(report.expires_at, evaluatedAt);
+          const count =
+            report.final_recommendation_count === null
+              ? dict['common.unavailable']
+              : String(report.final_recommendation_count);
+          return (
+            <li class="recent-row">
+              <p class="row-meta">
+                <time datetime={report.as_of}>{formatCalendarDate(report.as_of)}</time>
+                <span>{cadenceLabel(report.cadence, dict)}</span>
+              </p>
+              <p class="row-title">
+                <a href={`${BASE}/${report.route}`}>{report.title['zh-CN']}</a>
+              </p>
+              <p class="row-meta">
+                <ValidityBadge
+                  state={label === 'expired' ? 'expired' : label === 'unknown' ? 'unknown' : 'current'}
+                  label={expiryLabelText(label, dict)}
+                  expiresAt={report.expires_at}
+                />
+              </p>
+              <p class="row-count">
+                {dict['meta.finalCount'].replace('{count}', count)}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    )
+  }
+</section>
