@@ -4,7 +4,7 @@ tier = "pipeline"
 upgrade_ring = "ring_c"
 allow_legacy = false
 artifact_contract = "docs/advisory-contract.md"
-snapshot_contract = "docs/architecture.md"
+snapshot_contract = "docs/system-design.md"
 
 [qsl.compat]
 bundle = "2026.07.1"
