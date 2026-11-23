@@ -34,7 +34,7 @@ jobs:
       FROZEN_GENERATED_AT: ${{ inputs.frozen_generated_at || '2026-07-15T00:00:00Z' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -63,7 +63,7 @@ jobs:
           echo "workspace=$(cat "$BUILD_ROOT/workspace-path.txt")" >> "$GITHUB_OUTPUT"
           echo "evidence=$BUILD_ROOT/build-evidence.json" >> "$GITHUB_OUTPUT"
       - name: Upload exact preview members
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qar-d3-preview-bundle
           path: |
@@ -73,7 +73,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
       - name: Upload build evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qar-d3-build-evidence
           path: ${{ steps.build.outputs.evidence }}
